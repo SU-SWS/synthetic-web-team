@@ -1,0 +1,577 @@
+# SWS source repos: inspected prior art
+#
+# Inspected 2026-08-10 by reading package.json on each repo's default branch,
+# then corrected by SWS review the same day.
+# Unlike live_exemplars in catalog.yml, these have READABLE SOURCE, so `era` is
+# verified rather than assumed.
+#
+# ==============================================================================
+# PRECEDENCE, ALL THREE CLAUSES (full version in README.md):
+#
+#   1. Prior art informs HOW we solved a problem shape. Standards decide WHAT
+#      to build with. A repo on Decanter 7 + Tailwind 3 is DATED: do not copy
+#      its CSS.
+#   2. Repeated identical choices are a CONVENTION worth adopting. cnbuilder
+#      ^3.1.0 pinned across seven repos is knowledge, not drift.
+#   3. But NEITHER tells you WHY a dependency is there, nor WHERE the org is
+#      heading. Both require asking a person.
+#
+# Clause 3 is not theoretical. This pass produced four proposed corrections to
+# our standards and THREE WERE WRONG:
+#
+#   - sa11y correlates PERFECTLY with Storyblok here (5/5 with, 6/6 without).
+#     I read the count and called it a developer a11y convention. It is a
+#     CONTENT-AUTHOR tool used in Visual Editor overlays. When a dependency
+#     correlates tightly with another, it probably belongs to that domain.
+#   - Cypress in 3 repos and Playwright in 0 looked decisive. SWS is moving to
+#     Playwright. Lockfiles record executed decisions, never intent.
+#   - sws-astro on Astro 6 looked like a constraint to adopt. The real answer
+#     was to stop naming versions in recipes at all.
+#
+# Full record, kept deliberately: standards/patterns/sws-conventions.md
+# ==============================================================================
+
+version: 1
+inspected: 2026-08-10
+corrected: 2026-08-10
+method: package.json on default branch via GitHub API, then SWS review
+
+# ------------------------------------------------------------------------------
+# WATCH THE DEFAULT BRANCH. It is not `main` for most of these.
+#   main -> sws-astro
+#   dev  -> adapt-stanford-homesite, adapt-online-giving, adapt-directory,
+#           ood-giving-campaign, ood-stanford-tour, ccc-bulletin
+#   1.x  -> cardinalsites-nextjs, csp-nextjs, sulgryphon-nextjs, summer-nextjs
+# Any prior-art pointer MUST carry an explicit ref or it silently reads the
+# wrong branch.
+#
+# NOTE ON VERSIONS BELOW: recorded as observed, for era classification only.
+# Recipes do not pin versions. See sws-conventions.md.
+# ------------------------------------------------------------------------------
+
+families:
+  astro-decanter8:
+    what: Astro with Decanter 8 and Tailwind 4. Newest, smallest, closest to astro-static.
+    members:
+      - sws-astro
+  storyblok-next-netlify:
+    what: >
+      Next + Storyblok + Netlify. The Office of Development / ADAPT family.
+      npm, cnbuilder, netlify-plugin-vault-variables for secrets, and sa11y in
+      the Visual Editor overlay for content authors.
+    members:
+      - adapt-stanford-homesite
+      - adapt-online-giving
+      - adapt-directory
+      - ood-giving-campaign
+      - ood-stanford-tour
+      - ccc-bulletin
+  decoupled-drupal:
+    what: >
+      Next + GraphQL against Drupal. yarn 4, --webpack (deliberately not
+      Turbopack), graphql-codegen, Algolia, clsx + tailwind-merge, .githooks.
+    members:
+      - cardinalsites-nextjs
+      - csp-nextjs
+      - sulgryphon-nextjs
+      - summer-nextjs
+
+repos:
+  # ============================================================ DECANTER 8 ERA
+  - name: sws-astro
+    url: https://github.com/SU-SWS/sws-astro
+    ref: main
+    family: astro-decanter8
+    era: decanter-8
+    rating: exemplary
+    stack:
+      framework: "astro ^6.4.4"
+      decanter: "github:SU-SWS/decanter#v8"
+      tailwind: "^4.3.0 via @tailwindcss/vite"
+      react: "^19.2.7 via @astrojs/react"
+      node: ">=22.12.0"
+      other:
+        - "@astrojs/sitemap"
+        - "@astrojs/check"
+        - cnbuilder
+        - motion
+        - heroicons
+        - number-flow
+    why_exemplary: >
+      SWS's own reference implementation of very nearly the stack the
+      astro-static recipe describes. When the recipe and this repo disagree,
+      investigate before assuming the recipe is right.
+    use_for:
+      - THE canonical reference for Astro + Decanter 8 + Tailwind 4 wiring
+      - Astro + React island composition
+      - eslint config for Astro projects via eslint-plugin-astro
+      - "`astro check` as the typecheck step"
+    do_not_use_for: []
+    notable:
+      - Installs Decanter from the v8 GIT BRANCH, not npm. Predates the npm publish.
+      - >
+        Runs Astro 6 while 7 is current. NOT a constraint to copy: SWS confirmed
+        Astro 7 is fine and that recipes should install latest.
+      - "Carries overrides.vite ^7.3.2, suggesting a known Vite resolution issue."
+      - No test harness of any kind. Not a testing reference.
+    priority: highest
+
+  - name: ccc-bulletin
+    url: https://github.com/SU-SWS/ccc-bulletin
+    ref: dev
+    family: storyblok-next-netlify
+    era: decanter-8
+    rating: exemplary
+    stack:
+      framework: "next ^16.2.12"
+      decanter: "https://github.com/SU-SWS/decanter.git#v8"
+      tailwind: "^4.3.3 via @tailwindcss/postcss"
+      cms: "@storyblok/react ^6.1.11"
+      node: ">=22.0.0"
+      package_manager: "yarn@4.12.0"
+      other:
+        - cnbuilder
+        - tailwind-merge
+        - "sa11y ^5.0.9 (author-facing; Visual Editor overlay)"
+        - motion
+        - MUI 9
+        - zod
+        - netlify blobs/edge/functions
+        - Cypress 15
+        - BackstopJS
+    why_exemplary: >
+      The only Next + Decanter 8 + Tailwind 4 project in the set, and therefore
+      THE reference for the next-static recipe. Also the most complete testing
+      setup after the homesite.
+    use_for:
+      - Next + Decanter 8 + Tailwind 4 via "@tailwindcss/postcss"
+      - Storyblok at a current version, "@storyblok/react 6.x"
+      - Visual regression via BackstopJS, the only example in the set
+      - >
+        sa11y 5.x in the Visual Editor overlay, giving CONTENT AUTHORS
+        accessibility feedback while they edit. This is the only control in the
+        whole system that addresses content published after launch.
+    do_not_use_for: []
+    notable:
+      - Also installs Decanter from the git v8 branch.
+      - Mixes MUI with Decanter. Understand why before copying.
+      - yarn 4 despite sitting in the Storyblok family, which usually uses npm.
+    priority: highest
+
+  # ======================================================= DECANTER 7, CURRENT
+  - name: adapt-stanford-homesite
+    url: https://github.com/SU-SWS/adapt-stanford-homesite
+    ref: dev
+    family: storyblok-next-netlify
+    era: decanter-derived
+    lineage: >
+      NOT a Decanter consumer. Its own design system, heavily derived from
+      Decanter, and currently INFLUENCING Decanter 8. Confirmed by SWS.
+    influences: decanter-8
+    rating: exemplary
+    live: https://www.stanford.edu/
+    stack:
+      framework: "next ^16.0.0"
+      decanter: >
+        NOT A DEPENDENCY BY DESIGN. Derived design system. See lineage.
+      tailwind: "^4.2.1 via @tailwindcss/postcss"
+      cms: "@storyblok/react ^5.4.18"
+      node: ">=22.0.0"
+      package_manager: npm
+      other:
+        - "Storybook 10 + addon-a11y + nextjs-vite"
+        - Cypress 15
+        - Jest 29
+        - MSW
+        - "sa11y ^4.3.5 (author-facing)"
+        - FontAwesome Pro
+        - maplibre
+        - "@google-cloud/discoveryengine"
+        - "@google/genai"
+        - "@netlify/plugin-csp-nonce"
+        - netlify-plugin-vault-variables
+    why_exemplary: >
+      This is www.stanford.edu. The most scrutinised Stanford web property and
+      by far the most complete engineering setup in the set: Storybook with the
+      a11y addon, Cypress e2e and component, Jest, MSW mocking, CSP nonces, and
+      Vault-managed secrets.
+    use_for:
+      - >
+        THE reference for testing and QA rigour, at the scale of a flagship
+        property. Read it for what thorough looks like, not as a shopping list:
+        this project deliberately does NOT adopt a component workshop, since
+        most unit sites have a handful of components and one consumer.
+      - >
+        Global Footer and Identity Bar as shipped on the canonical site. Brand
+        furniture is authoritative here regardless of the design system lineage,
+        because brand is brand.
+      - CSP implementation via "@netlify/plugin-csp-nonce"
+      - Secrets via HashiCorp Vault rather than env files
+      - AI-adjacent search via Google discoveryengine + genai, relevant to GEO
+      - >
+        A preview of where Decanter 8 is heading, since patterns here are
+        feeding back into it.
+    do_not_use_for:
+      - >
+        FontAwesome Pro. Licence-gated with a preinstall token check, and
+        Decanter recommends heroicons. Do not propagate it to unit sites.
+      - >
+        Decanter conformance. Its tokens and CSS are a PARALLEL VOCABULARY, not
+        Decanter's. Copying them into a Decanter 8 project produces something
+        that looks approximately right and does not use the design system.
+    notable:
+      - >
+        ANSWERED (SWS, 2026-08-10): no `decanter` dependency is deliberate. This
+        is its own design system, heavily derived from Decanter, and it is
+        currently influencing Decanter 8. It sits UPSTREAM of the design system,
+        not downstream of it.
+      - >
+        Therefore `era` does not apply in the usual linear sense. See the
+        lineage note in README.md: newer is not automatically better, and this
+        repo can be simultaneously ahead of Decanter 8 and incompatible with it.
+      - Storybook build is conditional on $NETLIFY and published to /storybook.
+    priority: highest
+
+  - name: adapt-online-giving
+    url: https://github.com/SU-SWS/adapt-online-giving
+    ref: dev
+    family: storyblok-next-netlify
+    era: decanter-7
+    rating: sound
+    live: https://give.stanford.edu
+    stack:
+      framework: "next ^16.2.6"
+      decanter: "^7.4.0"
+      tailwind: "^3.4.18, with @tailwindcss/postcss ^4.2.1 also present"
+      cms: "@storyblok/react ^6.1.6"
+      node: ">=24.0.0"
+      package_manager: npm
+      other:
+        - Stripe
+        - "adapt-auth-sdk ^2.1.0"
+        - "@algolia/client-search"
+        - Upstash Redis
+        - "TanStack Form + Query"
+        - "react-email + Mailgun"
+        - "AWS S3/STS"
+        - Airtable
+        - zod
+        - zustand
+        - "sa11y ^4.4.1 (author-facing)"
+    use_for:
+      - Complex transactional form flows, the best form reference in the set
+      - TanStack Form for validation-heavy forms
+      - Transactional email patterns via react-email
+    do_not_use_for:
+      - Any Low-risk static site's data handling. See the compliance note.
+    notable:
+      - >
+        COMPLIANCE: Stripe means PCI DSS scope, and adapt-auth-sdk means
+        authenticated users. This is High-risk-tier work. Never cite it as a
+        template for a Low-risk unit site.
+      - Only repo in the set on Node >=24. Everything else is >=22 or >=20.
+      - Declares both tailwind 3.4 and "@tailwindcss/postcss" 4.2. Mixed state.
+      - >
+        OPEN QUESTION: `adapt-auth-sdk` appears to be a private SWS package.
+        What does it wrap, and is it the sanctioned path for Stanford auth?
+
+  - name: adapt-directory
+    url: https://github.com/SU-SWS/adapt-directory
+    ref: dev
+    family: storyblok-next-netlify
+    era: decanter-7
+    rating: dated
+    stack:
+      framework: "next ^13.4.19"
+      decanter: "^7.1.1"
+      tailwind: "^3.3.5"
+      cms: none
+      node: unspecified
+      package_manager: npm
+      other:
+        - "@coveo/headless ^2.37"
+        - "@coveo/cli"
+        - "@coveo/push-api-client"
+        - MUI 5
+        - Redux Toolkit
+        - "adapt-auth-sdk ^1.0.20"
+        - Upstash ratelimit
+        - Cypress 13
+        - Jest 29
+        - cnbuilder
+    use_for:
+      - >
+        THE Coveo reference. Extensive CLI workflow for org resource pull/push,
+        index seeding, key generation, and identity sync. Nothing else in the
+        set covers Coveo.
+      - >
+        Directory and people-search patterns, plus a megaprofile pipeline that
+        turns OpenAPI into TS types and enum options.
+      - Mock server pattern for local dev against an unavailable API.
+    do_not_use_for:
+      - >
+        Anything current. Next 13, Decanter 7.1, Tailwind 3.3, MUI 5, Redux.
+        Read the Coveo scripts and ignore the rest.
+    notable:
+      - Oldest stack in the set. Rated dated for that reason, not for quality.
+      - >
+        No Storyblok and no sa11y. This is the datapoint that confirms the
+        sa11y/Storyblok correlation and the author-facing reading.
+      - Stanford GSB org names are hardcoded in npm scripts.
+
+  - name: ood-giving-campaign
+    url: https://github.com/SU-SWS/ood-giving-campaign
+    ref: dev
+    family: storyblok-next-netlify
+    era: decanter-7
+    rating: sound
+    live: https://momentum.stanford.edu/
+    description_in_repo: Momentum
+    stack:
+      framework: "next ^14.2.35"
+      decanter: "^7.4.0"
+      tailwind: "^3.4.17"
+      cms: "@storyblok/react ^3.0.15"
+      node: ">=22.0.0"
+      package_manager: npm
+      other:
+        - framer-motion
+        - "sa11y ^4.1.1 (author-facing)"
+        - Typeform embed
+        - headlessui
+        - heroicons
+    use_for:
+      - Campaign microsite structure, close in scope to typical astro-static use
+      - Storyblok content modelling for a campaign site
+    do_not_use_for:
+      - CSS setup
+      - dependency versions
+    notable:
+      - >
+        Pairs with the momentum.stanford.edu live exemplar. Source plus rendered
+        output for the same site is the most useful prior-art pairing available.
+      - "@storyblok/react 3.x is several majors behind ccc-bulletin's 6.x."
+
+  - name: ood-stanford-tour
+    url: https://github.com/SU-SWS/ood-stanford-tour
+    ref: dev
+    family: storyblok-next-netlify
+    era: decanter-7
+    rating: sound
+    live: https://openminds.stanford.edu/
+    description_in_repo: Open Minds
+    stack:
+      framework: "next ^14.2.35"
+      decanter: "^7.3.1"
+      tailwind: not declared directly
+      cms: "@storyblok/react ^3.0.15"
+      node: ">=20.0.0"
+      package_manager: npm
+      other:
+        - framer-motion
+        - "sa11y ^4.1.1 (author-facing)"
+        - Typeform embed
+    use_for:
+      - >
+        Small editorial-leaning program site, near-identical in shape to
+        ood-giving-campaign. Comparing the two shows the house pattern.
+    do_not_use_for:
+      - CSS setup
+      - dependency versions
+    notable:
+      - Lowest Node floor in the set at >=20.
+      - Pairs with the openminds.stanford.edu live exemplar.
+
+  # ================================================== DECOUPLED DRUPAL FAMILY
+  - name: cardinalsites-nextjs
+    url: https://github.com/SU-SWS/cardinalsites-nextjs
+    ref: 1.x
+    family: decoupled-drupal
+    era: decanter-7
+    rating: exemplary
+    stack:
+      framework: "next 16.2.10, run with --webpack"
+      decanter: "^7.4.0"
+      tailwind: "^3.4.19"
+      cms: "Drupal via graphql-request + graphql-codegen"
+      package_manager: "yarn@4.17.1"
+      other:
+        - "passport-saml ^3.2.4"
+        - xml-encryption
+        - jose
+        - node-vault
+        - algoliasearch
+        - react-instantsearch
+        - react-instantsearch-nextjs
+        - "@base-ui/react"
+        - plaiceholder
+        - sharp
+    why_exemplary: >
+      The headless Stanford Sites front end, and the only SAML implementation in
+      the set. Reference for both decoupled Drupal and Stanford authentication,
+      which makes it the key input to the v2 identity work.
+    use_for:
+      - THE Drupal decoupling reference. GraphQL codegen setup and query patterns
+      - THE SAML reference. passport-saml plus xml-encryption plus jose
+      - Algolia with Next App Router via react-instantsearch-nextjs
+      - Vault-based secret retrieval with node-vault
+    do_not_use_for:
+      - CSS setup
+      - Tailwind 3 patterns
+    notable:
+      - >
+        package.json `name` is `decoupled-cardinalsites`, identical to
+        csp-nextjs, which is an intentional sibling instance for a different
+        client. See that entry.
+      - >
+        Deliberately runs --webpack, opting OUT of Turbopack. All four repos in
+        this family do. Ask why before recommending Turbopack anywhere.
+    priority: high
+
+  - name: csp-nextjs
+    url: https://github.com/SU-SWS/csp-nextjs
+    ref: 1.x
+    family: decoupled-drupal
+    era: decanter-7
+    rating: sound
+    stack:
+      framework: "next 16.2.10, run with --webpack"
+      decanter: "^7.4.0"
+      tailwind: "^3.4.19"
+      package_manager: "yarn@4.17.1"
+      other:
+        - same dependency set as cardinalsites-nextjs
+        - "@vercel/speed-insights"
+    relationship:
+      type: sibling-instance
+      of: cardinalsites-nextjs
+      why: >
+        INTENTIONAL (SWS, 2026-08-10). Two sites for two different clients.
+        csp-nextjs was created by copying cardinalsites-nextjs. Not divergence
+        to reconcile, and both are citable.
+    use_for:
+      - Same as cardinalsites-nextjs
+      - >
+        The clearest example of the copy-fork pattern SWS uses to start a new
+        client site from an existing one. See sws-conventions.md.
+    do_not_use_for:
+      - CSS setup
+      - Tailwind 3 patterns
+    notable:
+      - >
+        Same package `name` as cardinalsites-nextjs, same dependency set,
+        differing only by "@vercel/speed-insights" and a couple of patch
+        versions. This is expected, not a problem.
+      - >
+        Despite the repo name, no CSP-specific dependency is present. CSP work
+        in this org appears in adapt-stanford-homesite via
+        "@netlify/plugin-csp-nonce" instead. The name likely refers to the
+        client, not to Content Security Policy.
+
+  - name: sulgryphon-nextjs
+    url: https://github.com/SU-SWS/sulgryphon-nextjs
+    ref: 1.x
+    family: decoupled-drupal
+    era: decanter-7
+    rating: sound
+    live: https://library.stanford.edu
+    stack:
+      framework: "next ^16.0.10, run with --webpack"
+      decanter: "^7.4.0"
+      tailwind: "^3.4.19"
+      cms: "Drupal via next-drupal ^2.0.0 and graphql-request"
+      package_manager: "yarn@4.9.2"
+      other:
+        - react-aria
+        - react-stately
+        - "@formkit/auto-animate"
+        - jsona
+        - react-obfuscate-email
+        - "@tailwindcss/typography"
+    use_for:
+      - >
+        Accessibility-forward component work. The only repo using react-aria and
+        react-stately, which is a meaningful a11y signal.
+      - next-drupal as an alternative to hand-rolled GraphQL
+      - Email obfuscation, a recurring university requirement
+    do_not_use_for:
+      - CSS setup
+      - Tailwind 3 patterns
+    notable:
+      - >
+        package.json `name` is `basic-starter` and it is MIT licensed while
+        everything else is private. Suggests it began as a template.
+      - Pairs with the library.stanford.edu live exemplar.
+      - >
+        react-aria here, "@base-ui/react" in cardinalsites, MUI in ccc-bulletin,
+        headlessui in the ADAPT family. There is no house headless library.
+
+  - name: summer-nextjs
+    url: https://github.com/SU-SWS/summer-nextjs
+    ref: 1.x
+    family: decoupled-drupal
+    era: decanter-7
+    rating: sound
+    stack:
+      framework: "next 16.2.12, run with --webpack"
+      decanter: "^7.4.0"
+      tailwind: "^3.4.19"
+      package_manager: "yarn@4.9.2"
+      other:
+        - algoliasearch
+        - react-instantsearch
+        - react-instantsearch-router-nextjs
+        - react-cookiebot
+        - react-zendesk
+        - react-toastify
+        - react-youtube
+    use_for:
+      - Algolia with URL-synced routing via react-instantsearch-router-nextjs
+      - "Third-party embed patterns: Zendesk and YouTube"
+    do_not_use_for:
+      - CSS setup
+      - Tailwind 3 patterns
+      - >
+        Cookie consent. DO NOT cite react-cookiebot as a pattern, a precedent,
+        or a recommendation. See below.
+    notable:
+      - >
+        ANSWERED (SWS, 2026-08-10): `react-cookiebot` is present because the
+        CLIENT REQUIRED IT for this specific site. Stanford centrally licenses
+        NO cookie banner service. This is a documented one-off, not a pattern.
+      - >
+        Guidance when consent management comes up: no banner is required, do not
+        hand-roll one, and DO NOT NAME A VENDOR. Route the person to the
+        University Privacy Office. See the "route, don't recommend" principle in
+        the project plan.
+
+# ==============================================================================
+# ANSWERED (SWS, 2026-08-10)
+#
+# A1. www.stanford.edu does not consume Decanter. It is its own design system,
+#     heavily derived from Decanter, and it is currently INFLUENCING Decanter 8.
+#     Consequence: `era` is not a linear timeline. Some work sits upstream of
+#     the design system. See the lineage section in README.md.
+#
+# A2. cardinalsites-nextjs and csp-nextjs are intentional sibling instances,
+#     two clients, one copied from the other. Both citable. Also the clearest
+#     example of the copy-fork pattern this project is trying to improve on
+#     rather than replace. See sws-conventions.md.
+#
+# A3. summer-nextjs uses Cookiebot because the CLIENT required it. Stanford
+#     centrally licenses no cookie banner service. Documented one-off, not a
+#     pattern. Never name a consent vendor; route to the Privacy Office.
+#
+# STILL OPEN
+#
+# 1. `adapt-auth-sdk` is referenced at ^1.0.20 and ^2.1.0 but is not public.
+#    What does it wrap, and is it the sanctioned path for Stanford auth?
+# 2. All four decoupled-drupal repos pin `--webpack`, opting out of Turbopack.
+#    Is that a known issue we should document?
+# 3. Headless component libraries are inconsistent: react-aria, @base-ui/react,
+#    MUI, headlessui. Is there an intended house choice? This is the layer where
+#    accessibility is usually won or lost.
+# 4. NEW, from A1: how should a unit site treat a pattern that exists on
+#    www.stanford.edu but not yet in Decanter 8? Wait for it to land, or adopt
+#    early and risk a parallel vocabulary?
+# ==============================================================================

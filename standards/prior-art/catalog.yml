@@ -1,0 +1,408 @@
+# SWS prior-art catalog
+#
+# Curated pointers to existing Stanford Web Services work. NO CODE lives here,
+# only metadata and file paths. The agent fetches referenced files on demand.
+#
+# The value of this file is JUDGMENT: which implementation is the good one.
+# Automated search can find code; only this file can say "copy this one" or
+# "everyone copies this and shouldn't."
+#
+# ==============================================================================
+# PRECEDENCE: prior art informs HOW we solved a problem shape.
+#             Standards decide WHAT to build with. Standards always win.
+#             See README.md.
+# ==============================================================================
+#
+# `era` is mandatory on every entry. It tells the agent what NOT to borrow:
+#   decanter-6   SCSS/BEM. Borrow structure and content decisions only.
+#   decanter-7   Tailwind 3 JS preset. Never borrow CSS setup or config.
+#   decanter-8   Tailwind 4 CSS-first. Current. Safe to borrow more freely.
+#   pre-decanter Historical. Borrow IA and editorial thinking only.
+#
+# `rating` is the curator's call:
+#   exemplary    Copy the approach. This is how we do it.
+#   sound        Fine reference, nothing special.
+#   dated        Good thinking, superseded execution. Read, don't copy.
+#   cautionary   Known problems. Recorded so people stop copying it.
+#
+# `use_for` / `do_not_use_for` are the actionable fields. Be specific.
+
+version: 1
+updated: 2026-08-10
+maintainers:
+  - sheamck@stanford.edu
+sources:
+  - name: Awesome-Decanter
+    url: https://github.com/SU-SWS/Awesome-Decanter
+    harvested: 2026-08-10
+    note: >
+      Upstream curated list. When it gains entries, re-harvest rather than
+      duplicating maintenance. Our added value over it is era, rating, and the
+      use_for / do_not_use_for split, none of which the awesome list carries.
+
+# ------------------------------------------------------------------------------
+# SOURCE REPOS
+#
+# Ratings marked TBD must come from the people who built and maintain these.
+# Do not ship this file with `rating: TBD` entries still present.
+#
+# Upstream source for the live exemplars and tools sections:
+# https://github.com/SU-SWS/Awesome-Decanter  (harvested 2026-08-10)
+# ------------------------------------------------------------------------------
+
+repos:
+  - name: decanter
+    url: https://github.com/SU-SWS/decanter
+    visibility: public
+    era: decanter-8
+    rating: exemplary
+    what: The Stanford design system itself. Tailwind 4 CSS-first as of v8.
+    use_for:
+      - Canonical token names, spacing scale, type scale, color roles
+      - Component CSS conventions in src/css/components/
+      - The custom variants in src/css/custom-variants.css
+    do_not_use_for:
+      - Anything on the `main` branch, which is still v7 and Tailwind 3
+    pointers:
+      - path: src/css/theme/colors.css
+        ref: v8
+        note: All Stanford Identity colors as CSS custom properties
+      - path: src/css/index.css
+        ref: v8
+        note: The five-line entry point. Shows that Decanter imports Tailwind itself
+      - path: src/css/components/
+        ref: v8
+        note: How SWS writes component CSS in the v8 era
+
+  - name: stanford_basic
+    url: https://github.com/SU-SWS/stanford_basic
+    visibility: public
+    era: decanter-6
+    rating: cautionary
+    what: Drupal theme behind Stanford Sites.
+    use_for:
+      - Drupal-specific older Decanter (V6) component markup and CSS
+    do_not_use_for:
+      - Any new work. Last pushed 2021, predates v7 and v8 entirely. Listed explicitly so nobody adopts it by finding it in search.
+
+  - name: jumpstart_ui
+    url: https://github.com/SU-SWS/jumpstart_ui
+    visibility: public
+    era: decanter-6
+    rating: cautionary
+    what: Drupal component library.
+    use_for:
+      - Component inventory: what components a Stanford unit site actually needs
+    do_not_use_for:
+      - Implementation, if the era predates Decanter 8
+
+  - name: decanter-web
+    url: https://github.com/SU-SWS/decanter-web
+    visibility: public
+    era: decanter-7
+    rating: sound
+    what: The decanter.stanford.edu documentation site.
+    use_for:
+      - How SWS documents a design system
+      - Content structure for a docs-style Stanford site
+      - Example markup for Decanter components, but only for v7. The v8 docs are not yet published.
+    do_not_use_for:
+      - Anything v8, since the docs still describe v7
+    open_question: >
+      Revisit as a dependency once it supports v8. The docs are still v7, but
+      it will change once the v8 docs are published.
+
+  - name: decanter-react
+    url: https://github.com/SU-SWS/decanter-react
+    visibility: public
+    era: decanter-7
+    rating: cautionary
+    what: React component library for Decanter.
+    use_for:
+      - Historical reference for component API shape only
+    do_not_use_for:
+      - Any new work. Last pushed 2021, predates v7 and v8 entirely.
+        Listed explicitly so nobody adopts it by finding it in search.
+
+  - name: decanter-mcp
+    url: https://github.com/SU-SWS/decanter-mcp
+    visibility: private
+    era: decanter-7
+    rating: dated
+    what: Hosted MCP server for Decanter.
+    use_for:
+      - Reference when we build @su-sws/mcp
+    do_not_use_for:
+      - Decanter 8 or Tailwind 4 questions, per SWS guidance
+    open_question: Revisit as a dependency once it supports v8.
+
+# ==============================================================================
+# LIVE EXEMPLARS
+#
+# Harvested from https://github.com/SU-SWS/Awesome-Decanter on 2026-08-10.
+#
+# READ THIS BEFORE USING THESE ENTRIES:
+#
+# These are URLs, not repos. For most there is no public source, so they are
+# references for rendered output: page furniture, IA, content patterns, and
+# Decanter usage in the wild. They are NEVER references for build config,
+# dependency versions, component source, or CSS architecture.
+#
+# `era: unverified` on every entry is deliberate and honest. A rendered page
+# gives no reliable signal about which Decanter version produced it, and none
+# of these has been inspected yet. Until someone does the inspection pass,
+# the precedence rule applies at full strength: borrow problem shapes, never
+# implementation.
+#
+# `use_for` below is INFERRED from each site's evident purpose, not from
+# inspection. Treat it as a starting hypothesis for the Phase 1 pass, which
+# should confirm or correct it and replace `rating: TBD` with a real call.
+# ==============================================================================
+
+live_exemplars:
+  # ---------------------------------------------------------- brand canonical
+  - name: Stanford Homesite
+    url: https://www.stanford.edu/
+    kind: live
+    repo: https://github.com/SU-SWS/adapt-stanford-homesite
+    repo_ref: dev
+    era: decanter-derived
+    lineage: >
+      Own design system, derived from Decanter, currently influencing Decanter 8.
+      See repos.yml for the full entry.
+    rating: exemplary
+    why_exemplary: >
+      The canonical source for the Stanford Identity Bar and Global Footer.
+      When our fragment and this page disagree, this page is right.
+    use_for:
+      - Global Footer link set, order, labels, and targets
+      - Identity Bar markup and placement
+      - The central Cookie Policy and Privacy Policy this project links to
+    do_not_use_for:
+      - >
+        Decanter conformance. Its tokens and CSS are a parallel vocabulary, not
+        Decanter's. Brand furniture yes, design system no.
+    priority: highest
+
+  - name: Emergency
+    url: https://emergency.stanford.edu
+    kind: live
+    repo: https://github.com/SU-SWS/adapt-emergency
+    era: decanter-7
+    rating: exemplary
+    use_for:
+      - Crisis communication patterns, performance under load, minimal payload
+      - It is also a required Global Footer link target, so it is worth knowing
+    do_not_use_for: [implementation]
+
+  # ------------------------------------------------------- large school sites
+  - name: Stanford Engineering
+    url: https://engineering.stanford.edu
+    kind: live
+    repo: unknown
+    era: decanter-6
+    rating: dated
+    use_for:
+      - Large school IA, an alternative solution to the same problem as Doerr.
+        Comparing the two is more instructive than reading either alone
+    do_not_use_for: [implementation]
+
+  - name: Stanford Libraries
+    url: https://library.stanford.edu
+    kind: live
+    repo: https://github.com/SU-SWS/sulgryphon-nextjs
+    era: decanter-7
+    rating: sound
+    use_for:
+      - Search-forward IA, very large content volume, complex taxonomy
+      - Likely the best reference for search integration patterns
+    do_not_use_for: [implementation]
+
+  # --------------------------------------------------- editorial and news
+  - name: Stanford Report
+    url: https://news.stanford.edu/
+    kind: live
+    repo: unknown
+    era: decanter-7
+    rating: sound
+    use_for:
+      - Editorial and article patterns, bylines, topic taxonomy, archive IA
+      - Highest-volume content model at Stanford. Best news reference
+    do_not_use_for: [implementation]
+
+  - name: Stanford University Press
+    url: https://sup.org/
+    kind: live
+    repo: https://github.com/SU-SWS/press-nextjs
+    era: decanter-7
+    rating: sound
+    use_for:
+      - Decanter applied on a NON-stanford.edu domain, which is a MinWeb case
+        worth understanding since the standards still apply
+      - Catalog and commerce-adjacent patterns
+    do_not_use_for: [implementation]
+    note: >
+      MinWeb explicitly covers Stanford-branded .org and .com sites. This is a
+      live example of that scenario.
+
+  # ------------------------------------------------- conversion and campaign
+  - name: Stanford Alumni
+    url: https://alumni.stanford.edu
+    kind: live
+    repo: https://github.com/SU-SWS/saa-alumni
+    era: decanter-7
+    rating: exemplary
+    use_for: [Membership and community IA, authenticated-adjacent journeys]
+    do_not_use_for: [implementation]
+
+  - name: Giving to Stanford
+    url: https://giving.stanford.edu
+    kind: live
+    repo: https://github.com/SU-SWS/adapt-giving
+    era: decanter-7
+    rating: exemplary
+    use_for: [Conversion-oriented IA and campaign landing patterns]
+    do_not_use_for: [implementation]
+
+  - name: Online Giving
+    url: https://give.stanford.edu
+    kind: live
+    repo: https://github.com/SU-SWS/adapt-online-giving
+    era: decanter-7
+    rating: exemplary
+    use_for:
+      - Transactional form flows, which is the best available Decanter form
+        reference and directly relevant to `standards/patterns/forms.md`
+    do_not_use_for: [implementation]
+    note: >
+      Almost certainly a Moderate-or-higher risk tier. Do not treat its data
+      handling as a template for a Low-risk static site.
+
+  - name: Stanford Engineering Centennial
+    url: https://engineering100.stanford.edu/
+    kind: live
+    repo: https://github.com/SU-SOE/soe-centennial-nextjs
+    era: decanter-7
+    rating: exemplary
+    use_for:
+      - Campaign microsite scope, which is the closest match to what most
+        `astro-static` users are actually building
+    do_not_use_for: [implementation]
+    priority: high
+
+  # ----------------------------------------------------- program and project
+  - name: CRAFT
+    url: https://craft.stanford.edu/
+    kind: live
+    repo: unknown
+    era: decanter-7
+    rating: sound
+    use_for: [Small program site scope and structure]
+    do_not_use_for: [implementation]
+    priority: high
+
+  - name: Momentum
+    url: https://momentum.stanford.edu/
+    kind: live
+    repo: https://github.com/SU-SWS/ood-giving-campaign
+    era: decanter-7
+    rating: exemplary
+    use_for: [Small program or initiative site scope]
+    do_not_use_for: [implementation]
+    priority: high
+
+  - name: Open Minds
+    url: https://openminds.stanford.edu/
+    kind: live
+    repo: https://github.com/SU-SWS/ood-stanford-tour
+    era: decanter-7
+    rating: exemplary
+    use_for: [Small program site, editorial-leaning]
+    do_not_use_for: [implementation]
+
+  - name: Redwood City
+    url: https://redwoodcity.stanford.edu
+    kind: live
+    repo: unknown
+    era: decanter-6
+    rating: cautionary
+    use_for: [Place and campus site IA, wayfinding, maps integration]
+    do_not_use_for: [implementation]
+
+  # ------------------------------------------------------ search and discovery
+  - name: Course Discovery (GSE)
+    url: https://coursediscovery.gse.stanford.edu/
+    kind: live
+    repo: unknown
+    era: decanter-7
+    rating: dated
+    use_for:
+      - Faceted search and filter UI, results patterns, empty states
+      - Most relevant reference for the Algolia or Coveo decision
+    do_not_use_for: [implementation]
+    priority: low
+
+  # ------------------------------------------------------- third-party platform
+  - name: Stanford Events Calendar
+    url: https://events.stanford.edu
+    kind: live
+    repo: unknown
+    era: decanter-6
+    rating: cautionary
+    platform: Localist (SaaS)
+    use_for:
+      - Decanter applied as a skin over a third-party SaaS platform, which is a
+        recurring SWS problem and a documented MinWeb scenario where the
+        vulnerability and accessibility burden shifts to the unit
+      - Event content modelling
+    do_not_use_for:
+      - Implementation, and specifically do not infer that SaaS theming is the
+        default answer. MinWeb warns about the burden it transfers
+
+# ==============================================================================
+# THEMES, TOOLS, FRAMEWORKS
+# Also harvested from Awesome-Decanter. Provenance varies and matters.
+# ==============================================================================
+
+tools:
+  - name: Redwood (WordPress theme)
+    url: https://drive.google.com/file/d/1VWwgp0pWy6pANO-i7LBSFJr-U1khhQWp/view
+    era: decanter-6
+    rating: cautionary
+    why: >
+      Distributed as a Google Drive file rather than a versioned package or
+      repo. That means no version history, no changelog, no dependency
+      metadata, and no way for us to check its era or its Decanter version.
+      Usable as a reference if someone must build Stanford WordPress, but it
+      cannot participate in any automated check and should not be recommended
+      as a supported path.
+    use_for: [WordPress-specific Decanter application, if unavoidable]
+    do_not_use_for: [Anything we can verify or check]
+
+  - name: Backdrop Decanter theme (v6)
+    url: https://github.com/borisay/backdrop_decanter
+    era: decanter-6
+    rating: dated
+    provenance: community, outside SU-SWS
+    use_for: [Historical reference only]
+    do_not_use_for: [New work. Decanter 6 was SCSS/BEM]
+
+  - name: Backdrop Decanter theme (v7)
+    url: https://github.com/backdrop-contrib/stanford_decanter
+    era: decanter-7
+    rating: sound
+    provenance: community, outside SU-SWS (backdrop-contrib)
+    use_for: [Reference for porting Decanter into a non-Drupal CMS]
+    do_not_use_for: [Decanter 8 or Tailwind 4 questions]
+    note: >
+      Not SWS-maintained. Flag the external provenance whenever this is cited,
+      since users will reasonably assume everything in Awesome-Decanter is ours.
+
+  - name: Decanter MCP
+    url: https://decanter-mcp.netlify.app
+    era: decanter-7
+    rating: dated
+    provenance: SU-SWS, source repo private
+    use_for: [Reference when building @su-sws/mcp]
+    do_not_use_for: [Decanter 8 or Tailwind 4, per SWS guidance]
+

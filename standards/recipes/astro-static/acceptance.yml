@@ -1,0 +1,539 @@
+# Acceptance criteria for recipe: astro-static
+#
+# This file is the contract. Because we ship recipes rather than starter code,
+# these criteria are the only thing standing between "the agent generated
+# something" and "the agent generated something compliant."
+#
+# Rules for this file:
+#   1. Every criterion MUST map to an implemented check in standards/checks/.
+#      A criterion with no check is a wish, not a requirement. Delete it or
+#      implement the check.
+#   2. severity: `block` is reserved for irreversible harm. Today that is
+#      exactly one thing: committed secrets. Everything else nags.
+#   3. `manual: true` criteria are reported as prompts, never as failures.
+#      They exist so the launch checklist is complete and honest.
+#   4. Every criterion carries a `mechanism:` describing HOW to verify it.
+#      Learned by executing this recipe: prose alone gets checks written
+#      wrong. "Nothing above the Identity Bar" was implemented as string
+#      slicing and produced a false FAIL on a correct site. Criteria that
+#      concern document structure MUST say "DOM position", not "appears
+#      before".
+#   5. Any check that can fail to execute (needs a browser, a network, a
+#      built artifact) MUST be able to report `unknown`. `unknown` is never
+#      counted as a pass and never contributes to the score. Learned the
+#      same way: a harness where axe silently failed to load still printed
+#      "0 violations", which is a report that lies.
+
+# Result states: pass | fail | unknown | acknowledged | not_applicable
+
+recipe: astro-static
+version: 1
+standard:
+  accessibility: WCAG 2.1 AA
+  policy_refs:
+    - minweb
+    - minsec/applications/low
+    - accessibility
+    - minpriv
+
+criteria:
+  # ---------------------------------------------------------------- brand
+  - id: footer.global.present
+    requires: Stanford Global Footer is present on every rendered page.
+    check: footer
+    severity: warn
+    weight: 5
+    policy: brand
+
+  - id: footer.global.exact
+    requires: >
+      Global Footer link set matches the canonical contract exactly: same
+      links, same order, same grouping, no additions, no removals, no altered
+      labels or targets.
+    check: footer
+    severity: warn
+    weight: 5
+    policy: brand
+    contract: standards/fragments/global-footer.yml
+    mechanism: >
+      Read the contract file; do not hardcode the link set. The links are in
+      TWO lists inside one <nav>, four then six, not a flat list of ten.
+      Report each mismatch individually: "Trademarks points at the wrong URL"
+      is actionable, "the footer is wrong" is not.
+    note: >
+      Highest-value automated check in the system. Contract extracted from the
+      upstream decanter-web component on 2026-08-10 and no longer blocked.
+
+  - id: brand.identity-bar.present
+    requires: Stanford Identity Bar is present on every rendered page.
+    check: identity
+    severity: warn
+    weight: 4
+    policy: brand
+
+  - id: brand.identity-bar.nothing-above
+    requires: >
+      Nothing precedes the Identity Bar in the document except a skip
+      navigation link.
+    check: identity
+    severity: warn
+    weight: 3
+    policy: brand
+    mechanism: >
+      DOM POSITION, not string order. Parse the built HTML, take the element
+      children of <body>, and require that the Identity Bar is at index 0, or
+      at index 1 where index 0 is the skip link. Do NOT implement by slicing
+      the raw HTML between <body> and the identity bar's id: that produces
+      false failures on correct markup, which is exactly what happened when
+      this recipe was first validated.
+
+  - id: brand.local-footer-separation
+    requires: Unit-specific links appear in a local footer, not inside the Global Footer.
+    check: footer
+    severity: warn
+    weight: 2
+    policy: brand
+
+  # ---------------------------------------------------------- accessibility
+  - id: a11y.axe.routes
+    requires: >
+      Zero axe-core violations tagged wcag2a, wcag2aa, wcag21a, or wcag21aa
+      on every route in the built output.
+    check: a11y
+    severity: warn
+    weight: 10
+    policy: accessibility
+    mechanism: >
+      Requires a REAL BROWSER. Run axe-core via @axe-core/playwright against
+      the built output. axe does not run reliably in a DOM shim; attempting it
+      produces a silent no-op.
+    reports_unknown_when: >
+      Chromium is unavailable, the build output is missing, or axe fails to
+      initialise. MUST report `unknown` with the reason, never `pass`. An
+      unknown a11y result withholds the full 10 points from the score rather
+      than awarding them.
+
+  - id: a11y.skiplink
+    requires: A skip navigation link is the first focusable element on every page.
+    check: a11y
+    severity: warn
+    weight: 3
+    policy: accessibility
+
+  - id: a11y.heading-order
+    requires: Exactly one h1 per page, and no skipped heading levels.
+    check: a11y
+    severity: warn
+    weight: 3
+    policy: accessibility
+
+  - id: a11y.image-alt
+    requires: Every img has an alt attribute; decorative images use alt="".
+    check: a11y
+    severity: warn
+    weight: 3
+    policy: accessibility
+
+  - id: a11y.lang
+    requires: The html element has a valid lang attribute.
+    check: a11y
+    severity: warn
+    weight: 2
+    policy: accessibility
+
+  - id: a11y.link-present
+    requires: >
+      An Accessibility link resolving to a barrier-reporting mechanism is
+      present, normally https://www.stanford.edu/site/accessibility
+    check: footer
+    severity: warn
+    weight: 4
+    policy: accessibility
+
+  - id: a11y.manual-checklist
+    requires: >
+      The manual WCAG 2.1 AA checklist has been completed and recorded.
+      Automation covers roughly 30 percent of issues per ODA guidance.
+    check: null
+    manual: true
+    severity: info
+    weight: 0
+    policy: accessibility
+
+  - id: a11y.oda-review-requested
+    requires: >
+      An ODA accessibility review has been requested ahead of launch, and the
+      date recorded in .sws/manifest.yml.
+    check: manifest
+    manual: true
+    severity: info
+    weight: 0
+    policy: accessibility
+    note: >
+      Pre-launch gate, and it needs lead time. Prompt for it during the project
+      rather than the week before go-live. Route per standards/policy/
+      escalation.md: launch means REVIEW, a build question means OFFICE HOURS,
+      anything else means the general contact. Offer one door, not three.
+
+  # -------------------------------------------------------------- decanter
+  - id: decanter.installed
+    requires: decanter resolves to a version in the 8.x line.
+    check: decanter
+    severity: warn
+    weight: 4
+    policy: patterns
+    mechanism: >
+      Read node_modules/decanter/package.json version, not the declared range
+      in the project's package.json. As of 2026-08-10 dist-tag `latest` is
+      7.4.0 and `alpha` is 8.0.0-alpha.1, so a bare `npm i decanter` yields
+      v7. When this fails, say which tag to use rather than just reporting the
+      version, because the fix is non-obvious.
+
+  - id: decanter.entry-css
+    requires: The entry CSS imports decanter.
+    check: decanter
+    severity: warn
+    weight: 4
+    policy: patterns
+
+  - id: decanter.no-js-config
+    requires: No tailwind.config.js or tailwind.config.mjs exists.
+    check: decanter
+    severity: warn
+    weight: 2
+    policy: patterns
+    note: Presence indicates a Decanter 7 mental model.
+
+  - id: decanter.no-dead-integration
+    requires: '@astrojs/tailwind is not a dependency.'
+    check: decanter
+    severity: warn
+    weight: 3
+    policy: patterns
+    note: Dead package. Appears to work, then fails.
+
+  - id: decanter.tailwind-major
+    requires: >
+      Every resolved tailwindcss in the dependency tree is 4.x, including
+      nested copies.
+    check: decanter
+    severity: warn
+    weight: 3
+    policy: patterns
+    mechanism: >
+      Check the WHOLE TREE, not just the top level. Installing the wrong
+      Decanter tag produces node_modules/decanter/node_modules/tailwindcss at
+      3.x underneath a top-level 4.x, which a top-level-only check reports as
+      passing while the build is wrong. Verified during recipe validation.
+      Also assert node_modules/decanter/package.json `main` is
+      src/css/index.css, since `tailwind.config.js` means v7.
+
+  # ------------------------------------------------------------ minweb core
+  - id: minweb.ownership
+    requires: >
+      A named business owner and a named technical web administrator, both with
+      valid Stanford affiliation and email, are discoverable in the footer or
+      on an About page, and recorded in .sws/manifest.yml.
+    check: ownership
+    severity: warn
+    weight: 5
+    policy: minweb
+
+  - id: minweb.no-secrets
+    requires: No credentials, API keys, or tokens are committed to the repository.
+    check: secrets
+    severity: block
+    weight: 10
+    policy: minweb
+    note: >
+      THE ONLY BLOCKING CRITERION IN THE SYSTEM. Justified because the harm is
+      irreversible once pushed and MinWeb names it explicitly.
+    mechanism: >
+      On a PULL REQUEST, blocking stops the leak from landing. On a PUSH TO
+      MAIN the commit is already in the remote's history, so blocking only
+      prevents publishing the credential on a public website. That is still
+      worth stopping, but the message must differ by context.
+      Trunk message must say, in this order: (1) rotate the credential now,
+      because it is already in git history and blocking the deploy does not
+      un-leak it, (2) then clean the history, (3) then push again. A failure
+      that only says "secret detected" teaches nothing and gets worked around.
+
+  - id: minweb.https-only
+    requires: >
+      No hardcoded http:// URLs to Stanford or first-party resources. Deploy
+      target enforces HTTPS with a live certificate.
+    check: hygiene
+    severity: warn
+    weight: 4
+    policy: minweb
+
+  - id: minweb.subdomain-approved
+    requires: >
+      The stanford.edu subdomain reflects the recognized unit name and is
+      approved by University Communications.
+    check: null
+    manual: true
+    severity: info
+    weight: 0
+    policy: minweb
+
+  - id: minweb.mfa-admin
+    requires: All administrative logins use MFA or SSO with MFA.
+    check: null
+    manual: true
+    severity: info
+    weight: 0
+    policy: minweb
+
+  - id: minweb.siteimprove
+    requires: >
+      The site is registered with Siteimprove, which is required for
+      public-facing Stanford sites, and the registration is recorded in
+      .sws/manifest.yml.
+    check: manifest
+    severity: warn
+    weight: 4
+    policy: minweb
+    note: Siteimprove is required. Google Analytics is not.
+
+  # --------------------------------------------------------------- privacy
+  - id: privacy.no-handrolled-consent
+    requires: >
+      No hand-rolled cookie consent banner. None is required at Stanford, and a
+      bespoke one implies a consent mechanism that does not exist while adding
+      an accessibility surface nobody maintains.
+    check: hygiene
+    severity: warn
+    weight: 2
+    policy: minpriv
+    mechanism: >
+      Detect consent-like UI authored IN THIS REPO: components combining cookie
+      or consent vocabulary with accept/reject affordances. Do NOT flag a
+      third-party consent package, which is covered by the next criterion.
+
+  - id: privacy.consent-tooling-declared
+    requires: >
+      If third-party consent tooling is present, it is recorded in
+      .sws/manifest.yml with the reason, and the University Privacy Office has
+      been consulted.
+    check: manifest
+    severity: info
+    weight: 0
+    policy: minpriv
+    note: >
+      Presence is LEGITIMATE. Stanford centrally licenses no cookie banner
+      service, but a client or funder may require one, as happened on
+      summer-nextjs. Undocumented presence is the only problem here.
+    mechanism: >
+      Detect known consent packages in the dependency tree. If found and not
+      declared in the manifest, prompt to record the reason. NEVER recommend or
+      rank a vendor: state the obligation and name the Privacy Office. See the
+      "route, don't recommend" principle in the project plan.
+
+  - id: privacy.notice-before-collection
+    requires: >
+      Any form or collection point carries a transparency notice before
+      collection, per MinPriv.
+    check: null
+    manual: true
+    severity: info
+    weight: 0
+    policy: minpriv
+
+  - id: privacy.dra-if-triggered
+    requires: >
+      If the site collects personal information or introduces third-party
+      services, a Data Risk Assessment is filed before deploy.
+    check: manifest
+    severity: warn
+    weight: 0
+    policy: minpriv
+    applies_when: tier != low
+
+  # --------------------------------------------------- discoverability
+  - id: seo.title-unique
+    requires: Every page has a non-empty title, unique across the site.
+    check: seo
+    severity: warn
+    weight: 3
+    policy: patterns
+
+  - id: seo.meta-description
+    requires: Every page has a non-empty meta description.
+    check: seo
+    severity: warn
+    weight: 2
+    policy: patterns
+
+  - id: seo.canonical
+    requires: >
+      Canonical URLs resolve to the production origin, which requires `site`
+      to be set in astro.config.mjs.
+    check: seo
+    severity: warn
+    weight: 3
+    policy: patterns
+
+  - id: seo.sitemap
+    requires: sitemap-index.xml is emitted and reachable.
+    check: seo
+    severity: warn
+    weight: 3
+    policy: patterns
+
+  - id: seo.robots
+    requires: robots.txt exists and references the sitemap.
+    check: seo
+    severity: warn
+    weight: 2
+    policy: patterns
+
+  - id: seo.robots-ai-sections
+    requires: >
+      robots.txt addresses AI crawlers explicitly rather than by omission,
+      distinguishing retrieval bots from training crawlers.
+    check: seo
+    severity: info
+    weight: 1
+    policy: patterns
+    note: >
+      Only ~8% of sites with robots.txt have any AI rules. Silence is a default,
+      not a decision. This prompts a decision; it does not prescribe one, since
+      whether to allow training crawlers is a unit policy call.
+
+  - id: seo.structured-data
+    requires: >
+      JSON-LD is present and valid for the appropriate type, normally
+      EducationalOrganization or Organization plus BreadcrumbList.
+    check: seo
+    severity: info
+    weight: 2
+    policy: patterns
+    note: >
+      FOR RICH RESULTS ONLY. Google states (May 2026) that no special markup is
+      needed to appear in generative AI features. Do not report this as an
+      AI-visibility measure, and do not let anyone claim AI credit for it.
+
+  - id: seo.canonical-facts-in-html
+    requires: >
+      Canonical facts (deadlines, tuition, program requirements, accreditation)
+      appear as HTML text, not only inside PDFs or JS-rendered components.
+    check: null
+    manual: true
+    severity: info
+    weight: 0
+    policy: patterns
+    note: >
+      One of the few evidence-backed discoverability practices: 44.2% of LLM
+      citations come from the first 30% of a document, and PDF-only facts are
+      invisible to both search and AI retrieval.
+
+  - id: seo.no-llms-txt-on-marketing
+    requires: >
+      No llms.txt on a marketing or unit site. It belongs on documentation
+      sites, for the IDE coding-agent audience.
+    check: seo
+    severity: info
+    weight: 0
+    policy: patterns
+    note: >
+      Verified 2026-08: 97% of published llms.txt files receive zero requests
+      and AI search crawlers read HTML directly. Presence is harmless but
+      signals a misunderstanding worth correcting.
+
+  # ---------------------------------------------------------------- build
+  - id: build.succeeds
+    requires: astro build completes with exit code 0.
+    check: build
+    severity: warn
+    weight: 8
+    policy: null
+
+  - id: build.static-output
+    requires: Astro output mode is 'static'.
+    check: build
+    severity: warn
+    weight: 3
+    policy: null
+
+  - id: build.node-major
+    requires: Node major version is 24 or newer.
+    check: hygiene
+    severity: warn
+    weight: 2
+    policy: null
+
+  - id: build.base-path
+    requires: >
+      If deploying to a subpath, `base` is set in astro.config.mjs to match.
+    check: build
+    severity: warn
+    weight: 3
+    policy: null
+    note: Works locally and breaks in production when missed.
+
+  - id: workflow.push-to-main-deploys
+    requires: >
+      The deploy workflow triggers on push to the default branch, so a direct
+      commit publishes without requiring a pull request.
+    check: workflow
+    severity: warn
+    weight: 3
+    policy: null
+    note: >
+      Pull requests are first-class but never required. Many campus editors
+      work through the GitHub web UI, which is push-to-main by construction.
+      A workflow that only deploys on merge locks them out.
+
+  - id: workflow.no-forced-review
+    requires: >
+      No branch protection rule, required status check, or protected
+      environment (other than `github-pages`) makes a pull request mandatory
+      on the default branch.
+    check: workflow
+    severity: info
+    weight: 0
+    policy: null
+    mechanism: >
+      Requires repo admin scope to read protection rules, so report `unknown`
+      rather than `pass` when the token cannot see them. Never auto-remove a
+      protection rule: a team may have added one deliberately. Report and ask.
+
+  - id: workflow.report-reaches-a-reader
+    requires: >
+      The advisory report is written to the job summary and a persistent
+      issue on trunk pushes, and to annotations plus a PR comment on pull
+      requests.
+    check: workflow
+    severity: warn
+    weight: 2
+    policy: null
+    note: >
+      Needs `issues: write` and `pull-requests: write` permissions. Without
+      them the report is produced and nobody ever sees it, which is worse than
+      not running the check.
+
+  - id: perf.budget
+    requires: Lighthouse performance budget met on the built output.
+    check: perf
+    severity: info
+    weight: 3
+    policy: null
+
+  # ----------------------------------------------------------- provenance
+  - id: manifest.present
+    requires: >
+      .sws/manifest.yml exists and records standards version, resolved tool
+      versions, compliance tier, editors emitted for, prior art reused, and
+      divergences.
+    check: manifest
+    severity: warn
+    weight: 4
+    policy: null
+
+  - id: manifest.divergences-explained
+    requires: Every divergence from this recipe has a recorded one-line reason.
+    check: manifest
+    severity: info
+    weight: 2
+    policy: null
