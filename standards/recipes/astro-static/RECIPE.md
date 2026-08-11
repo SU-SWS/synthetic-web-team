@@ -196,15 +196,22 @@ Motion increases engagement when used purposefully, but it must serve the conten
 - **Reward interaction**: Smooth transitions on hover and click
 - **Establish brand tone**: Motion is a design choice, not a default
 
+Use **Framer Motion** for animations. It integrates cleanly with Astro islands and respects accessibility preferences out of the box.
+
+```bash
+npm install framer-motion
+```
+
+**Key rule**: Things inside moving things should not also move. Parent animations take priority; child elements stay static.
+
 **Guidelines:**
 
-1. **Respect `prefers-reduced-motion`**: Always honor OS-level motion preferences. Provide a fallback CSS rule for users who disable animations.
+1. **Respect `prefers-reduced-motion`**: Always honor OS-level motion preferences. Framer Motion respects this automatically with the `AnimatePresence` API, but also provide a CSS fallback:
 
    ```css
    @media (prefers-reduced-motion: reduce) {
      * {
        animation-duration: 0.01ms !important;
-       animation-iteration-count: 1 !important;
        transition-duration: 0.01ms !important;
      }
    }
@@ -212,16 +219,16 @@ Motion increases engagement when used purposefully, but it must serve the conten
 
 2. **Keep animations brief**: 300–600ms for most interactions. Longer than 800ms feels sluggish.
 
-3. **Use easing functions**: `ease-out` for entrances (feels snappy), `ease-in-out` for state changes.
+3. **Use appropriate easing**: `easeOut` for entrances (feels snappy), `easeInOut` for state changes.
 
-4. **Common patterns:**
-   - **Fade-in on scroll**: Sections fade in as they enter the viewport using CSS `animation-timeline: view()` or JavaScript Intersection Observer.
-   - **Button hover lift**: Transform Y by 2–4px with a subtle shadow increase.
-   - **Gradient text/buttons**: Text or button background shifts from one color to another on hover.
-   - **Scale on hover**: Elements grow 1.05–1.10x on hover, paired with shadow growth for depth.
-   - **Staggered animations**: Child elements animate in sequence with 100–150ms delays.
+4. **Common patterns with Framer Motion:**
+   - **Fade-in on scroll**: Wrap sections in `<motion.div>` with `initial={{ opacity: 0 }}` and `whileInView={{ opacity: 1 }}`.
+   - **Button hover lift**: Use `whileHover={{ y: -2 }}` with shadow via className.
+   - **Scale on hover**: `whileHover={{ scale: 1.05 }}` for gentle growth.
+   - **Staggered animations**: Use `staggerChildren` for sequential child animations.
+   - **Avoid nested motion**: Parent container animates; children remain static. Do not animate both a parent and child element independently.
 
-5. **Performance**: Use `transform` and `opacity` for animations (GPU-accelerated). Avoid animating layout properties like `width`, `height`, or `margin`.
+5. **Performance**: Framer Motion uses `transform` and `opacity` by default (GPU-accelerated). Let the library handle optimization.
 
 6. **Testing**: Verify animations work smoothly at typical device speeds. A 60fps target means 16.67ms per frame. Test on real devices, not just desktop browsers.
 
@@ -230,39 +237,25 @@ Motion increases engagement when used purposefully, but it must serve the conten
    - Avoid flashing or strobing (3+ flashes per second) — this can trigger seizures.
    - Provide text alternatives or skip animations for critical content.
 
-**Example: Fade-in on scroll**
+**Example: Fade-in on scroll with Astro island**
 
-```css
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+```tsx
+'use client';
+
+import { motion } from 'framer-motion';
+
+export default function FadeInSection({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: 'easeOut' }}
+      viewport={{ once: true, amount: 0.3 }}
+    >
+      {children}
+    </motion.div>
+  );
 }
-
-section {
-  animation: fadeInUp 0.8s ease-out forwards;
-  animation-timeline: view();
-  animation-range: entry 0% cover 30%;
-}
-```
-
-Or with JavaScript (broader browser support):
-
-```js
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.classList.add('visible');
-    }
-  });
-});
-
-document.querySelectorAll('section').forEach(el => observer.observe(el));
 ```
 
 **When not to use motion**: Static informational or documentation sites gain little from animations and risk appearing less serious or harder to scan. Opt out by simply not defining animations.

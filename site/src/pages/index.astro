@@ -55,7 +55,7 @@ const benefits = [
         Stanford Web Services
       </p>
       <h1 class="type-6 mb-32 max-w-[28ch] font-serif leading-tight opacity-0 animate-[fadeInUp_0.8s_ease-out_0.2s_forwards]">
-        Ship Stanford sites in <span class="bg-gradient-to-r from-white via-orange-300 to-yellow-200 bg-clip-text text-transparent font-bold">hours</span>
+        Ship Stanford sites in hours
       </h1>
       <p class="mb-32 max-w-[65ch] text-28 leading-relaxed md:text-32 opacity-0 animate-[fadeIn_0.6s_ease-out_0.3s_forwards]">
         AI meets compliance. No manual work. No technical debt. Just launch.
@@ -73,9 +73,9 @@ const benefits = [
       <div class="grid grid-cols-1 gap-40 md:grid-cols-2">
         {
           benefits.map((b, i) => (
-            <div class="border-l-8 border-cardinal-red pl-32 opacity-0 transition-all duration-500 hover:border-digital-red hover:pl-40 group" style={`animation: fadeInUp 0.8s ease-out ${0.1 + i * 0.1}s forwards`}>
-              <h3 class="type-2 mb-16 font-serif bg-gradient-to-r from-cardinal-red to-digital-red bg-clip-text text-transparent group-hover:from-digital-red group-hover:to-cardinal-red transition-all duration-300">{b.h}</h3>
-              <p class="mb-0 text-22 text-black-80 leading-relaxed group-hover:text-black transition-colors duration-300">{b.p}</p>
+            <div class="border-l-8 border-cardinal-red pl-32 opacity-0 transition-all duration-500 hover:border-digital-red hover:pl-40 hover:-translate-y-1 group" style={`animation: fadeInUp 0.8s ease-out ${0.1 + i * 0.1}s forwards`}>
+              <h3 class="type-2 mb-16 font-serif text-cardinal-red">{b.h}</h3>
+              <p class="mb-0 text-22 text-black-80 leading-relaxed">{b.p}</p>
             </div>
           ))
         }
@@ -135,10 +135,10 @@ const benefits = [
           { emoji: '•', title: 'Stanford compliance built-in', desc: 'WCAG 2.1 AA, MinWeb, MinSec, brand, privacy. Zero manual work.' },
           { emoji: '•', title: 'No bloat or debt', desc: 'Clean, maintainable code. No starter template rot. No lock-in.' },
         ].map((item, i) => (
-          <li class="flex gap-20 opacity-0 group hover:opacity-100 transition-opacity duration-300" style={`animation: fadeInUp 0.8s ease-out ${0.3 + i * 0.1}s forwards`}>
-            <span class="text-40 font-serif text-cardinal-red flex-shrink-0 group-hover:text-digital-red transition-colors duration-300">•</span>
-            <div class="group-hover:pl-4 transition-all duration-300">
-              <h3 class="type-1 mb-8 font-serif group-hover:text-cardinal-red transition-colors duration-300">{item.title}</h3>
+          <li class="flex gap-20 opacity-0 transition-all duration-300 hover:-translate-y-1 hover:pl-4" style={`animation: fadeInUp 0.8s ease-out ${0.3 + i * 0.1}s forwards`}>
+            <span class="text-40 font-serif text-cardinal-red flex-shrink-0">•</span>
+            <div>
+              <h3 class="type-1 mb-8 font-serif">{item.title}</h3>
               <p class="mb-0 text-18 text-black-80">{item.desc}</p>
             </div>
           </li>

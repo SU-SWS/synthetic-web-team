@@ -5,7 +5,7 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Animation keyframes */
+/* Animation keyframes for scroll-triggered animations */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -26,55 +26,7 @@ html {
   }
 }
 
-@keyframes gradientShift {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-@keyframes slideInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* Section animations - fade in on load */
-section {
-  animation: fadeIn 0.6s ease-out forwards;
-}
-
-section:nth-child(2) {
-  animation-delay: 0.1s;
-}
-
-section:nth-child(3) {
-  animation-delay: 0.2s;
-}
-
-section:nth-child(4) {
-  animation-delay: 0.3s;
-}
-
-section:nth-child(5) {
-  animation-delay: 0.4s;
-}
-
-section:nth-child(6) {
-  animation-delay: 0.5s;
-}
-
-/* Hero button animations */
+/* Button animations */
 .button {
   transition: all 0.3s ease;
   position: relative;
@@ -89,31 +41,13 @@ section:nth-child(6) {
   transform: translateY(0);
 }
 
-/* Gradient text animation for headings */
-h1, h2, h3 {
-  transition: color 0.3s ease;
-}
-
-/* Card hover effects */
-div[class*="border"] {
-  transition: all 0.3s ease;
-}
-
-div[class*="border"]:hover {
-  transform: translateY(-4px);
-  border-color: rgba(177, 23, 23, 0.5);
-}
-
-/* Link animations */
-a {
-  transition: all 0.3s ease;
-}
-
-/* Smooth scroll fade-in for elements on page load */
-@supports (animation-timeline: view()) {
-  section {
-    animation: fadeInUp 0.8s ease-out forwards;
-    animation-timeline: view();
-    animation-range: entry 0% cover 30%;
+/* Respect motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
