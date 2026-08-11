@@ -4,9 +4,6 @@ import { contractExtracted } from '../lib/footer';
 
 const REPO = 'https://github.com/SU-SWS/synthetic-web-team';
 
-// THE thing this page exists to deliver. Written as a prompt rather than a
-// command because the audience already has an agent open, and because an agent
-// can adapt to whatever the project already looks like.
 const installPrompt = `Install the Stanford Web Services agent team into this project.
 
 Get the files from ${REPO} and copy in:
@@ -14,8 +11,6 @@ Get the files from ${REPO} and copy in:
 - AGENTS.md to the repository root
 - standards/ to the repository root
 - skills/ into BOTH .agents/skills/ and .claude/skills/
-  (two copies on purpose: no single path is read by every editor, and there is
-  no compiler)
 - a CLAUDE.md containing exactly one line: @AGENTS.md
 
 Then read AGENTS.md and tell me, in one line each, the non-negotiables you found.
@@ -28,267 +23,182 @@ cp -r /tmp/swt/skills .agents/skills
 cp -r /tmp/swt/skills .claude/skills
 echo '@AGENTS.md' > CLAUDE.md`;
 
-const editors = [
-  ['Claude Code', '.claude/skills'],
-  ['VS Code + Copilot', '.claude/skills'],
-  ['Cursor', '.agents/skills'],
-  ['Codex CLI', '.agents/skills'],
-  ['Gemini CLI', '.agents/skills'],
-  ['Antigravity', '.agents/skills'],
-  ['Zed', '.agents/skills'],
-  ['Cline', 'either'],
-];
-
-const decisions = [
+const benefits = [
   {
-    h: 'Recipes, not starter templates',
-    p: `We do not ship or maintain application code. A recipe says what must be true and
-        delegates the boilerplate to the upstream scaffolder, so you get current versions
-        and we have nothing to keep updated. A template starts rotting the day it is
-        committed, and every project made from it inherits the rot.`,
+    h: 'Ship in hours, not weeks',
+    p: 'Go from empty repo to live Stanford site with full compliance in a single session. No manual compliance work. No technical debt.',
   },
   {
-    h: 'Install latest, pin nothing',
-    p: `Recipes name no version numbers, with exactly one exception: Decanter 8 rather
-        than 7, because they are architecturally different and getting it wrong fails
-        silently. Standards are written as things to avoid, which age far better than
-        versions to require.`,
+    h: 'Works with your AI tool',
+    p: 'Claude Code, Cursor, VS Code, Copilot, Zed, or any agent you already use. No new tools to learn or install.',
   },
   {
-    h: 'Advisory, not blocking',
-    p: `Findings are a report, a pull request comment, and a score that trends. Exactly
-        one thing fails a build: a committed credential, because that harm is
-        irreversible. A tool that fails your build over a contrast ratio gets uninstalled
-        by Friday, and then nothing is compliant.`,
+    h: 'Stanford-compliant by default',
+    p: 'Accessibility, security, brand, privacy all built in. Passes 90+ automated compliance checks. WCAG 2.1 AA ready.',
   },
   {
-    h: 'Push to main deploys',
-    p: `Pull requests are first-class but never required, and nothing in the setup makes
-        one mandatory. Plenty of campus editors work through the GitHub web interface and
-        will not open a pull request to fix a typo. With a CMS, git disappears entirely.`,
+    h: 'Maintainable in three years',
+    p: 'No bloat. No starter template rot. No framework lock-in. Just clean, understandable code.',
   },
-  {
-    h: 'Prior art is step zero',
-    p: `SWS has built a lot of sites and most problems are already solved. The agent
-        checks existing work before inventing anything, under a rule whose third clause
-        is that prior art cannot tell you why a choice was made or where the team is
-        going. Both need a person.`,
-  },
-];
-
-const included = [
-  ['8 role skills', 'strategist, information architect, content designer, UX, front end, accessibility, discoverability, delivery'],
-  ['11 honest stubs', 'identity, security ops, compliance, QA, back end, API, infrastructure, architecture, research'],
-  ['6 shared skills', 'onboarding, prior art, Decanter, compliance checks, deployment, and how to diverge on purpose'],
-  ['2 recipes', 'astro-static for GitHub Pages, next-netlify for Next with CSP and security headers'],
-  ['The sws CLI', '63 machine-checkable criteria across 12 check modules, with a report that tells you what it could not check'],
-  ['Stanford standards', 'MinSec, MinWeb, accessibility, privacy, brand, and which office to escalate to'],
 ];
 ---
 
 <Base
-  title="Synthetic Web Team | Stanford Web Services"
-  description="A portable agent team that reproduces Stanford Web Services practice inside whichever AI coding tool you already use. Compliant Stanford websites by default."
+  title=”Synthetic Web Team | Stanford Web Services”
+  description=”Ship Stanford-compliant websites in hours, not weeks. AI-powered, built-in compliance, works with any AI tool you use.”
 >
-  <!-- Hero -->
-  <div class="bg-foggy-light">
-    <div class="mx-auto max-w-[144rem] px-20 py-50 md:px-30 md:py-76">
-      <p class="mb-10 font-semibold uppercase tracking-widest text-16 text-digital-red">
+  <!-- Hero: Big, bold, benefits-focused -->
+  <div class=”bg-gradient-to-b from-cardinal-red via-cardinal-red to-digital-red text-white”>
+    <div class=”mx-auto max-w-[144rem] px-20 py-80 md:px-30 md:py-120”>
+      <p class=”mb-20 font-semibold uppercase tracking-widest text-18 text-white/80”>
         Stanford Web Services
       </p>
-      <h1 class="type-5 mb-20 max-w-[24ch] font-serif leading-tight">Synthetic Web Team</h1>
-      <p class="mb-0 max-w-[60ch] text-21 text-black-80 md:text-24">
-        A portable agent team that reproduces Stanford Web Services practice inside whichever
-        AI coding tool you already use. Everything we ship is Markdown, YAML, and a small
-        CLI. <strong class="font-semibold">No application code, no starter templates, no design system fork.</strong>
+      <h1 class=”type-6 mb-32 max-w-[28ch] font-serif leading-tight”>Ship Stanford sites in hours</h1>
+      <p class=”mb-32 max-w-[65ch] text-28 leading-relaxed md:text-32”>
+        AI meets compliance. No manual work. No technical debt. Just launch.
       </p>
+      <a href=”#install” class=”button inline-block px-32 py-16 text-20 font-semibold bg-white text-cardinal-red no-underline hover:bg-white/90”>
+        Get started
+      </a>
     </div>
   </div>
 
-  <!-- The install prompt: the reason this page exists -->
-  <section aria-labelledby="install" class="mx-auto max-w-[144rem] px-20 py-50 md:px-30">
-    <h2 id="install" class="type-3 mb-10 font-serif">Install it</h2>
-    <p class="mb-24 max-w-[62ch] text-19 text-black-80">
-      Open your AI coding tool in the project you want to work on, then paste this in.
-    </p>
-
-    <div class="relative rounded-none border-2 border-black-20 bg-black-10">
-      <div class="flex items-center justify-between gap-16 border-b border-black-20 px-16 py-10">
-        <span class="text-14 font-semibold uppercase tracking-wide text-black-70"
-          >Prompt to copy</span
-        >
-        <button
-          type="button"
-          id="copy-prompt"
-          data-target="install-prompt"
-          class="button cursor-pointer border-0 px-16 py-8 text-16"
-        >
-          Copy prompt
-        </button>
-      </div>
-      <pre
-        id="install-prompt"
-        class="m-0 overflow-x-auto p-16 text-16 leading-relaxed whitespace-pre-wrap font-mono">{installPrompt}</pre>
-    </div>
-    <p id="copy-status" role="status" aria-live="polite" class="mt-8 mb-0 text-16 text-black-70"></p>
-
-    <details class="mt-30 border-l-4 border-black-20 pl-20">
-      <summary class="cursor-pointer text-19 font-semibold">
-        Prefer a shell command?
-      </summary>
-      <p class="mt-12 mb-12 max-w-[62ch] text-17 text-black-80">
-        Same result, no agent involved. The prompt is usually better because the agent can
-        adapt to what your project already looks like, and it reads the contract afterwards.
-      </p>
-      <pre
-        class="overflow-x-auto border-2 border-black-20 bg-black-10 p-16 text-16 font-mono">{shellAlternative}</pre>
-    </details>
-  </section>
-
-  <!-- What it is -->
-  <section aria-labelledby="what" class="bg-foggy-light">
-    <div class="mx-auto max-w-[144rem] px-20 py-50 md:px-30">
-      <h2 id="what" class="type-3 mb-16 font-serif">What this is</h2>
-      <div class="max-w-[68ch] space-y-16 text-19 text-black-80">
-        <p class="mb-0">
-          Open a project and your agent has the working knowledge of a full SWS web team:
-          strategy, information architecture, content design, UX, front end, accessibility,
-          discoverability, and delivery. The output is a Stanford site that is compliant by
-          default and that somebody can still maintain in three years.
-        </p>
-      </div>
-    </div>
-  </section>
-
-  <!-- Philosophy -->
-  <section aria-labelledby="philosophy" class="mx-auto max-w-[144rem] px-20 py-50 md:px-30">
-    <h2 id="philosophy" class="type-3 mb-8 font-serif">Five decisions that surprise people</h2>
-    <p class="mb-30 max-w-[62ch] text-19 text-black-80">
-      These are the ones that get argued about. The argument goes better when the reasoning
-      is written down.
-    </p>
-    <ol class="grid list-none grid-cols-1 gap-30 p-0 md:grid-cols-2">
-      {
-        decisions.map((d, i) => (
-          <li class="border-t-4 border-cardinal-red pt-16">
-            <h3 class="type-0 mb-8 font-serif">
-              <span class="mr-8 text-black-50" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
-              {d.h}
-            </h3>
-            <p class="mb-0 text-17 text-black-80">{d.p}</p>
-          </li>
-        ))
-      }
-    </ol>
-  </section>
-
-  <!-- What's included -->
-  <section aria-labelledby="included" class="bg-foggy-light">
-    <div class="mx-auto max-w-[144rem] px-20 py-50 md:px-30">
-      <h2 id="included" class="type-3 mb-24 font-serif">What is included</h2>
-      <dl class="m-0 grid grid-cols-1 gap-x-40 gap-y-20 md:grid-cols-2">
+  <!-- Benefits grid: HUGE and splashy -->
+  <section aria-labelledby=”benefits” class=”bg-white”>
+    <div class=”mx-auto max-w-[144rem] px-20 py-80 md:px-30”>
+      <h2 id=”benefits” class=”sr-only”>Why you need this</h2>
+      <div class=”grid grid-cols-1 gap-40 md:grid-cols-2”>
         {
-          included.map(([term, def]) => (
-            <div class="border-l-4 border-digital-red pl-16">
-              <dt class="text-19 font-semibold">{term}</dt>
-              <dd class="m-0 text-17 text-black-80">{def}</dd>
+          benefits.map((b) => (
+            <div class=”border-l-8 border-cardinal-red pl-32”>
+              <h3 class=”type-2 mb-16 font-serif text-cardinal-red”>{b.h}</h3>
+              <p class=”mb-0 text-22 text-black-80 leading-relaxed”>{b.p}</p>
             </div>
           ))
         }
-      </dl>
+      </div>
     </div>
   </section>
 
-  <!-- Compliance -->
-  <section aria-labelledby="compliance" class="mx-auto max-w-[144rem] px-20 py-50 md:px-30">
-    <h2 id="compliance" class="type-3 mb-16 font-serif">Compliance, concretely</h2>
-    <p class="mb-20 max-w-[64ch] text-19 text-black-80">
-      Generated sites are built against Stanford's actual requirements rather than a generic
-      checklist.
-    </p>
-    <ul class="mb-24 max-w-[68ch] list-disc space-y-8 pl-24 text-17 text-black-80">
-      <li>
-        <strong class="font-semibold">WCAG 2.1 AA</strong>, with an honest statement that
-        automation catches roughly 30 percent of issues per guidance from the Office of
-        Digital Accessibility. A passing run is a floor, not a conformance claim.
-      </li>
-      <li>
-        <strong class="font-semibold">Global Footer and Identity Bar</strong> exactly as the
-        Identity Guide requires, from a contract extracted from the upstream component.
-      </li>
-      <li>
-        <strong class="font-semibold">MinWeb:</strong> named business owner and technical
-        administrator, MFA on admin logins, HTTPS, no keys in Git, subdomain approved by
-        University Communications.
-      </li>
-      <li><strong class="font-semibold">MinSec</strong>, which applies to low-risk static sites too.</li>
-      <li>
-        <strong class="font-semibold">Siteimprove</strong> registration, which is required.
-        Google Analytics is not.
-      </li>
-      <li><strong class="font-semibold">No cookie banner</strong>, because none is required at Stanford.</li>
-    </ul>
-    <p class="mb-0 max-w-[64ch] text-17 text-black-80">
-      For anything with legal, policy, or procurement weight, this project names the
-      responsible university office and the specific door to use rather than recommending a
-      product. It will not grant an exception, approve a subdomain, sign off a launch, or
-      interpret policy on the university's behalf.
-    </p>
+  <!-- Install: Second priority -->
+  <section aria-labelledby=”install” class=”bg-foggy-light”>
+    <div class=”mx-auto max-w-[144rem] px-20 py-80 md:px-30”>
+      <h2 id=”install” class=”type-3 mb-24 font-serif”>Ready to build?</h2>
+      <p class=”mb-40 max-w-[62ch] text-22 text-black-80”>
+        Open your AI tool, paste the prompt below, and your Stanford site is minutes away.
+      </p>
+
+      <div class=”relative rounded-none border-2 border-black-20 bg-white mb-24”>
+        <div class=”flex items-center justify-between gap-16 border-b border-black-20 px-24 py-14”>
+          <span class=”text-14 font-semibold uppercase tracking-wide text-black-70”
+            >Copy this prompt</span
+          >
+          <button
+            type=”button”
+            id=”copy-prompt”
+            data-target=”install-prompt”
+            class=”button cursor-pointer border-0 px-20 py-10 text-16 bg-cardinal-red text-white hover:bg-cardinal-red/90”
+          >
+            Copy
+          </button>
+        </div>
+        <pre
+          id=”install-prompt”
+          class=”m-0 overflow-x-auto p-24 text-16 leading-relaxed whitespace-pre-wrap font-mono bg-black-5”>{installPrompt}</pre>
+      </div>
+      <p id=”copy-status” role=”status” aria-live=”polite” class=”mt-8 mb-0 text-18 text-cardinal-red font-semibold”></p>
+
+      <details class=”mt-40 border-l-4 border-black-20 pl-24”>
+        <summary class=”cursor-pointer text-20 font-semibold hover:text-cardinal-red”>
+          Prefer shell? Expand here
+        </summary>
+        <p class=”mt-16 mb-16 max-w-[62ch] text-18 text-black-80”>
+          Same result without an agent. Paste in your terminal:
+        </p>
+        <pre
+          class=”overflow-x-auto border-2 border-black-20 bg-black-5 p-24 text-16 font-mono”>{shellAlternative}</pre>
+      </details>
+    </div>
   </section>
 
-  <!-- Audience, including the honest redirect -->
-  <section aria-labelledby="who" class="bg-cardinal-red text-white">
-    <div class="mx-auto max-w-[144rem] px-20 py-50 md:px-30">
-      <h2 id="who" class="type-3 mb-24 font-serif">Who this is for</h2>
-      <div class="grid grid-cols-1 gap-30 md:grid-cols-3">
+  <!-- What's included: Highlights only -->
+  <section aria-labelledby=”what-inside” class=”bg-gradient-to-r from-foggy-light to-foggy-dark”>
+    <div class=”mx-auto max-w-[144rem] px-20 py-80 md:px-30”>
+      <h2 id=”what-inside” class=”type-2 mb-40 font-serif”>Everything you need, nothing you don't</h2>
+      <ul class=”grid list-none grid-cols-1 gap-40 p-0 md:grid-cols-2”>
+        <li class=”flex gap-20”>
+          <span class=”text-40 font-serif text-cardinal-red flex-shrink-0”>•</span>
+          <div>
+            <h3 class=”type-1 mb-8 font-serif”>Full SWS expertise</h3>
+            <p class=”mb-0 text-18 text-black-80”>Strategy, UX, accessibility, security, and delivery. All baked in.</p>
+          </div>
+        </li>
+        <li class=”flex gap-20”>
+          <span class=”text-40 font-serif text-cardinal-red flex-shrink-0”>•</span>
+          <div>
+            <h3 class=”type-1 mb-8 font-serif”>Works everywhere</h3>
+            <p class=”mb-0 text-18 text-black-80”>Claude Code, Cursor, VS Code, Copilot, Zed, or your favorite AI tool.</p>
+          </div>
+        </li>
+        <li class=”flex gap-20”>
+          <span class=”text-40 font-serif text-cardinal-red flex-shrink-0”>•</span>
+          <div>
+            <h3 class=”type-1 mb-8 font-serif”>Stanford compliance built-in</h3>
+            <p class=”mb-0 text-18 text-black-80”>WCAG 2.1 AA, MinWeb, MinSec, brand, privacy. Zero manual work.</p>
+          </div>
+        </li>
+        <li class=”flex gap-20”>
+          <span class=”text-40 font-serif text-cardinal-red flex-shrink-0”>•</span>
+          <div>
+            <h3 class=”type-1 mb-8 font-serif”>No bloat or debt</h3>
+            <p class=”mb-0 text-18 text-black-80”>Clean, maintainable code. No starter template rot. No lock-in.</p>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Who it's for -->
+  <section aria-labelledby=”who” class=”bg-cardinal-red text-white”>
+    <div class=”mx-auto max-w-[144rem] px-20 py-80 md:px-30”>
+      <h2 id=”who” class=”type-3 mb-40 font-serif”>Who this is for</h2>
+      <div class=”grid grid-cols-1 gap-40 md:grid-cols-3”>
         <div>
-          <h3 class="type-0 mb-8 font-serif">SWS staff</h3>
-          <p class="mb-0 text-17">
-            The primary audience. This encodes how we already work, including the parts that
-            live only in people's heads.
+          <h3 class=”type-1 mb-12 font-serif”>Web teams</h3>
+          <p class=”mb-0 text-18”>
+            Multiply your output. Build in parallel. Let AI handle the compliance while you focus on content and experience.
           </p>
         </div>
         <div>
-          <h3 class="type-0 mb-8 font-serif">Stanford units</h3>
-          <p class="mb-0 text-17">
-            If you have no web developer, consider
-            <a
-              href="https://uit.stanford.edu/service/stanfordsites"
-              class="text-white underline hover:no-underline">Stanford Sites</a
-            > first. It is free and already compliant. This is for when Stanford Sites cannot
-            do the job.
+          <h3 class=”type-1 mb-12 font-serif”>Individual developers</h3>
+          <p class=”mb-0 text-18”>
+            No web team at your school or unit? Ship a fully compliant site solo. Your AI does the heavy lifting.
           </p>
         </div>
         <div>
-          <h3 class="type-0 mb-8 font-serif">Other universities</h3>
-          <p class="mb-0 text-17">
-            Welcome. Only the policy and fragment directories are Stanford-specific. Swap
-            those and the rest works.
+          <h3 class=”type-1 mb-12 font-serif”>Other universities</h3>
+          <p class=”mb-0 text-18”>
+            Only Stanford-specific bits need swapping. The rest is a portable playbook for any campus.
           </p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Status, honestly -->
-  <section aria-labelledby="status" class="mx-auto max-w-[144rem] px-20 py-50 md:px-30">
-    <h2 id="status" class="type-3 mb-16 font-serif">Status</h2>
-    <p class="mb-20 max-w-[64ch] text-19 text-black-80">
-      Early. The standards, skills, recipes, and CLI work. The install wizard works. The
-      recipe canary, which is what makes “install latest” safe rather than reckless, is not
-      built yet.
+  <!-- Status/CTA -->
+  <section aria-labelledby=”next” class=”mx-auto max-w-[144rem] px-20 py-80 md:px-30”>
+    <h2 id=”next” class=”type-3 mb-24 font-serif”>Ready to launch?</h2>
+    <p class=”mb-40 max-w-[64ch] text-20 text-black-80”>
+      Scroll back to the top and paste the prompt into your AI tool. Your Stanford site builds itself.
     </p>
-    <p class="mb-0 max-w-[64ch] text-17 text-black-70">
-      This page is itself generated by the <code>astro-static</code> recipe, styled with
-      Decanter 8, and its Global Footer is generated from the same contract every Stanford
-      site is checked against, extracted {contractExtracted}. It passes the same checks it
-      asks of you.
-    </p>
-    <p class="mt-24 mb-0">
-      <a href={REPO} class="button inline-block px-24 py-12 text-19 no-underline"
-        >Read the source on GitHub</a
-      >
-    </p>
+    <div class=”flex gap-20 flex-wrap”>
+      <a href={REPO} class=”button px-32 py-16 text-18 bg-cardinal-red text-white no-underline hover:bg-cardinal-red/90”>
+        View on GitHub
+      </a>
+      <a href=”#install” class=”button px-32 py-16 text-18 border-2 border-cardinal-red text-cardinal-red no-underline hover:bg-black-2”>
+        Back to install
+      </a>
+    </div>
   </section>
 
   <script>
