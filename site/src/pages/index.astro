@@ -143,23 +143,6 @@ const included = [
       <pre
         class="overflow-x-auto border-2 border-black-20 bg-black-10 p-16 text-16 font-mono">{shellAlternative}</pre>
     </details>
-
-    <h3 class="type-1 mt-40 mb-12 font-serif">Why two skill directories?</h3>
-    <p class="mb-16 max-w-[62ch] text-17 text-black-80">
-      Because no single path is read by every editor, and we deliberately have no compiler
-      to translate between formats. Two copies is the floor, not a design flaw. If you only
-      use one editor, delete the other directory.
-    </p>
-    <ul class="grid list-none grid-cols-1 gap-x-30 gap-y-4 p-0 text-17 sm:grid-cols-2">
-      {
-        editors.map(([name, path]) => (
-          <li class="flex justify-between gap-16 border-b border-black-10 py-6">
-            <span>{name}</span>
-            <code class="text-16 text-black-70">{path}</code>
-          </li>
-        ))
-      }
-    </ul>
   </section>
 
   <!-- What it is -->
@@ -172,15 +155,6 @@ const included = [
           strategy, information architecture, content design, UX, front end, accessibility,
           discoverability, and delivery. The output is a Stanford site that is compliant by
           default and that somebody can still maintain in three years.
-        </p>
-        <p class="mb-0">
-          <strong class="font-semibold">What it replaces, and what it does not.</strong> SWS
-          already has a working answer to reusing what we built: copy the last client's
-          repository. That is fast, it carries genuinely working code, and it preserves a
-          hundred decisions no document captured. What it cannot do is tell you what has
-          moved since. A fork made eighteen months ago silently inherits that era's Decanter,
-          that era's accessibility target, and that era's dependencies. So the goal is not to
-          stop copy-forking. It is to keep the reuse and add a way to know what changed.
         </p>
       </div>
     </div>

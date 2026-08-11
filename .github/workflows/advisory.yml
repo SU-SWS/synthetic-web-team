@@ -23,9 +23,9 @@ jobs:
   secrets:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: '24' }
       - run: npm ci --prefix packages/cli
       - name: Scan for committed credentials
@@ -38,8 +38,8 @@ jobs:
     # Deliberately does not depend on `secrets`: a leaked key should not hide
     # the rest of the report.
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: { node-version: '24' }
 
       - name: Validate skills against the portability constraints
@@ -71,7 +71,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: { node-version: '24' }
       - run: echo "Recipe canary is not implemented yet. See PROJECT-PLAN.md Phase 3."

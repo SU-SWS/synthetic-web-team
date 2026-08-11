@@ -53,11 +53,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@latest
+      - uses: actions/setup-node@latest
         with:
           node-version: '24'
-      - uses: actions/configure-pages@v4
+      - uses: actions/configure-pages@latest
 
       - name: Install
         working-directory: site
@@ -89,7 +89,7 @@ jobs:
           npm --prefix ../packages/cli ci || npm --prefix ../packages/cli install
           node ../packages/cli/bin/sws.mjs check --standards ../standards
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@latest
         with:
           path: site/dist
 
@@ -103,4 +103,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@latest
