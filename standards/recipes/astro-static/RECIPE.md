@@ -235,7 +235,9 @@ Note that GitHub Pages serves **one site**, so a pull request gets checks but **
 
 Use the first-party actions in the documented **two-job** pattern: a `build` job running `configure-pages` → build → `upload-pages-artifact`, and a `deploy` job with `needs: build` running `deploy-pages`.
 
-Current majors as of August 2026: `actions/configure-pages@v5`, `actions/upload-pages-artifact@v4`, `actions/deploy-pages@v5` (v4 also valid). Check the release pages at generation time rather than trusting this line. Note `upload-pages-artifact@v4` requires `deploy-pages@v4` or newer, and **artifact actions v3 are no longer supported for Pages** as of a December 2024 deprecation.
+Current majors as of August 2026: `actions/checkout@v5`, `actions/setup-node@v6`, `actions/configure-pages@v5`, `actions/upload-pages-artifact@v4`, `actions/deploy-pages@v5` (v4 also valid). Check the release pages at generation time rather than trusting this line.
+
+Two version traps. `upload-pages-artifact@v4` requires `deploy-pages@v4` or newer, and **artifact actions v3 are no longer supported for Pages** as of a December 2024 deprecation. Separately, **older action majors emit a Node 20 deprecation warning**: Node 24 became the default JavaScript action runtime in 2026 and Node 20 is being removed from hosted runners, so `checkout@v4` and `setup-node@v4` produce noise even though they still run. Use the current majors.
 
 Required, and not optional:
 
@@ -259,7 +261,16 @@ environment:
 
 On `cancel-in-progress: false`: this follows GitHub's Pages guidance and means queued runs all execute in order, so nothing gets skipped. If your editors make many rapid small edits and only the latest matters, `true` is faster. Either is defensible; know which you chose.
 
-Also set repo Settings → Pages → Source to **GitHub Actions**, which is outside the workflow and easy to forget.
+**Set repo Settings → Pages → Source to "GitHub Actions" before the first run.** This is outside the workflow, it is the single most commonly forgotten step, and the failure it produces does not obviously point at it:
+
+```
+Branch "main" is not allowed to deploy to github-pages
+due to environment protection rules.
+```
+
+That message reads like a permissions problem. It usually means Pages source is still "Deploy from a branch", so the `github-pages` environment kept its default deployment-branch protection. Switching the source reconfigures the environment. If it persists, check Settings → Environments → github-pages → Deployment branches and allow your default branch.
+
+Worth knowing that this project forgot it on the first run of its own Pages workflow, having written the warning one paragraph earlier.
 
 **Two gotchas that will cost you an afternoon:**
 

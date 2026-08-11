@@ -26,6 +26,7 @@ const { values: flags, positionals } = parseArgs({
     format: { type: 'string', default: 'terminal' },
     out: { type: 'string' },
     strict: { type: 'boolean', default: false },
+    'no-summary': { type: 'boolean', default: false },
     help: { type: 'boolean', short: 'h', default: false },
   },
 });
@@ -47,6 +48,11 @@ const USAGE = `
   --format          terminal | json | markdown
   --out <file>      Write the report to a file as well as stdout
   --strict          Treat every failure as blocking. Opt-in, off by default.
+  --no-summary      Do not append to \$GITHUB_STEP_SUMMARY.
+
+  In GitHub Actions the report is appended to the job summary automatically,
+  unless --format markdown (you are handling output) or --no-summary. One
+  invocation is enough; do not also redirect into the summary file.
 `;
 
 if (flags.help) { console.log(USAGE); process.exit(0); }
@@ -237,7 +243,17 @@ async function run() {
   }
 
   // GitHub job summary, so a trunk push reports somewhere a human will look.
-  if (process.env.GITHUB_STEP_SUMMARY) {
+  //
+  // Only when the caller did NOT ask for markdown on stdout. Otherwise a
+  // workflow doing `sws check --format markdown >> $GITHUB_STEP_SUMMARY` gets
+  // the report twice from one invocation, and a workflow that also runs the
+  // terminal format gets it three times. That happened on the first real run of
+  // this project's own Pages workflow.
+  //
+  // `--no-summary` opts out entirely, for a caller that wants full control.
+  const wantsSummary =
+    process.env.GITHUB_STEP_SUMMARY && flags.format !== 'markdown' && !flags['no-summary'];
+  if (wantsSummary) {
     writeFileSync(process.env.GITHUB_STEP_SUMMARY, renderMarkdown(payload) + '\n', { flag: 'a' });
   }
 
