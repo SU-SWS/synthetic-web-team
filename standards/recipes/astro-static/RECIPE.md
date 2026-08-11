@@ -187,7 +187,87 @@ The last two were wrong in this project's first draft, which is a good argument 
 | JSON-LD | Layout | `EducationalOrganization` or `Organization`, plus `BreadcrumbList`. **For rich results, not for AI citation** — Google states no special markup is needed for generative AI features |
 | `llms.txt` | Skip it | **Do not add one to a marketing site.** Verified: 97% of published `llms.txt` files receive zero requests and AI search crawlers read HTML directly. It is fetched by IDE coding agents, so it belongs on documentation sites only |
 
-### 6. Accessibility harness
+### 6. Motion and animations (optional, recommended for marketing sites)
+
+Motion increases engagement when used purposefully, but it must serve the content, not distract from it. Use motion to:
+
+- **Guide attention**: Draw focus to key CTAs or benefits
+- **Improve perceived performance**: Fade elements in while content loads
+- **Reward interaction**: Smooth transitions on hover and click
+- **Establish brand tone**: Motion is a design choice, not a default
+
+**Guidelines:**
+
+1. **Respect `prefers-reduced-motion`**: Always honor OS-level motion preferences. Provide a fallback CSS rule for users who disable animations.
+
+   ```css
+   @media (prefers-reduced-motion: reduce) {
+     * {
+       animation-duration: 0.01ms !important;
+       animation-iteration-count: 1 !important;
+       transition-duration: 0.01ms !important;
+     }
+   }
+   ```
+
+2. **Keep animations brief**: 300–600ms for most interactions. Longer than 800ms feels sluggish.
+
+3. **Use easing functions**: `ease-out` for entrances (feels snappy), `ease-in-out` for state changes.
+
+4. **Common patterns:**
+   - **Fade-in on scroll**: Sections fade in as they enter the viewport using CSS `animation-timeline: view()` or JavaScript Intersection Observer.
+   - **Button hover lift**: Transform Y by 2–4px with a subtle shadow increase.
+   - **Gradient text/buttons**: Text or button background shifts from one color to another on hover.
+   - **Scale on hover**: Elements grow 1.05–1.10x on hover, paired with shadow growth for depth.
+   - **Staggered animations**: Child elements animate in sequence with 100–150ms delays.
+
+5. **Performance**: Use `transform` and `opacity` for animations (GPU-accelerated). Avoid animating layout properties like `width`, `height`, or `margin`.
+
+6. **Testing**: Verify animations work smoothly at typical device speeds. A 60fps target means 16.67ms per frame. Test on real devices, not just desktop browsers.
+
+7. **Accessibility in motion**:
+   - Animations must not auto-play audio or video without user consent.
+   - Avoid flashing or strobing (3+ flashes per second) — this can trigger seizures.
+   - Provide text alternatives or skip animations for critical content.
+
+**Example: Fade-in on scroll**
+
+```css
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+section {
+  animation: fadeInUp 0.8s ease-out forwards;
+  animation-timeline: view();
+  animation-range: entry 0% cover 30%;
+}
+```
+
+Or with JavaScript (broader browser support):
+
+```js
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+});
+
+document.querySelectorAll('section').forEach(el => observer.observe(el));
+```
+
+**When not to use motion**: Static informational or documentation sites gain little from animations and risk appearing less serious or harder to scan. Opt out by simply not defining animations.
+
+### 7. Accessibility harness
 
 Target is **WCAG 2.1 AA**.
 
@@ -213,7 +293,7 @@ If you later need **component-level** a11y assertions, Vitest plus `axe-core` ag
 
 State plainly in the project's own docs that automated testing catches roughly 30 percent of accessibility issues, per ODA guidance. The manual checklist in `role-accessibility-lead` covers the rest, and Siteimprove applies further criteria after launch.
 
-### 7. Deploy to GitHub Pages
+### 8. Deploy to GitHub Pages
 
 **Push to `main` deploys. Pull requests are supported but never required.**
 
@@ -279,7 +359,7 @@ Worth knowing that this project forgot it on the first run of its own Pages work
 
 Branch-based deploys and `peaceiris/actions-gh-pages` still function but are the legacy path; that action's own README points users to the official one. Prefer artifact-based deployment for new work.
 
-### 8. Verify
+### 9. Verify
 
 ```bash
 npx astro build

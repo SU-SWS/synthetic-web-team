@@ -48,16 +48,19 @@ const benefits = [
   description="Ship Stanford-compliant websites in hours, not weeks. AI-powered, built-in compliance, works with any AI tool you use."
 >
   <!-- Hero: Big, bold, benefits-focused -->
-  <div class="bg-gradient-to-b from-cardinal-red via-cardinal-red to-digital-red text-white">
-    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30 md:py-120">
-      <p class="mb-20 font-semibold uppercase tracking-widest text-18 text-white/80">
+  <div class="bg-gradient-to-b from-cardinal-red via-cardinal-red to-digital-red text-white relative overflow-hidden">
+    <div class="absolute inset-0 opacity-10" style="background: radial-gradient(circle at 30% 50%, white 0%, transparent 50%)"></div>
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30 md:py-120 relative">
+      <p class="mb-20 font-semibold uppercase tracking-widest text-18 text-white/80 opacity-0 animate-[fadeIn_0.6s_ease-out_0.1s_forwards]">
         Stanford Web Services
       </p>
-      <h1 class="type-6 mb-32 max-w-[28ch] font-serif leading-tight">Ship sites in hours</h1>
-      <p class="mb-32 max-w-[65ch] text-28 leading-relaxed md:text-32">
+      <h1 class="type-6 mb-32 max-w-[28ch] font-serif leading-tight opacity-0 animate-[fadeInUp_0.8s_ease-out_0.2s_forwards]">
+        Ship Stanford sites in <span class="bg-gradient-to-r from-white via-orange-300 to-yellow-200 bg-clip-text text-transparent font-bold">hours</span>
+      </h1>
+      <p class="mb-32 max-w-[65ch] text-28 leading-relaxed md:text-32 opacity-0 animate-[fadeIn_0.6s_ease-out_0.3s_forwards]">
         AI meets compliance. No manual work. No technical debt. Just launch.
       </p>
-      <a href="#install" class="button inline-block px-32 py-16 text-20 font-semibold bg-white text-cardinal-red no-underline hover:bg-white/90 hover:underline hover:underline-offset-4 hover:decoration-2 focus-visible:underline focus-visible:underline-offset-4 focus-visible:decoration-2">
+      <a href="#install" class="button inline-block px-32 py-16 text-20 font-semibold bg-gradient-to-r from-white to-orange-100 text-cardinal-red no-underline opacity-0 animate-[fadeIn_0.6s_ease-out_0.4s_forwards] hover:shadow-xl hover:scale-105 transition-all duration-300">
         Get started
       </a>
     </div>
@@ -69,10 +72,10 @@ const benefits = [
       <h2 id="benefits" class="sr-only">Why you need this</h2>
       <div class="grid grid-cols-1 gap-40 md:grid-cols-2">
         {
-          benefits.map((b) => (
-            <div class="border-l-8 border-cardinal-red pl-32">
-              <h3 class="type-2 mb-16 font-serif text-cardinal-red">{b.h}</h3>
-              <p class="mb-0 text-22 text-black-80 leading-relaxed">{b.p}</p>
+          benefits.map((b, i) => (
+            <div class="border-l-8 border-cardinal-red pl-32 opacity-0 transition-all duration-500 hover:border-digital-red hover:pl-40 group" style={`animation: fadeInUp 0.8s ease-out ${0.1 + i * 0.1}s forwards`}>
+              <h3 class="type-2 mb-16 font-serif bg-gradient-to-r from-cardinal-red to-digital-red bg-clip-text text-transparent group-hover:from-digital-red group-hover:to-cardinal-red transition-all duration-300">{b.h}</h3>
+              <p class="mb-0 text-22 text-black-80 leading-relaxed group-hover:text-black transition-colors duration-300">{b.p}</p>
             </div>
           ))
         }
@@ -124,36 +127,22 @@ const benefits = [
   <!-- What's included: Highlights only -->
   <section aria-labelledby="what-inside" class="bg-gradient-to-r from-foggy-light to-foggy-dark">
     <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
-      <h2 id="what-inside" class="type-2 mb-40 font-serif">Everything you need, nothing you don't</h2>
+      <h2 id="what-inside" class="type-2 mb-40 font-serif opacity-0 animate-[fadeInUp_0.8s_ease-out_0.2s_forwards]">Everything you need, nothing you don't</h2>
       <ul class="grid list-none grid-cols-1 gap-40 p-0 md:grid-cols-2">
-        <li class="flex gap-20">
-          <span class="text-40 font-serif text-cardinal-red flex-shrink-0">•</span>
-          <div>
-            <h3 class="type-1 mb-8 font-serif">Full SWS expertise</h3>
-            <p class="mb-0 text-18 text-black-80">Strategy, UX, accessibility, security, and delivery. All baked in.</p>
-          </div>
-        </li>
-        <li class="flex gap-20">
-          <span class="text-40 font-serif text-cardinal-red flex-shrink-0">•</span>
-          <div>
-            <h3 class="type-1 mb-8 font-serif">Works everywhere</h3>
-            <p class="mb-0 text-18 text-black-80">Claude Code, Cursor, VS Code, Copilot, Zed, or your favorite AI tool.</p>
-          </div>
-        </li>
-        <li class="flex gap-20">
-          <span class="text-40 font-serif text-cardinal-red flex-shrink-0">•</span>
-          <div>
-            <h3 class="type-1 mb-8 font-serif">Stanford compliance built-in</h3>
-            <p class="mb-0 text-18 text-black-80">WCAG 2.1 AA, MinWeb, MinSec, brand, privacy. Zero manual work.</p>
-          </div>
-        </li>
-        <li class="flex gap-20">
-          <span class="text-40 font-serif text-cardinal-red flex-shrink-0">•</span>
-          <div>
-            <h3 class="type-1 mb-8 font-serif">No bloat or debt</h3>
-            <p class="mb-0 text-18 text-black-80">Clean, maintainable code. No starter template rot. No lock-in.</p>
-          </div>
-        </li>
+        {[
+          { emoji: '•', title: 'Full SWS expertise', desc: 'Strategy, UX, accessibility, security, and delivery. All baked in.' },
+          { emoji: '•', title: 'Works everywhere', desc: 'Claude Code, Cursor, VS Code, Copilot, Zed, or your favorite AI tool.' },
+          { emoji: '•', title: 'Stanford compliance built-in', desc: 'WCAG 2.1 AA, MinWeb, MinSec, brand, privacy. Zero manual work.' },
+          { emoji: '•', title: 'No bloat or debt', desc: 'Clean, maintainable code. No starter template rot. No lock-in.' },
+        ].map((item, i) => (
+          <li class="flex gap-20 opacity-0 group hover:opacity-100 transition-opacity duration-300" style={`animation: fadeInUp 0.8s ease-out ${0.3 + i * 0.1}s forwards`}>
+            <span class="text-40 font-serif text-cardinal-red flex-shrink-0 group-hover:text-digital-red transition-colors duration-300">•</span>
+            <div class="group-hover:pl-4 transition-all duration-300">
+              <h3 class="type-1 mb-8 font-serif group-hover:text-cardinal-red transition-colors duration-300">{item.title}</h3>
+              <p class="mb-0 text-18 text-black-80">{item.desc}</p>
+            </div>
+          </li>
+        ))}
       </ul>
     </div>
   </section>
@@ -186,16 +175,16 @@ const benefits = [
   </section>
 
   <!-- Status/CTA -->
-  <section aria-labelledby="next" class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+  <section aria-labelledby="next" class="mx-auto max-w-[144rem] px-20 py-80 md:px-30 opacity-0 animate-[fadeIn_0.8s_ease-out_0.5s_forwards]">
     <h2 id="next" class="type-3 mb-24 font-serif">Ready to launch?</h2>
     <p class="mb-40 max-w-[64ch] text-20 text-black-80">
       Scroll back to the top and paste the prompt into your AI tool. Your Stanford site builds itself.
     </p>
     <div class="flex gap-20 flex-wrap">
-      <a href={REPO} class="inline-block rounded-none bg-cardinal-red px-32 py-16 text-18 font-semibold text-white no-underline hover:bg-cardinal-red/90 hover:underline hover:underline-offset-4 hover:decoration-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cardinal-red focus-visible:underline focus-visible:underline-offset-4 focus-visible:decoration-2">
+      <a href={REPO} class="inline-block rounded-none bg-gradient-to-r from-cardinal-red to-digital-red px-32 py-16 text-18 font-semibold text-white no-underline transition-all duration-300 hover:shadow-lg hover:scale-105 hover:from-digital-red hover:to-cardinal-red focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cardinal-red">
         View on GitHub
       </a>
-      <a href="#install" class="inline-block rounded-none border-2 border-cardinal-red bg-white px-32 py-16 text-18 font-semibold text-cardinal-red no-underline hover:bg-black-5 hover:underline hover:underline-offset-4 hover:decoration-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cardinal-red focus-visible:underline focus-visible:underline-offset-4 focus-visible:decoration-2">
+      <a href="#install" class="inline-block rounded-none border-2 border-cardinal-red bg-white px-32 py-16 text-18 font-semibold text-cardinal-red no-underline transition-all duration-300 hover:shadow-lg hover:scale-105 hover:bg-cardinal-red hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cardinal-red">
         Back to install
       </a>
     </div>

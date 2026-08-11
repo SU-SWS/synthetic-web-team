@@ -200,7 +200,93 @@ Same as `astro-static`, and the contract is shared:
 - **No cookie banner.** The Global Footer Privacy link satisfies disclosure.
 - **No `llms.txt`** on a unit site.
 
-### 8. Testing
+### 8. Motion and animations (optional, recommended for marketing sites)
+
+Motion increases engagement when used purposefully, but it must serve the content, not distract from it. Use motion to:
+
+- **Guide attention**: Draw focus to key CTAs or benefits
+- **Improve perceived performance**: Fade elements in while content loads
+- **Reward interaction**: Smooth transitions on hover and click
+- **Establish brand tone**: Motion is a design choice, not a default
+
+**Guidelines:**
+
+1. **Respect `prefers-reduced-motion`**: Always honor OS-level motion preferences. Provide a fallback CSS rule for users who disable animations.
+
+   ```css
+   @media (prefers-reduced-motion: reduce) {
+     * {
+       animation-duration: 0.01ms !important;
+       animation-iteration-count: 1 !important;
+       transition-duration: 0.01ms !important;
+     }
+   }
+   ```
+
+2. **Keep animations brief**: 300–600ms for most interactions. Longer than 800ms feels sluggish.
+
+3. **Use easing functions**: `ease-out` for entrances (feels snappy), `ease-in-out` for state changes.
+
+4. **Common patterns:**
+   - **Fade-in on scroll**: Sections fade in as they enter the viewport. In Next.js, use a scroll observer or a library like `react-intersection-observer`.
+   - **Button hover lift**: Transform Y by 2–4px with a subtle shadow increase.
+   - **Gradient text/buttons**: Text or button background shifts from one color to another on hover.
+   - **Scale on hover**: Elements grow 1.05–1.10x on hover, paired with shadow growth for depth.
+   - **Staggered animations**: Child elements animate in sequence with 100–150ms delays.
+
+5. **Performance**: Use `transform` and `opacity` for animations (GPU-accelerated). Avoid animating layout properties like `width`, `height`, or `margin`.
+
+6. **Testing**: Verify animations work smoothly at typical device speeds. A 60fps target means 16.67ms per frame. Test on real devices, not just desktop browsers.
+
+7. **Accessibility in motion**:
+   - Animations must not auto-play audio or video without user consent.
+   - Avoid flashing or strobing (3+ flashes per second) — this can trigger seizures.
+   - Provide text alternatives or skip animations for critical content.
+
+**Example: Fade-in with Next.js**
+
+```tsx
+'use client';
+
+import { useEffect, useRef } from 'react';
+
+export default function FadeInSection({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('opacity-100');
+        observer.unobserve(entry.target);
+      }
+    });
+
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="opacity-0 transition-opacity duration-700">
+      {children}
+    </div>
+  );
+}
+```
+
+And in CSS:
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+```
+
+**When not to use motion**: Static informational or documentation sites gain little from animations and risk appearing less serious or harder to scan. Opt out by simply not defining animations.
+
+### 9. Testing
 
 Playwright plus `@axe-core/playwright` against every route, asserting zero
 violations tagged `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`.
@@ -214,14 +300,14 @@ reading either baseline.
 is right at flagship scale and wrong for a unit site with a handful of components
 and one consumer. Read it for what thorough looks like, not as a shopping list.
 
-### 9. Secrets
+### 10. Secrets
 
 **Not `.env` in production.** SWS uses HashiCorp Vault, via
 `netlify-plugin-vault-variables` in this family. Follow that rather than
 introducing a new pattern. Committed credentials are the only thing in this system
 that fails a build.
 
-### 10. Verify
+### 11. Verify
 
 ```bash
 npm run build
