@@ -44,35 +44,35 @@ const benefits = [
 ---
 
 <Base
-  title=”Synthetic Web Team | Stanford Web Services”
-  description=”Ship Stanford-compliant websites in hours, not weeks. AI-powered, built-in compliance, works with any AI tool you use.”
+  title="Synthetic Web Team | Stanford Web Services"
+  description="Ship Stanford-compliant websites in hours, not weeks. AI-powered, built-in compliance, works with any AI tool you use."
 >
   <!-- Hero: Big, bold, benefits-focused -->
-  <div class=”bg-gradient-to-b from-cardinal-red via-cardinal-red to-digital-red text-white”>
-    <div class=”mx-auto max-w-[144rem] px-20 py-80 md:px-30 md:py-120”>
-      <p class=”mb-20 font-semibold uppercase tracking-widest text-18 text-white/80”>
+  <div class="bg-gradient-to-b from-cardinal-red via-cardinal-red to-digital-red text-white">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30 md:py-120">
+      <p class="mb-20 font-semibold uppercase tracking-widest text-18 text-white/80">
         Stanford Web Services
       </p>
-      <h1 class=”type-6 mb-32 max-w-[28ch] font-serif leading-tight”>Ship Stanford sites in hours</h1>
-      <p class=”mb-32 max-w-[65ch] text-28 leading-relaxed md:text-32”>
+      <h1 class="type-6 mb-32 max-w-[28ch] font-serif leading-tight">Ship Stanford sites in hours</h1>
+      <p class="mb-32 max-w-[65ch] text-28 leading-relaxed md:text-32">
         AI meets compliance. No manual work. No technical debt. Just launch.
       </p>
-      <a href=”#install” class=”button inline-block px-32 py-16 text-20 font-semibold bg-white text-cardinal-red no-underline hover:bg-white/90”>
+      <a href="#install" class="button inline-block px-32 py-16 text-20 font-semibold bg-white text-cardinal-red no-underline hover:bg-white/90">
         Get started
       </a>
     </div>
   </div>
 
   <!-- Benefits grid: HUGE and splashy -->
-  <section aria-labelledby=”benefits” class=”bg-white”>
-    <div class=”mx-auto max-w-[144rem] px-20 py-80 md:px-30”>
-      <h2 id=”benefits” class=”sr-only”>Why you need this</h2>
-      <div class=”grid grid-cols-1 gap-40 md:grid-cols-2”>
+  <section aria-labelledby="benefits" class="bg-white">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <h2 id="benefits" class="sr-only">Why you need this</h2>
+      <div class="grid grid-cols-1 gap-40 md:grid-cols-2">
         {
           benefits.map((b) => (
-            <div class=”border-l-8 border-cardinal-red pl-32”>
-              <h3 class=”type-2 mb-16 font-serif text-cardinal-red”>{b.h}</h3>
-              <p class=”mb-0 text-22 text-black-80 leading-relaxed”>{b.p}</p>
+            <div class="border-l-8 border-cardinal-red pl-32">
+              <h3 class="type-2 mb-16 font-serif text-cardinal-red">{b.h}</h3>
+              <p class="mb-0 text-22 text-black-80 leading-relaxed">{b.p}</p>
             </div>
           ))
         }
@@ -81,77 +81,77 @@ const benefits = [
   </section>
 
   <!-- Install: Second priority -->
-  <section aria-labelledby=”install” class=”bg-foggy-light”>
-    <div class=”mx-auto max-w-[144rem] px-20 py-80 md:px-30”>
-      <h2 id=”install” class=”type-3 mb-24 font-serif”>Ready to build?</h2>
-      <p class=”mb-40 max-w-[62ch] text-22 text-black-80”>
+  <section aria-labelledby="install" class="bg-foggy-light">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <h2 id="install" class="type-3 mb-24 font-serif">Ready to build?</h2>
+      <p class="mb-40 max-w-[62ch] text-22 text-black-80">
         Open your AI tool, paste the prompt below, and your Stanford site is minutes away.
       </p>
 
-      <div class=”relative rounded-none border-2 border-black-20 bg-white mb-24”>
-        <div class=”flex items-center justify-between gap-16 border-b border-black-20 px-24 py-14”>
-          <span class=”text-14 font-semibold uppercase tracking-wide text-black-70”
+      <div class="relative rounded-none border-2 border-black-20 bg-white mb-24">
+        <div class="flex items-center justify-between gap-16 border-b border-black-20 px-24 py-14">
+          <span class="text-14 font-semibold uppercase tracking-wide text-black-70"
             >Copy this prompt</span
           >
           <button
-            type=”button”
-            id=”copy-prompt”
-            data-target=”install-prompt”
-            class=”button cursor-pointer border-0 px-20 py-10 text-16 bg-cardinal-red text-white hover:bg-cardinal-red/90”
+            type="button"
+            id="copy-prompt"
+            data-target="install-prompt"
+            class="button cursor-pointer border-0 px-20 py-10 text-16 bg-cardinal-red text-white hover:bg-cardinal-red/90"
           >
             Copy
           </button>
         </div>
         <pre
-          id=”install-prompt”
-          class=”m-0 overflow-x-auto p-24 text-16 leading-relaxed whitespace-pre-wrap font-mono bg-black-5”>{installPrompt}</pre>
+          id="install-prompt"
+          class="m-0 overflow-x-auto p-24 text-16 leading-relaxed whitespace-pre-wrap font-mono bg-black-5">{installPrompt}</pre>
       </div>
-      <p id=”copy-status” role=”status” aria-live=”polite” class=”mt-8 mb-0 text-18 text-cardinal-red font-semibold”></p>
+      <p id="copy-status" role="status" aria-live="polite" class="mt-8 mb-0 text-18 text-cardinal-red font-semibold"></p>
 
-      <details class=”mt-40 border-l-4 border-black-20 pl-24”>
-        <summary class=”cursor-pointer text-20 font-semibold hover:text-cardinal-red”>
+      <details class="mt-40 border-l-4 border-black-20 pl-24">
+        <summary class="cursor-pointer text-20 font-semibold hover:text-cardinal-red">
           Prefer shell? Expand here
         </summary>
-        <p class=”mt-16 mb-16 max-w-[62ch] text-18 text-black-80”>
+        <p class="mt-16 mb-16 max-w-[62ch] text-18 text-black-80">
           Same result without an agent. Paste in your terminal:
         </p>
         <pre
-          class=”overflow-x-auto border-2 border-black-20 bg-black-5 p-24 text-16 font-mono”>{shellAlternative}</pre>
+          class="overflow-x-auto border-2 border-black-20 bg-black-5 p-24 text-16 font-mono">{shellAlternative}</pre>
       </details>
     </div>
   </section>
 
   <!-- What's included: Highlights only -->
-  <section aria-labelledby=”what-inside” class=”bg-gradient-to-r from-foggy-light to-foggy-dark”>
-    <div class=”mx-auto max-w-[144rem] px-20 py-80 md:px-30”>
-      <h2 id=”what-inside” class=”type-2 mb-40 font-serif”>Everything you need, nothing you don't</h2>
-      <ul class=”grid list-none grid-cols-1 gap-40 p-0 md:grid-cols-2”>
-        <li class=”flex gap-20”>
-          <span class=”text-40 font-serif text-cardinal-red flex-shrink-0”>•</span>
+  <section aria-labelledby="what-inside" class="bg-gradient-to-r from-foggy-light to-foggy-dark">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <h2 id="what-inside" class="type-2 mb-40 font-serif">Everything you need, nothing you don't</h2>
+      <ul class="grid list-none grid-cols-1 gap-40 p-0 md:grid-cols-2">
+        <li class="flex gap-20">
+          <span class="text-40 font-serif text-cardinal-red flex-shrink-0">•</span>
           <div>
-            <h3 class=”type-1 mb-8 font-serif”>Full SWS expertise</h3>
-            <p class=”mb-0 text-18 text-black-80”>Strategy, UX, accessibility, security, and delivery. All baked in.</p>
+            <h3 class="type-1 mb-8 font-serif">Full SWS expertise</h3>
+            <p class="mb-0 text-18 text-black-80">Strategy, UX, accessibility, security, and delivery. All baked in.</p>
           </div>
         </li>
-        <li class=”flex gap-20”>
-          <span class=”text-40 font-serif text-cardinal-red flex-shrink-0”>•</span>
+        <li class="flex gap-20">
+          <span class="text-40 font-serif text-cardinal-red flex-shrink-0">•</span>
           <div>
-            <h3 class=”type-1 mb-8 font-serif”>Works everywhere</h3>
-            <p class=”mb-0 text-18 text-black-80”>Claude Code, Cursor, VS Code, Copilot, Zed, or your favorite AI tool.</p>
+            <h3 class="type-1 mb-8 font-serif">Works everywhere</h3>
+            <p class="mb-0 text-18 text-black-80">Claude Code, Cursor, VS Code, Copilot, Zed, or your favorite AI tool.</p>
           </div>
         </li>
-        <li class=”flex gap-20”>
-          <span class=”text-40 font-serif text-cardinal-red flex-shrink-0”>•</span>
+        <li class="flex gap-20">
+          <span class="text-40 font-serif text-cardinal-red flex-shrink-0">•</span>
           <div>
-            <h3 class=”type-1 mb-8 font-serif”>Stanford compliance built-in</h3>
-            <p class=”mb-0 text-18 text-black-80”>WCAG 2.1 AA, MinWeb, MinSec, brand, privacy. Zero manual work.</p>
+            <h3 class="type-1 mb-8 font-serif">Stanford compliance built-in</h3>
+            <p class="mb-0 text-18 text-black-80">WCAG 2.1 AA, MinWeb, MinSec, brand, privacy. Zero manual work.</p>
           </div>
         </li>
-        <li class=”flex gap-20”>
-          <span class=”text-40 font-serif text-cardinal-red flex-shrink-0”>•</span>
+        <li class="flex gap-20">
+          <span class="text-40 font-serif text-cardinal-red flex-shrink-0">•</span>
           <div>
-            <h3 class=”type-1 mb-8 font-serif”>No bloat or debt</h3>
-            <p class=”mb-0 text-18 text-black-80”>Clean, maintainable code. No starter template rot. No lock-in.</p>
+            <h3 class="type-1 mb-8 font-serif">No bloat or debt</h3>
+            <p class="mb-0 text-18 text-black-80">Clean, maintainable code. No starter template rot. No lock-in.</p>
           </div>
         </li>
       </ul>
@@ -159,25 +159,25 @@ const benefits = [
   </section>
 
   <!-- Who it's for -->
-  <section aria-labelledby=”who” class=”bg-cardinal-red text-white”>
-    <div class=”mx-auto max-w-[144rem] px-20 py-80 md:px-30”>
-      <h2 id=”who” class=”type-3 mb-40 font-serif”>Who this is for</h2>
-      <div class=”grid grid-cols-1 gap-40 md:grid-cols-3”>
+  <section aria-labelledby="who" class="bg-cardinal-red text-white">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <h2 id="who" class="type-3 mb-40 font-serif">Who this is for</h2>
+      <div class="grid grid-cols-1 gap-40 md:grid-cols-3">
         <div>
-          <h3 class=”type-1 mb-12 font-serif”>Web teams</h3>
-          <p class=”mb-0 text-18”>
+          <h3 class="type-1 mb-12 font-serif">Web teams</h3>
+          <p class="mb-0 text-18">
             Multiply your output. Build in parallel. Let AI handle the compliance while you focus on content and experience.
           </p>
         </div>
         <div>
-          <h3 class=”type-1 mb-12 font-serif”>Individual developers</h3>
-          <p class=”mb-0 text-18”>
+          <h3 class="type-1 mb-12 font-serif">Individual developers</h3>
+          <p class="mb-0 text-18">
             No web team at your school or unit? Ship a fully compliant site solo. Your AI does the heavy lifting.
           </p>
         </div>
         <div>
-          <h3 class=”type-1 mb-12 font-serif”>Other universities</h3>
-          <p class=”mb-0 text-18”>
+          <h3 class="type-1 mb-12 font-serif">Other universities</h3>
+          <p class="mb-0 text-18">
             Only Stanford-specific bits need swapping. The rest is a portable playbook for any campus.
           </p>
         </div>
@@ -186,16 +186,16 @@ const benefits = [
   </section>
 
   <!-- Status/CTA -->
-  <section aria-labelledby=”next” class=”mx-auto max-w-[144rem] px-20 py-80 md:px-30”>
-    <h2 id=”next” class=”type-3 mb-24 font-serif”>Ready to launch?</h2>
-    <p class=”mb-40 max-w-[64ch] text-20 text-black-80”>
+  <section aria-labelledby="next" class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+    <h2 id="next" class="type-3 mb-24 font-serif">Ready to launch?</h2>
+    <p class="mb-40 max-w-[64ch] text-20 text-black-80">
       Scroll back to the top and paste the prompt into your AI tool. Your Stanford site builds itself.
     </p>
-    <div class=”flex gap-20 flex-wrap”>
-      <a href={REPO} class=”button px-32 py-16 text-18 bg-cardinal-red text-white no-underline hover:bg-cardinal-red/90”>
+    <div class="flex gap-20 flex-wrap">
+      <a href={REPO} class="button px-32 py-16 text-18 bg-cardinal-red text-white no-underline hover:bg-cardinal-red/90">
         View on GitHub
       </a>
-      <a href=”#install” class=”button px-32 py-16 text-18 border-2 border-cardinal-red text-cardinal-red no-underline hover:bg-black-2”>
+      <a href="#install" class="button px-32 py-16 text-18 border-2 border-cardinal-red text-cardinal-red no-underline hover:bg-black-2">
         Back to install
       </a>
     </div>
