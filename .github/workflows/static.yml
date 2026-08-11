@@ -1,0 +1,106 @@
+name: static
+
+# Deploys the documentation site in site/ to GitHub Pages.
+#
+# Shaped exactly as standards/recipes/astro-static/RECIPE.md prescribes:
+# push to main deploys, pull requests get checks but no preview (Pages serves
+# one site), and nothing here fails except a committed credential.
+#
+# ---------------------------------------------------------------------------
+# ONE-TIME REPOSITORY SETUP, REQUIRED. This workflow cannot do it for you.
+#
+#   Settings -> Pages -> Build and deployment -> Source: GitHub Actions
+#
+# Until that is set, the `github-pages` environment keeps the default
+# deployment-branch protection and the deploy job fails with:
+#
+#   Branch "main" is not allowed to deploy to github-pages due to
+#   environment protection rules.
+#
+# If it still fails after switching the source, check
+# Settings -> Environments -> github-pages -> Deployment branches and allow
+# your default branch.
+#
+# This is the step the recipe calls out as "outside the workflow and easy to
+# forget". It was duly forgotten on the first run of this very workflow.
+# ---------------------------------------------------------------------------
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'standards/fragments/**'   # the footer is generated from the contract
+      - '.github/workflows/pages.yml'
+  pull_request:
+    paths:
+      - 'site/**'
+      - 'standards/fragments/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  issues: write          # persistent "Site health" issue on trunk pushes
+  pull-requests: write   # PR comment when a PR fired
+
+concurrency:
+  group: pages
+  cancel-in-progress: false   # per GitHub Pages guidance: queue, do not skip
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/configure-pages@v4
+
+      - name: Install
+        working-directory: site
+        run: npm install
+
+      - name: Confirm Decanter 8, because v7 fails silently
+        working-directory: site
+        run: |
+          V=$(node -p "require('./node_modules/decanter/package.json').version")
+          M=$(node -p "require('./node_modules/decanter/package.json').main")
+          echo "decanter $V (main: $M)"
+          case "$V" in
+            8.*) ;;
+            *) echo "::error::decanter resolved to $V, expected 8.x. A bare 'npm install decanter' currently gets v7. Use decanter@alpha until 8.0.0 is on latest."; exit 1 ;;
+          esac
+          test "$M" = "src/css/index.css" || { echo "::error::decanter main is $M, expected src/css/index.css (v7 detected)"; exit 1; }
+
+      - name: Build
+        working-directory: site
+        run: npm run build
+
+      # Advisory. ONE invocation: the CLI appends to the job summary itself when
+      # it detects GITHUB_STEP_SUMMARY. Calling it twice and also redirecting
+      # printed the report three times on the first real run.
+      - name: Compliance report
+        working-directory: site
+        continue-on-error: true
+        run: |
+          npm --prefix ../packages/cli ci || npm --prefix ../packages/cli install
+          node ../packages/cli/bin/sws.mjs check --standards ../standards
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+  deploy:
+    needs: build
+    # Pages serves one site, so pull requests get checks and no preview.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
