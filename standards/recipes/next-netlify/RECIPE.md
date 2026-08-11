@@ -209,17 +209,17 @@ Motion increases engagement when used purposefully, but it must serve the conten
 - **Reward interaction**: Smooth transitions on hover and click
 - **Establish brand tone**: Motion is a design choice, not a default
 
-Use **Framer Motion** for animations. It integrates seamlessly with Next.js and respects accessibility preferences out of the box.
+Use **motion** for animations. It integrates seamlessly with Next.js and respects accessibility preferences out of the box.
 
 ```bash
-npm install framer-motion
+npm install motion
 ```
 
 **Key rule**: Things inside moving things should not also move. Parent animations take priority; child elements stay static.
 
 **Guidelines:**
 
-1. **Respect `prefers-reduced-motion`**: Always honor OS-level motion preferences. Framer Motion respects this automatically, but also provide a CSS fallback:
+1. **Respect `prefers-reduced-motion`**: Always honor OS-level motion preferences. `motion` respects this automatically, but also provide a CSS fallback:
 
    ```css
    @media (prefers-reduced-motion: reduce) {
@@ -234,14 +234,14 @@ npm install framer-motion
 
 3. **Use appropriate easing**: `easeOut` for entrances (feels snappy), `easeInOut` for state changes.
 
-4. **Common patterns with Framer Motion:**
+4. **Common patterns with motion:**
    - **Fade-in on scroll**: Wrap sections in `<motion.div>` with `initial={{ opacity: 0 }}` and `whileInView={{ opacity: 1 }}`.
    - **Button hover lift**: Use `whileHover={{ y: -2 }}` with shadow via className.
    - **Scale on hover**: `whileHover={{ scale: 1.05 }}` for gentle growth.
    - **Staggered animations**: Use `staggerChildren` for sequential child animations.
    - **Avoid nested motion**: Parent container animates; children remain static. Do not animate both a parent and child element independently.
 
-5. **Performance**: Framer Motion uses `transform` and `opacity` by default (GPU-accelerated). Let the library handle optimization.
+5. **Performance**: `motion` uses `transform` and `opacity` by default (GPU-accelerated). Let the library handle optimization.
 
 6. **Testing**: Verify animations work smoothly at typical device speeds. A 60fps target means 16.67ms per frame. Test on real devices, not just desktop browsers.
 
@@ -255,7 +255,7 @@ npm install framer-motion
 ```tsx
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion } from 'motion';
 
 export default function FadeInSection({ children }: { children: React.ReactNode }) {
   return (
