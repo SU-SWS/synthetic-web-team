@@ -1,0 +1,77 @@
+name: advisory
+
+# Our own nag ladder, dogfooded. Push to main and pull requests both run.
+# Nothing here fails except the secrets job.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write          # the persistent "Site health" issue on trunk pushes
+  pull-requests: write   # the PR comment when a PR fired
+
+concurrency:
+  group: advisory-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The only job allowed to fail. Small and fast so it reports quickly.
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: '24' }
+      - run: npm ci --prefix packages/cli
+      - name: Scan for committed credentials
+        run: node packages/cli/bin/sws.mjs check --standards standards --format terminal
+        # Exits 1 on a blocking finding. On a trunk push the credential is
+        # already in history, so the message says rotate first.
+
+  standards:
+    runs-on: ubuntu-latest
+    # Deliberately does not depend on `secrets`: a leaked key should not hide
+    # the rest of the report.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24' }
+
+      - name: Validate skills against the portability constraints
+        run: node scripts/validate-skills.mjs
+
+      - name: Confirm emitted skill copies are not stale
+        run: node scripts/sync-skills.mjs --check || (echo "::warning::run npm run sync-skills"; true)
+
+      - name: Validate every YAML in standards/
+        run: |
+          node -e '
+          const fs=require("fs"),path=require("path");
+          const yaml=require("./packages/cli/node_modules/yaml");
+          let bad=0;
+          (function walk(d){for(const n of fs.readdirSync(d)){const p=path.join(d,n);
+            if(fs.statSync(p).isDirectory())walk(p);
+            else if(/\.ya?ml$/.test(n)){try{yaml.parse(fs.readFileSync(p,"utf8"))}
+            catch(e){console.log(`::error file=${p}::${e.message}`);bad++}}}})("standards");
+          console.log(bad?`${bad} invalid`:"all YAML parses");
+          process.exit(bad?1:0)'
+
+      - name: Criteria and checks map in both directions
+        run: node scripts/validate-criteria.mjs
+
+  # Weekly, plus on demand: generate a project from the recipe against current
+  # latest and see whether upstream broke it. This replaces the starter template
+  # as our early warning system.
+  canary:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24' }
+      - run: echo "Recipe canary is not implemented yet. See PROJECT-PLAN.md Phase 3."

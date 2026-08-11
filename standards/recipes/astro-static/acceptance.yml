@@ -87,12 +87,27 @@ criteria:
       false failures on correct markup, which is exactly what happened when
       this recipe was first validated.
 
-  - id: brand.local-footer-separation
-    requires: Unit-specific links appear in a local footer, not inside the Global Footer.
+  - id: footer.no-additions
+    requires: >
+      No links other than the ten in the contract appear inside the Global
+      Footer. Unit links belong in a local footer above it.
+    check: footer
+    severity: warn
+    weight: 3
+    policy: brand
+    contract: standards/fragments/global-footer.yml
+    mechanism: >
+      When this fails, say where the links should move to. "Remove these links"
+      is unhelpful; "these belong in a local footer above the Global Footer" is
+      actionable.
+
+  - id: footer.copyright
+    requires: Both copyright lines are present, including the 94305 address.
     check: footer
     severity: warn
     weight: 2
     policy: brand
+    contract: standards/fragments/global-footer.yml
 
   # ---------------------------------------------------------- accessibility
   - id: a11y.axe.routes
@@ -195,6 +210,44 @@ criteria:
     severity: warn
     weight: 4
     policy: patterns
+
+  - id: decanter.css-first
+    requires: >
+      The installed decanter package's `main` is src/css/index.css, confirming
+      the CSS-first v8 architecture.
+    check: decanter
+    severity: warn
+    weight: 3
+    policy: patterns
+    note: >
+      A `main` of tailwind.config.js means v7 is installed. This is a more
+      reliable tell than the version string, since the git-branch install form
+      does not always carry a bumped version.
+
+  - id: decanter.no-nested-tailwind
+    requires: >
+      No nested node_modules/decanter/node_modules/tailwindcss exists.
+    check: decanter
+    severity: warn
+    weight: 3
+    policy: patterns
+    note: >
+      Means v7 crept in beneath a top-level Tailwind 4. Produces a build that
+      half works and errors that make no sense. A top-level-only version check
+      reports this as passing, which is why it is separate.
+
+  - id: decanter.no-redundant-tailwind-import
+    requires: >
+      The entry CSS does not import tailwindcss alongside decanter.
+    check: decanter
+    severity: info
+    weight: 1
+    policy: patterns
+    note: >
+      Decanter imports Tailwind itself. Harmless but redundant, roughly 340
+      bytes. Low weight deliberately: it is a tidiness signal, not a defect.
+      Note that www.stanford.edu DOES import tailwindcss directly, correctly,
+      because it does not consume Decanter.
 
   - id: decanter.no-js-config
     requires: No tailwind.config.js or tailwind.config.mjs exists.
@@ -462,6 +515,17 @@ criteria:
     severity: warn
     weight: 2
     policy: null
+
+  - id: build.site-set
+    requires: '`site` is set in astro.config.mjs to the production origin.'
+    check: build
+    severity: warn
+    weight: 4
+    policy: patterns
+    note: >
+      The most common configuration miss. Without it @astrojs/sitemap emits
+      nothing and canonical URLs are wrong, so it silently fails two other
+      criteria. Weighted accordingly.
 
   - id: build.base-path
     requires: >

@@ -1,0 +1,67 @@
+# The project's own documentation site. Deliberately built with astro-static and
+# checked by sws, so the standards are proven on something real rather than only
+# described.
+
+standards_version: 0.1.0
+recipe: astro-static
+created: 2026-08-11
+
+tier: low
+tier_because: >
+  Public documentation only. No forms, no authentication, no personal
+  information, no analytics.
+
+site:
+  name: "Synthetic Web Team"
+  unit: "Stanford Web Services"
+  purpose: "Explain the project and give people the prompt that installs it"
+  url: "https://su-sws.github.io/synthetic-web-team"
+
+owners:
+  business:
+    name: "Shea McKinney"
+    email: "sheamck@stanford.edu"
+  technical:
+    name: "Shea McKinney"
+    email: "sheamck@stanford.edu"
+
+# github.io, not a stanford.edu subdomain, so no University Communications
+# name approval applies and Siteimprove registration is not required.
+siteimprove:
+  registered: not_applicable
+  why: >
+    Not a stanford.edu domain. If this ever moves to a Stanford subdomain,
+    Siteimprove registration becomes required and the subdomain needs
+    University Communications approval.
+
+accessibility:
+  standard: WCAG 2.1 AA
+  oda_review_requested: null
+
+editors: []
+skills_installed: 25
+
+resolved:
+  astro: "7.2.1"
+  decanter: "8.0.0-alpha.1"
+  tailwindcss: "4.3.3"
+
+prior_art:
+  - what: Global Footer markup
+    from: standards/fragments/global-footer.yml
+    how: >
+      Generated at build time rather than transcribed. Two of the ten URLs were
+      wrong in this project's first draft because they were typed from memory.
+
+divergences:
+  - from: astro-static
+    changed: Site lives in a site/ subdirectory rather than at the repository root
+    reason: >
+      The repository is primarily the standards package; the docs site is a
+      sub-project. Running sws from site/ works, and the workflow check walks up
+      to find repository-level CI.
+    cost_accepted: >
+      A subdirectory layout is slightly unusual and needed a `base` path, which
+      is gotcha 4 in the recipe. Exercising it here is a feature.
+    date: 2026-08-11
+    by: sheamck@stanford.edu

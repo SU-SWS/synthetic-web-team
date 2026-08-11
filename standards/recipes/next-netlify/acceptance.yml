@@ -1,0 +1,193 @@
+# Acceptance criteria for recipe: next-netlify
+#
+# EXTENDS astro-static. Everything about the footer, Identity Bar, accessibility,
+# MinWeb, privacy, discoverability, and provenance is shared and lives there.
+# Duplicating those criteria would guarantee they drift, which is the failure
+# this whole project is organised against.
+#
+# Only differences belong in this file:
+#   - criteria that do not apply here (marked `applies: false`)
+#   - criteria whose mechanism differs on Next
+#   - criteria that exist only here
+#
+# Same rules as the parent: every criterion maps to an implemented check or is
+# marked manual; `unknown` is never a pass; `block` is reserved for irreversible
+# harm, which today is exactly one thing.
+
+recipe: next-netlify
+version: 1
+extends: astro-static
+
+standard:
+  accessibility: WCAG 2.1 AA
+  policy_refs: [minweb, minsec/applications/low, accessibility, minpriv]
+
+# ---------------------------------------------------------------- overrides
+# These come from the parent but do not apply, or apply differently.
+overrides:
+  - id: build.static-output
+    applies: false
+    why: >
+      This recipe deliberately does NOT use output: 'export'. Static export
+      cannot emit response headers, which removes CSP and the security header
+      set, and that is the main reason to choose this recipe over astro-static.
+
+  - id: build.base-path
+    applies: false
+    why: Netlify serves from the root. `base` is an Astro/Pages concern.
+
+  - id: build.site-set
+    applies: false
+    why: >
+      Astro-specific config key. The Next equivalent is metadataBase, checked
+      as next.metadata-base below.
+
+  - id: seo.canonical
+    mechanism: >
+      On Next, canonical URLs come from the App Router metadata API rather than
+      a hand-written link element. Check for a rel=canonical link in the built
+      output regardless of how it was produced, and if it is missing, point at
+      metadataBase rather than at Astro's `site`.
+
+  - id: decanter.entry-css
+    mechanism: >
+      Look for `@import 'decanter'` in the entry CSS, conventionally
+      styles/global.css rather than src/styles/global.css. Also verify the entry
+      does NOT begin with `@import 'tailwindcss'`: that is the homesite's
+      pattern, correct only because it does not consume Decanter.
+
+# ---------------------------------------------------------------- additions
+criteria:
+  - id: next.postcss-configured
+    requires: >
+      postcss.config.mjs registers @tailwindcss/postcss.
+    check: decanter
+    severity: warn
+    weight: 4
+    policy: patterns
+    note: >
+      Next uses the PostCSS plugin. @tailwindcss/vite is the Astro path and does
+      not apply here. Without this, Decanter's CSS is imported and never compiled.
+
+  - id: next.no-vite-tailwind
+    requires: '@tailwindcss/vite is not a dependency.'
+    check: decanter
+    severity: warn
+    weight: 2
+    policy: patterns
+    note: Wrong integration for Next. Signals a copied Astro config.
+
+  - id: next.metadata-base
+    requires: >
+      metadataBase is set in the root layout's metadata export, so canonical and
+      Open Graph URLs resolve absolutely.
+    check: seo
+    severity: warn
+    weight: 3
+    policy: patterns
+    note: The Next equivalent of Astro's `site`, and the same common miss.
+
+  - id: security.csp-present
+    requires: >
+      A Content-Security-Policy header is configured for the deployed
+      environment.
+    check: security
+    severity: warn
+    weight: 5
+    policy: minsec
+    mechanism: >
+      Parse next.config.* for a headers() function returning a
+      Content-Security-Policy entry. Cannot verify the served header without a
+      deployed URL, so report `unknown` rather than `pass` when the config
+      cannot be read or is generated dynamically in a way this check cannot
+      follow.
+    note: >
+      The main capability this recipe has and astro-static does not. Prefer
+      'strict-dynamic' with nonces over a host allowlist, which drifts and
+      eventually allows everything.
+
+  - id: security.headers-set
+    requires: >
+      Strict-Transport-Security, X-Content-Type-Options, Referrer-Policy, and
+      Permissions-Policy are configured.
+    check: security
+    severity: warn
+    weight: 4
+    policy: minsec
+    mechanism: Parse next.config.* headers(). Report per missing header, not as one failure.
+
+  - id: security.editor-csp-separate
+    requires: >
+      If the Storyblok Visual Editor is in use, its route has its own CSP
+      allowing frame-ancestors from storyblok.com, and carries
+      noindex, nofollow.
+    check: security
+    severity: info
+    weight: 2
+    policy: minsec
+    applies_when: cms == storyblok
+    note: >
+      One policy cannot serve both: the app needs frame-ancestors 'none' and the
+      editor must be iframable by the CMS. The homesite solves this with two
+      policies and a path-exclusion pattern.
+
+  - id: security.csp-strict-dynamic
+    requires: >
+      The CSP uses 'strict-dynamic' with nonces rather than a host allowlist.
+    check: security
+    severity: info
+    weight: 2
+    policy: minsec
+    note: >
+      A CSP built from a long list of allowed hosts drifts and eventually allows
+      everything. @netlify/plugin-csp-nonce injects nonces at the edge.
+
+  - id: security.no-fontawesome-pro
+    requires: '@fortawesome/pro-* packages are not dependencies.'
+    check: hygiene
+    severity: warn
+    weight: 2
+    policy: patterns
+    note: >
+      Inherited from the homesite baseline, where it sits behind a licence-gated
+      preinstall token check. A unit site copying it gets an install failure and
+      a licence nobody mentioned. Use Heroicons.
+
+  - id: next.no-tailwind-config
+    requires: No tailwind.config.* file, and Tailwind was not added by the scaffolder.
+    check: decanter
+    severity: warn
+    weight: 2
+    policy: patterns
+    note: >
+      Scaffold with --no-tailwind. The scaffolder's Tailwind setup conflicts with
+      the Decanter integration.
+
+  - id: next.theme-extensions-annotated
+    requires: >
+      Project token overrides in the tailwind/ @theme block carry a comment
+      marking what differs from Decanter.
+    check: null
+    manual: true
+    severity: info
+    weight: 0
+    policy: patterns
+    note: >
+      ccc-bulletin annotates deviations inline ("/* Differs from Decanter */").
+      A comment at the token level is the same discipline as recording a
+      divergence in the manifest. Not automatable, worth prompting.
+
+  - id: next.not-homesite-tokens
+    requires: >
+      The project has not copied www.stanford.edu's tailwind/theme.css.
+    check: null
+    manual: true
+    severity: info
+    weight: 0
+    policy: patterns
+    note: >
+      The homesite's tokens are a PARALLEL VOCABULARY, not Decanter's. Copying
+      them produces something that looks approximately right and does not use
+      the design system, which passes visual review and fails every token check.
+      A short theme.css containing only deviations is the tell that this was
+      done correctly.

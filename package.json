@@ -1,0 +1,19 @@
+{
+  "name": "@su-sws/synthetic-web-team",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A portable agent team that reproduces Stanford Web Services practice in any AI coding tool.",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SU-SWS/synthetic-web-team.git"
+  },
+  "scripts": {
+    "sync-skills": "node scripts/sync-skills.mjs",
+    "validate": "node scripts/validate-skills.mjs && node scripts/validate-criteria.mjs",
+    "check": "npm run validate && npm run sync-skills -- --check"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

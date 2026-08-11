@@ -1,0 +1,30 @@
+User-agent: *
+Allow: /
+
+# Retrieval and user-triggered AI agents: allowed. This is public documentation
+# for a public university project and we want it findable.
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+# Training crawlers: also allowed here, deliberately. This is a unit policy
+# decision, not a default the standards impose. See
+# standards/patterns/discoverability.md
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+Sitemap: https://su-sws.github.io/synthetic-web-team/sitemap-index.xml

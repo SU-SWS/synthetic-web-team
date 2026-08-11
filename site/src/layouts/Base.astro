@@ -1,0 +1,122 @@
+---
+import '../styles/global.css';
+import { resourceLinks, policyLinks, copyrightLines } from '../lib/footer';
+
+interface Props { title: string; description: string; }
+const { title, description } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareSourceCode',
+  name: 'Synthetic Web Team',
+  description,
+  codeRepository: 'https://github.com/SU-SWS/synthetic-web-team',
+  programmingLanguage: 'JavaScript',
+  license: 'https://www.gnu.org/licenses/gpl-3.0.html',
+  author: {
+    '@type': 'EducationalOrganization',
+    name: 'Stanford Web Services, Stanford University',
+    url: 'https://uit.stanford.edu/sws',
+  },
+};
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <link rel="sitemap" href="/synthetic-web-team/sitemap-index.xml" />
+    <!-- Google Fonts, per Decanter 8: it ships no font assets. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,300..700;1,300..700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300..700;1,8..60,300..700&display=swap"
+    />
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </head>
+
+  <body class="bg-white text-black antialiased">
+    <!-- The only thing permitted above the Identity Bar. -->
+    <a
+      href="#main-content"
+      class="skiplink sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-white focus:px-16 focus:py-8 focus:text-cardinal-red focus:underline"
+      >Skip to main content</a
+    >
+
+    <!-- Stanford Identity Bar. Nothing above it but the skip link. -->
+    <div id="su-identity" class="bg-cardinal-red">
+      <div class="mx-auto max-w-[144rem] px-20 py-12 md:px-30">
+        <a
+          href="https://www.stanford.edu"
+          class="font-serif text-24 text-white no-underline hover:underline focus:underline md:text-27"
+          >Stanford University</a
+        >
+      </div>
+    </div>
+
+    <main id="main-content"><slot /></main>
+
+    <!-- Local footer. Unit links go HERE, never inside the Global Footer. -->
+    <div class="border-t border-black-20 bg-foggy-light">
+      <div class="mx-auto max-w-[144rem] px-20 py-30 md:px-30">
+        <p class="mb-0 text-16 text-black-70">
+          Built and maintained by
+          <a href="https://uit.stanford.edu/sws" class="text-digital-red underline hover:no-underline"
+            >Stanford Web Services</a
+          >. Source on
+          <a
+            href="https://github.com/SU-SWS/synthetic-web-team"
+            class="text-digital-red underline hover:no-underline">GitHub</a
+          >, licensed GPL-3.0-or-later.
+        </p>
+      </div>
+    </div>
+
+    <!--
+      Stanford Global Footer. IMMUTABLE.
+      Generated from standards/fragments/global-footer.yml at build time, so it
+      cannot drift from the contract every other Stanford site is checked against.
+    -->
+    <footer id="su-global-footer" class="bg-cardinal-red text-white">
+      <div class="mx-auto max-w-[144rem] px-20 py-36 md:px-30">
+        <nav aria-label="global footer menu" class="mb-20">
+          <ul class="mb-16 flex list-none flex-col gap-y-8 p-0 text-16 sm:flex-row sm:gap-x-30">
+            {
+              resourceLinks.map((l) => (
+                <li>
+                  <a href={l.href} class="text-white no-underline hover:underline focus:underline"
+                    set:html={l.label.replace(/&/g, '&amp;')}
+                  />
+                </li>
+              ))
+            }
+          </ul>
+          <ul class="flex list-none flex-col gap-y-8 p-0 text-14 sm:flex-row sm:gap-x-24">
+            {
+              policyLinks.map((l) => (
+                <li>
+                  <a
+                    href={l.href}
+                    title={l.title}
+                    class="text-white no-underline hover:underline focus:underline">{l.label}</a
+                  >
+                </li>
+              ))
+            }
+          </ul>
+        </nav>
+        <p class="mb-0 text-14">
+          {copyrightLines.map((line) => <span class="mr-8">{line}</span>)}
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

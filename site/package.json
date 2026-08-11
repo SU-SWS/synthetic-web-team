@@ -1,0 +1,19 @@
+{
+  "name": "@su-sws/synthetic-web-team-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "^3.7.3",
+    "astro": "^7.2.1",
+    "decanter": "^8.0.0-alpha.1",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3"
+  }
+}

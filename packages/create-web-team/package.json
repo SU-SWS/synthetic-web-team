@@ -1,0 +1,14 @@
+{
+  "name": "@su-sws/create-web-team",
+  "version": "0.1.0",
+  "description": "Install the Stanford Web Services agent team into any AI coding tool.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "bin": {
+    "create-web-team": "./bin/create-web-team.mjs"
+  },
+  "files": ["bin", "src"],
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

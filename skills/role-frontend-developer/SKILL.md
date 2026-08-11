@@ -1,0 +1,130 @@
+---
+name: role-frontend-developer
+description: Build the front end of a Stanford site. Use when writing components, templates, layouts, or styles; setting up Astro or Next; wiring Tailwind and Decanter; handling images, fonts, and performance; or reviewing front-end code.
+---
+
+# Front-end development
+
+Astro or Next, Tailwind 4 through Decanter 8, static output. See `sws-decanter`
+for the styling mechanics and `sws-deploy` for CI and hosting. This skill is
+about how to write the code.
+
+## Semantic HTML is the whole accessibility foundation
+
+Most accessibility failures are a `div` that should have been a `button`.
+
+- **Real elements before ARIA.** A `button` is focusable, keyboard-operable, and
+  announced correctly for free. `<div role="button">` needs `tabindex`, key
+  handlers, and still behaves worse.
+- **Landmarks on every page**: `header`, `nav`, `main`, `footer`. One `main`.
+- **One `h1`**, no skipped levels. Heading level is structure, not size.
+- **Lists for lists**, including navigation.
+- **ARIA only when no element exists.** Bad ARIA is worse than none, and the
+  first rule of ARIA is not to use it.
+
+Reach for `react-aria` or a headless library when building genuinely complex
+widgets like combo boxes or date pickers. `sulgryphon-nextjs` uses `react-aria`
+and is the strongest accessibility signal across SWS repos. Note there is no
+house headless library, so pick one per project rather than mixing.
+
+## Astro specifics
+
+**Default to zero JavaScript.** Astro components render to HTML with no runtime.
+Only add an island when something needs interactivity, and use the narrowest
+directive that works: `client:visible` over `client:load`, `client:idle` over
+`client:load`.
+
+**`output: 'static'`** for Pages. `'hybrid'` no longer exists.
+
+**Set `site`** in the config. Without it the sitemap emits nothing and canonical
+URLs are wrong, which fails two acceptance criteria. This is the single most
+common configuration miss.
+
+**Set `base`** if deploying to a subpath, or internal links work locally and
+break in production.
+
+**Content collections** for anything repeated: news, people, programs, events.
+Define a schema, get type safety and validation. Hand-maintained arrays of
+frontmatter drift.
+
+Run `astro check` as the typecheck step. `sws-astro` is the reference for config,
+eslint, and island composition.
+
+## Next specifics
+
+Static export forfeits `redirects`, `headers`, `rewrites`, Proxy, ISR, Server
+Actions, Draft Mode, and default-loader image optimization. Route Handlers work
+for `GET` only. Know that going in rather than discovering it.
+
+`ccc-bulletin` is the reference for Next with Decanter 8 and Tailwind 4 through
+`@tailwindcss/postcss`. Note the decoupled Drupal family deliberately runs
+`--webpack` rather than Turbopack across all four repos, which is consistent
+enough to be intentional. Ask before recommending Turbopack.
+
+## Conventions from the repos
+
+**`cnbuilder`** for conditional classes on Astro and Storyblok projects, pinned
+at `^3.1.0` across seven SWS repos. The decoupled Drupal family uses `clsx` plus
+`tailwind-merge`. Both fine, one per project.
+
+**Heroicons.** Not FontAwesome Pro: one repo uses it behind a licence-gated
+preinstall token check, and a unit site inheriting that gets an install failure
+and a licence nobody mentioned.
+
+**npm, or yarn if the project already has it.** Never convert a project's package
+manager. Advice about dependency overrides must be manager-aware, since npm
+`overrides` and yarn `resolutions` differ.
+
+## Images, fonts, performance
+
+**Images.** Use the framework's image component for local images so you get
+dimensions, lazy loading, and modern formats. Always set width and height, or
+explicit aspect ratio, to prevent layout shift. Under static export in Next, the
+default image loader does not work and you need a custom one.
+
+**Fonts.** Decanter ships no font assets. Import `fonts.css` or
+`fonts-basic.css`. Preload the one or two faces above the fold and let the rest
+load normally. `font-display: swap` unless you have a reason.
+
+**Performance budget** in CI, and treat it as a real number. These are
+information sites; a department page that takes four seconds is a failure
+regardless of what the design looks like. The wins are almost always: fewer
+images, correctly sized; fewer islands; no client-side framework for static
+content.
+
+## Do not
+
+- Create `tailwind.config.js`. Decanter 8 has no JS config.
+- Install `@astrojs/tailwind`. Dead package.
+- Install `tailwindcss` or `@tailwindcss/forms` directly. Both arrive through
+  Decanter.
+- Hardcode Stanford hex values. Use the token.
+- Remove a focus outline without replacing it with something better.
+- Put canonical facts in an image, a PDF, or a client-rendered component.
+- Add a component workshop. These sites have few components and one consumer.
+
+## Testing
+
+Playwright plus `@axe-core/playwright` against every built route, asserting zero
+violations tagged `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`. Playwright is the
+forward default even though three SWS repos use Cypress; never convert an
+existing Cypress suite.
+
+If a11y assertions are needed at component level, Vitest plus `axe-core` gets
+there without a workshop. Reach for that when a component set earns real reuse.
+
+## Artifacts
+
+Components, layouts, and config in the project. Plus:
+
+| Artifact | Path |
+|---|---|
+| Performance budget | `docs/performance-budget.md` |
+| Component inventory | `docs/components.md`, shared with `role-ux-designer` |
+
+## When reviewing front-end code
+
+Look for the `div` that should be a `button`, the missing `site` config, a
+hardcoded hex, a removed focus outline, an island that did not need to be one, an
+image without dimensions, and a heading level chosen for its size. That list
+catches most of what actually goes wrong.
