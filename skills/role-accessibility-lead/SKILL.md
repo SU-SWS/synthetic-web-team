@@ -17,7 +17,7 @@ revisions. Not just new work.
 | Signal | When | Catches |
 |---|---|---|
 | **`sa11y`** in the CMS Visual Editor overlay | While authors edit | Content problems, before publish |
-| **axe** via Playwright in CI | Every build | Roughly 30 percent of issues in the built site |
+| **axe** via Playwright in CI | Every build | Roughly 30 percent of issues in the built site. Run it with `sws a11y` |
 | **Manual checklist** | Pre-launch, and on significant change | The other ~70 percent |
 | **Siteimprove** | After launch, continuously | Its own criteria, site-wide |
 
@@ -30,21 +30,16 @@ and never describe a site as accessible on the strength of a passing test.
 
 This causes recurring confusion, so be precise.
 
-Siteimprove runs **Alfa**, its own ACT-rules engine, not axe-core. Its
-Accessibility score spans **A, AA, and AAA** plus two non-normative categories,
-WAI-ARIA authoring practices and Best Practices, so AAA and best-practice
-findings drag a number whose policy target is 2.1 AA. Scoring is proprietary and
-weighted: most issues are assessed **site-wide**, meaning one violation anywhere
-can cap the score, with only about 30 points available from per-page work. It
-also reports **"Potential Issues"** requiring human confirmation, a bucket with
-no axe equivalent, and the usual explanation for "Siteimprove found more than
-axe."
+Siteimprove runs **Alfa**, its own ACT-rules engine, not axe-core. Its score
+spans **A, AA, and AAA** plus non-normative categories, its weighting is
+proprietary and mostly site-wide, and it reports **"Potential Issues"** that have
+no axe equivalent. The full comparison, and why a Siteimprove score below 100 may
+be entirely out of scope for a 2.1 AA target, is in
+`standards/policy/accessibility.md`.
 
-So: present them side by side with distinct labels, never as one number or a
-delta. Explain that a score below 100 may be entirely AAA and best-practice
-findings out of scope for the policy target. **ACT rule IDs are the only clean
-join key** if the two ever need correlating; Siteimprove publishes a rules list
-and API IDs for that.
+Operationally: **present them side by side with distinct labels, never as one
+number or a delta.** ACT rule IDs are the only clean join key if the two ever need
+correlating.
 
 Siteimprove registration is a **MinWeb requirement** for public-facing sites,
 through its own intake. Google Analytics is not required.
@@ -119,7 +114,7 @@ than none.
 Any purchased product needs a **VPAT or ACR dated within the past 12 months**,
 assessed against the required WCAG level. Read it rather than filing it: vendors
 routinely self-report "supports" for criteria they partially meet, and the
-remarks column is where the truth is.
+remarks column is where the truth is. See `standards/policy/procurement.md`.
 
 A **temporary exception** exists for cases where conformance is not technically
 feasible or would fundamentally alter the service. That is a request to ODA, not

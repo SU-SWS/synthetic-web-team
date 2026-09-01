@@ -1,0 +1,95 @@
+# Performance budget for a static Stanford information site.
+#
+# ==============================================================================
+# WHAT IS MEASURED, AND WHY IT IS NOT LIGHTHOUSE
+#
+# The criterion this backs used to say "Lighthouse performance budget". It now
+# budgets BYTES AND REQUEST COUNTS measured in real Chromium, not Lighthouse
+# scores. Three reasons, in order of weight:
+#
+# 1. A Lighthouse performance score varies by ten points or more between runs on
+#    a shared CI runner. This project trends a compliance score and reports it in
+#    a PR comment. A check that moves on its own would teach people to ignore the
+#    number, which is the one failure mode the whole advisory design is built to
+#    avoid. Byte counts are exact and identical run to run.
+#
+# 2. Bytes are what a Stanford unit can act on. `role-frontend-developer` already
+#    says the wins are "fewer images, correctly sized; fewer islands; no
+#    client-side framework for static content" -- all three are byte problems. A
+#    score of 84 tells nobody what to delete.
+#
+# 3. Lab timings on a build server say little about a reader on campus wifi.
+#    Field data would be better and we do not have it. Measuring bytes honestly
+#    beats measuring latency badly.
+#
+# Timings ARE recorded (domContentLoaded, load) as unscored context, so a person
+# can look. They never affect the result.
+#
+# ONLY FIRST-PARTY BYTES COUNT. Everything served from the site's own origin.
+# Third-party requests are counted and reported separately, because including
+# them would make the check depend on the network and fail in an offline CI. See
+# the third_party section below: it earns its place for a second reason.
+#
+# BYTES ARE UNCOMPRESSED. The local server does not gzip, and emulating a CDN's
+# compression would be guesswork. Real transfer of text assets will be roughly a
+# third of these numbers, so the budgets below are set with that slack in mind.
+# Do not "fix" this by multiplying by a guessed ratio.
+# ==============================================================================
+
+version: 1
+reviewed: 2026-09-01
+
+# Calibrated against this project's own docs site on 2026-09-01, which measured
+# 51.8 KB of first-party bytes across 5 requests (26.9 KB CSS, 15.2 KB HTML, no
+# JS). The budgets are deliberately far above that: a budget exists to catch
+# regression and bloat, not to freeze the current page. A site that trips one of
+# these has done something worth a conversation.
+budgets:
+  # Binding overall limit. Per-type limits below are sub-limits, so a site can
+  # sit under every type and still exceed the total.
+  total_kb: 800
+
+  by_type:
+    html_kb: 100
+    css_kb: 150
+    # 150 KB catches the failure this project cares most about: shipping a
+    # client-side framework to render static content. Astro's default is zero
+    # JS, so a unit site with 150 KB of script has almost certainly added an
+    # island that did not need to be one.
+    js_kb: 150
+    images_kb: 500
+    fonts_kb: 400
+    other_kb: 100
+
+  requests: 50
+
+# Not budgeted, reported. A third-party request is two things at once, and the
+# second is the reason this section exists:
+#   - a performance cost outside our control
+#   - a PRIVACY surface. MinPriv treats introducing a third-party service as
+#     something to disclose, and it can trigger a Data Risk Assessment.
+#     See standards/policy/privacy.md.
+# So the check lists the origins rather than scoring them, and says to check the
+# privacy consequence. This project's own site loads 147 KB of fonts from an
+# external origin, which is worth knowing on both counts.
+third_party:
+  report_origins: true
+  warn_above_origins: 4
+  note: >
+    Self-hosting fonts removes a third-party origin and usually gets faster.
+    Decanter ships no font assets, so the CDN reference is the default rather
+    than a decision anyone made. Worth revisiting per site.
+
+# Any project may override any number above in .sws/manifest.yml under
+# `performance_budget:`, which is a recorded divergence rather than a workaround.
+# An image-led site legitimately needs a larger images_kb. Say so there, with a
+# reason, and the check uses your number and reports that it did.
+override:
+  location: .sws/manifest.yml
+  key: performance_budget
+  example: |
+    performance_budget:
+      images_kb: 1200
+      reason: >
+        Photo-led admissions landing page; images are the content. Reviewed
+        with the unit 2026-09-01.

@@ -300,7 +300,7 @@ synthetic-web-team/                        pnpm workspace, Node 24
 ├── CLAUDE.md                              thin pointer: @AGENTS.md
 ├── skills/<name>/SKILL.md                 L1: source of truth for all skills
 │                                          copied to .agents/skills + .claude/skills
-├── packages/
+├── packages/                              npm workspaces, NOT pnpm: see the note below
 │   ├── standards/                         @su-sws/standards  (ships L0 + L1 content)
 │   ├── cli/                               @su-sws/sws-cli    → binary `sws`
 │   ├── create-web-team/                   @su-sws/create-web-team  (the wizard)
@@ -313,6 +313,10 @@ synthetic-web-team/                        pnpm workspace, Node 24
 ```
 
 ---
+
+**Divergence from this layout, recorded 1 September 2026: npm workspaces, not pnpm.** The header of this section says "pnpm workspace" and the repository uses **npm** instead. Two reasons. The stack defaults in section 3 already say *npm, and never convert a project's package manager* — converting our own repository would be the same mistake we tell consumers not to make. And `packages/cli` already carried an npm lockfile, so pnpm would have meant a conversion rather than a choice. npm workspaces supply the one thing actually needed here, which is cross-package linking so `@su-sws/create-web-team` can resolve `@su-sws/standards` during development. Nothing in the design depended on pnpm.
+
+**One consequence of `packages/standards` worth knowing.** The content lives at the repository root, because that is where `scripts/validate-skills.mjs`, `scripts/sync-skills.mjs` and the docs site all expect it, and npm cannot pack files from outside a package directory. So the package stages the content in at pack time and removes it afterwards, and its `index.mjs` resolves either layout. That keeps one source of truth and no build step, at the cost of one 60-line script. `advisory.yml` packs for real on every run and asserts the tarball contains 25 skills and 8 policy files, because a wrong `files` list fails silently until the day someone publishes.
 
 ## 5a. What a recipe is
 
@@ -598,6 +602,32 @@ This is a strictly better trade than maintaining starters. We test the **contrac
 
 The canary is also what makes "install latest, pin nothing" safe rather than reckless. Consumers get current versions, and we find out about a breaking upstream release within a week, on our own repo, before a Stanford unit hits it. It keeps `reference-versions.yml` honest without anyone remembering to update it.
 
+**Status: deferred by decision, 1 September 2026.** Nothing above is retracted; the canary is still the right answer and still the only mitigation for pinning nothing. But the project is not in production, so no Stanford unit is exposed, and the staleness we have actually suffered was in our own documents rather than in a recipe. Revisit before the first pilot. Recorded in the standing risks table as accepted and unmitigated.
+
+### Standards freshness, which is the pipeline to build first
+
+**Different target from the canary, and a more urgent one.** The canary asks *does the recipe still work against current upstream?* Freshness asks *is what we wrote still true?* Two failures in a single day on 1 September 2026 made the case:
+
+- Decanter's npm dist-tags moved — the alpha came off `latest`, a beta appeared — and every document in the repo confidently asserted the opposite for three weeks.
+- A misreading of four `--webpack` repos as a convention survived in seven files until a person was asked.
+
+Neither is a recipe failure. Both are L0 going stale while looking authoritative, which is the worst failure mode this project has, because the whole value proposition is that the standards are current.
+
+The groundwork is already laid: policy files carry `reviewed:` dates, sourced facts carry their source and a date, and `reference-versions.yml` carries a `rechecked:` block. Those make staleness **detectable**. The pipeline does the detecting:
+
+| Check | Signal |
+|---|---|
+| **`reviewed:` age** on every `standards/policy/*.md` | Over 12 months, nag. This is the nag ladder applied to ourselves |
+| **External URL liveness** across `standards/` | Dead escalation doors, dead prior-art exemplars, moved policy pages. `escalation.md` is nothing but links to offices |
+| **Sourced-fact drift** | For each fact with a recorded source, has the source changed? Content hash `UPGRADE.md`, `npm view <pkg> dist-tags`, the Global Footer component upstream |
+| **`reference-versions.yml` snapshot age** | Flag when the newest `rechecked:` entry is old, rather than pretending one snapshot date covers the file |
+| **GitHub Actions majors** in recipes vs current releases | Actions move on GitHub's schedule, not npm's |
+| **Prior-art `era` plausibility** | A catalog entry rated `exemplary` whose era is two Decanter majors back is probably now `dated` |
+
+Design constraints, same as everything else here: **advisory, never blocking**; report into the persistent issue rather than a new one per run; and every finding names the file and the fix. A freshness check that fails a build over a year-old `reviewed:` date would get switched off in a week.
+
+The one genuinely hard part is sourced-fact drift, because "the source changed" is not the same as "our statement is now wrong." Expect it to report *review this*, not *this is broken*, and expect a person to make the call. That is acceptable: the failure today was not knowing to look.
+
 ### The score, and why it works better than a gate
 
 A single number, 0 to 100, weighted across accessibility, MinWeb, brand and identity, discoverability, and hygiene. It appears in the PR comment, in `sws doctor`, and as a README badge. **It trends.** The PR comment says "94, up from 91" or "88, down from 94, three new contrast findings in `Hero.astro`."
@@ -718,6 +748,11 @@ L0 complete. The 8 built role skills, the 11 stubs, the 5 shared skills. `AGENTS
 *Exit: `npx` to a live, compliant GitHub Pages site in under ten minutes, with nothing vendored.*
 
 **Phase 3, Advisory enforcement and the canary (weeks 11 to 13, Oct 26 to Nov 13)**
+*Progress note, 1 September 2026: `sws doctor`, `sws check`, the score, `.sws/acknowledged.yml`, the secrets gate, **axe against every built route via `@axe-core/playwright`**, and the **performance budget** are all done. `sws a11y` and `sws perf` share one browser harness that serves the build, drives Chromium, and waits for animations to settle; both record results that `check` reads, and both report `unknown` rather than `pass` on any failure to run. The dogfooded site now scores 100/100 with every remaining unchecked item genuinely unautomatable. The canary is deferred (see section 9). **Phase 3 is otherwise complete**: the PR comment, the persistent Site health issue, the score trend with a sparkline, the standalone HTML report, and the README badge all ship, verified end to end against a stand-in GitHub API.*
+
+*The trend needed a storage decision the plan had not made. Committed files mean commit noise and PR conflicts; artifacts expire at 90 days; the Actions cache is evictable. The history therefore lives in the **Site health issue body** as an HTML comment — no new storage, survives indefinitely, and reuses the destination this section already chose. `sws doctor`'s local "since your last run" delta is kept deliberately separate in a gitignored file, so one person's local runs never move the project's number.*
+
+*One design change worth recording: the budget is **bytes, not Lighthouse**. A Lighthouse performance score varies by ten points or more between runs on a shared CI runner, and this project trends its score in a PR comment, so a self-moving number would teach people to ignore it — the exact failure the advisory design exists to prevent. Bytes are exact. Timings are recorded as unscored context. Rationale in `standards/stack/performance-budget.yml`.*
 `sws doctor` and `sws check`, with every `acceptance.yml` criterion from the Astro recipe backed by a real check, since the recipe is only as good as its verification. HTML and JSON reports, the score, the PR comment, the trend. `.sws/acknowledged.yml`. Secrets as the single gate. axe against every built route via `@axe-core/playwright`. `recipe-canary.yml` running weekly.
 *Exit: a generated project produces a useful, non-blocking report people want to read, and the canary is green.*
 
@@ -726,6 +761,9 @@ L0 complete. The 8 built role skills, the 11 stubs, the 5 shared skills. `AGENTS
 *Exit: both recipes generate projects that deploy to all three targets.*
 
 **Phase 5, MCP and Storyblok (weeks 17 to 20, Dec 7 to Jan 8)**
+*Reprioritised and partly delivered, 1 September 2026. `@su-sws/mcp` was pulled forward out of Phase 5 on the grounds that the primary installer of this package is an **agent**, not a human — which makes a tool an agent can call more important than a CLI it has to shell out to and parse. It ships with five tools (`sws_get_standard`, `sws_footer_html`, `sws_check`, `sws_decanter_token`, `sws_scaffold`) plus all 26 L0 documents as resources, verified end to end over the real stdio protocol. Storyblok and Algolia remain in this phase.*
+
+*Two divergences recorded. **Protocol version:** this section specified spec `2026-07-28` (stateless, `server/discover`). Checked against `@modelcontextprotocol/sdk` 1.30.0: that string appears nowhere in the SDK, nor does `server/discover`, and `LATEST_PROTOCOL_VERSION` is `2025-11-25`. Building against a spec no SDK implements would have produced a server that works in no editor. Built against the SDK's negotiated version instead. **Implementation:** `sws_check` and `sws_scaffold` shell out to the CLI and the wizard rather than reimplementing them, so the MCP result and the terminal result cannot disagree.*
 `@su-sws/mcp` against spec 2026-07-28. A Storyblok add-on recipe for the Astro path using the current `@storyblok/astro`, schema-as-code via the Storyblok CLI, and webhook-triggered rebuilds since Astro has no ISR primitive. Algolia DocSearch add-on recipe.
 *Exit: a Storyblok-backed Astro site generated from recipes, and the MCP server working in at least three editors.*
 
@@ -770,13 +808,13 @@ The uninstall rate and the acceptance-register usage are the two that tell us wh
 
 ### Blocking, needed in Phase 0
 
-1. **Answer the five remaining questions from the repo inspection.** Listed at the bottom of `standards/prior-art/repos.yml`. Two are already resolved: the homesite is a Decanter-derived system feeding Decanter 8, and the `cardinalsites`/`csp` pair are intentional sibling instances. The most consequential of what remains: what is `adapt-auth-sdk` and is it the sanctioned path for Stanford auth, and does a unit adopt a homesite pattern that has not yet landed in Decanter 8?
+1. ~~**Answer the five remaining questions from the repo inspection.**~~ **Resolved, 1 September 2026.** All answered by SWS and recorded at the bottom of `standards/prior-art/repos.yml` with the answers kept alongside the questions. Three changed guidance materially: **`weblogin-auth-sdk` is the preferred auth package** and `adapt-auth-sdk` is for alumni sites only; **Turbopack is the forward choice** for Next.js, reversing what four `--webpack` repos appeared to say; and **Decanter 8 is not a hard line on design** — carrot, not stick, with only policy binding and policy covering just a sliver of the aesthetic. The Turbopack answer also produced a new precedence clause, **count lineages not repos**, because four sibling repos sharing a flag is one copy-forked decision rather than four votes.
 
-2. **Rate the prior-art catalog.** Harvesting is done: 17 live exemplars and 4 tools are in `catalog.yml`, taken from [Awesome-Decanter](https://github.com/SU-SWS/Awesome-Decanter). What is missing is the judgment layer, which is the part only SWS can supply. Every entry carries `era: unverified` and most carry `rating: TBD`, and my `use_for` values are inferred from each site's evident purpose rather than from inspection. The inspection pass is ordered by value per minute in the file, and it is fine for it to demote entries to `sound` and move on. Ten well-judged entries beat seventeen unjudged ones.
+2. ~~**Rate the prior-art catalog.**~~ **Done.** All 26 catalog entries carry a real `era` and a real `rating`: 9 exemplary, 6 sound, 6 cautionary, 5 dated, across decanter-6, -7, -8 and decanter-derived eras. No `era: unverified` or `rating: TBD` entries remain. The judgment layer that only SWS could supply has been supplied.
 
-3. **Decanter 8's npm publish plan.** The alpha exists as a **git tag only**, not on the npm registry (`npm view decanter@8.0.0-alpha.1` returns 404), and `package.json` at that tag still reads `"version": "7.4.0"`. Our starters can install from the git tag today, which is how the spike ran, but shipping to campus needs a real npm version. Confirm the target date, that it publishes as `8.0.0`, and whether it goes to `latest` or a `next` tag first (that choice determines whether existing v7 consumers get pulled forward unexpectedly).
-4. **Whether Decanter 8 docs will exist at release.** `decanter.stanford.edu` documents v7, and the v8 README points at file paths that do not exist. If v8 ships without docs, `sws-decanter` becomes the de facto v8 documentation for our users, which is a larger authoring job than planned and one we should not take on accidentally.
-5. **The v7-to-v8 class-level delta.** The spike proved the build integration works; it did not enumerate which v7 utility and component classes changed, moved, or disappeared. `sws-decanter` needs that list to help anyone migrating an existing site, and the Decanter team almost certainly has it in an `UPGRADE.md` already (v7's exists).
+3. ~~**Decanter 8's npm publish plan.**~~ **Largely resolved, 1 September 2026.** `8.0.0-beta.0` is published to npm on the `beta` dist-tag. `latest` is `7.5.3`, so **existing v7 consumers are not pulled forward** — that was the consequential half of this question and the answer is the safe one. Recipes install `decanter@beta` explicitly until 8.0.0 reaches `latest`. Note the tags moved once already: the alpha briefly occupied `latest` in August, which is why `standards/stack/reference-versions.yml` now carries a dated recheck rather than a single snapshot. **Still open:** the 8.0.0 GA date.
+4. ~~**Whether Decanter 8 docs will exist at release.**~~ **Resolved for the part that mattered, 1 September 2026.** Upstream now ships a real `UPGRADE.md` plus a `CHANGELOG.md`, so we are not on the hook for authoring the migration story — the risk this question was actually about. **Still open, but with a known answer coming:** a new Decanter 8 documentation site is in progress (no date announced as of 1 September 2026). `decanter.stanford.edu` and the Figma library still document v7 in the meantime. The standing instruction is therefore to *not* author v8 reference documentation — no token catalogues, no per-component class lists — because that work is about to be superseded. `standards/patterns/decanter.md` covers only what SWS consumers operationally need and defers to the shipped CSS for token names.
+5. ~~**The v7-to-v8 class-level delta.**~~ **Resolved, 1 September 2026.** Upstream `UPGRADE.md` enumerates it, and the table is reproduced in `standards/patterns/decanter.md` with four traps called out: `type-N` is smaller than `text-mN` below `lg`; `children:` → `*:` reverses variant order and the intuitive form is wrong; `break-words` still compiles while silently losing its v7 behaviour; and `aspect-w-*` / `aspect-h-*` stop generating anything. Two further findings the spike had missed entirely: **form styles are opt-in in v8** behind a `decanter/forms` entry point, which fails silently and is the most likely v8 mistake on a unit site; and **`.a11y-hidden` / `.accessibility-hidden` were removed in 7.5.0**, having never had the screen-reader behaviour their docs claimed. Proven on our own docs site, which needed `foggy-*` → `fog-*` and would otherwise have lost three background colours with a green build.
 
 ### Research gaps to close
 
@@ -793,7 +831,8 @@ The uninstall rate and the acceptance-register usage are the two that tell us wh
 | Editor formats churn faster than we maintain | Medium | Convention-only is the mitigation. `AGENTS.md` and `SKILL.md` are the two most stable surfaces in the ecosystem, and the emitted per-editor files are thin pointers we can regenerate or delete |
 | Decanter 8 stays in alpha longer than expected | Low | Now published, and the recipe installs whatever tag we point at. Change one line to move from `next` to `latest`. Do **not** add a v7 fallback path, it would become legacy we support forever |
 | Decanter 8 introduces breaking changes late in its own alpha | Medium | Our Decanter surface is one line of CSS plus the token references in `sws-decanter`. The canary catches breakage weekly |
-| Upstream breaks a recipe and we find out from a user | Medium | `recipe-canary.yml` weekly. This is the risk we deliberately accepted by dropping starters, and the canary is the whole mitigation, so it must ship in Phase 3 rather than slipping |
+| Upstream breaks a recipe and we find out from a user | Medium | **Accepted and unmitigated as of 1 September 2026.** `recipe-canary.yml` remains the right answer and the design in section 9 stands, but it is deliberately deferred: the project is not in production, so no Stanford unit is exposed to upstream drift. **Revisit trigger: before the first pilot project.** Until then, drift is caught by hand, which today cost three weeks on the Decanter dist-tag move. Prioritised behind the standards freshness pipeline below, which addresses the staleness we have actually experienced |
+| Our own L0 goes stale and nobody notices | **High** | The failure we have actually had, twice in one day: Decanter's dist-tags moved without us knowing, and a misread of four `--webpack` repos survived three weeks in seven files. Policy files now carry `reviewed:` dates and sourced facts carry their source and date, which makes staleness *detectable*; a **standards freshness CI pipeline** to do the detecting is the next build. Scope sketched in section 9 |
 | Generated projects vary in quality because there is no template | Medium | Acceptance criteria plus `sws check`. Any requirement not backed by a check is a requirement that will not hold, which is a useful forcing function on what we bother to require |
 | Astro is young, two majors in five months | Medium | Recipes install latest and record what resolved. The canary catches a breaking major within a week, and the fix is a sentence in a recipe. `legacy.collections` as the escape hatch |
 | Advisory-only means nothing improves | Medium | The score, the trend, the PR comment, the badge, and the acceptance register are the behavioral design. Revisit at 90 days against the metrics in section 14 |

@@ -1,3 +1,9 @@
+---
+policy: escalation
+title: Escalation, which office and which door
+reviewed: 2026-09-01
+---
+
 # Escalation: which office, and which door
 
 **The operational counterpart to "route, don't recommend."** That principle says name the responsible university office rather than a product. This file says *which* office and, more usefully, *which door* at that office.

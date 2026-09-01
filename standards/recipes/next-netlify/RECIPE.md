@@ -78,7 +78,9 @@ node -p "require('./node_modules/decanter/package.json').main"      # expect src
 ls node_modules/decanter/node_modules 2>/dev/null                   # expect nothing
 ```
 
-`tailwindcss` and `@tailwindcss/forms` arrive transitively through Decanter. Do
+`tailwindcss` and `@tailwindcss/forms` both still arrive transitively through
+Decanter, but in v8 the form styles are only emitted if the project imports
+`decanter/forms` explicitly. A site with a form needs that second import. Do
 not install them directly, and do not create a `tailwind.config.js`.
 
 Also install, matching the house conventions: `cnbuilder` for conditional
@@ -308,7 +310,7 @@ npx sws check
 | `astro-static` instead | **Usually the better choice for a content site.** Less weight, simpler hosting, works on GitHub Pages |
 | Static export (`output: 'export'`) | Forfeits CSP and security headers, `redirects`, `rewrites`, Proxy, ISR, Server Actions, Draft Mode, and default-loader image optimization. Route Handlers become `GET`-only. If you want this, you want `astro-static` |
 | Vercel instead of Netlify | Supported, but you leave the platform every other SWS project uses and lose the shared tooling. `@netlify/plugin-csp-nonce` has no direct equivalent |
-| Decoupled Drupal instead of Storyblok | `graphql-request` plus `graphql-codegen`, per `cardinalsites-nextjs`. Note that family deliberately runs `--webpack` rather than Turbopack across all four repos |
+| Decoupled Drupal instead of Storyblok | `graphql-request` plus `graphql-codegen`, per `cardinalsites-nextjs`. That family runs `--webpack`, but it is a point-in-time decision rather than guidance: Turbopack is the forward default for new Next.js work |
 | Cypress instead of Playwright | Reasonable if the project already has it. Both baselines do |
 | `clsx` + `tailwind-merge` instead of `cnbuilder` | Both are in SWS use, split by project family. One per project |
 | yarn instead of npm | Fine. `ccc-bulletin` uses yarn 4, the homesite uses npm. Never convert a project |

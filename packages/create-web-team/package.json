@@ -7,8 +7,18 @@
   "bin": {
     "create-web-team": "./bin/create-web-team.mjs"
   },
-  "files": ["bin", "src"],
+  "files": [
+    "bin",
+    "src"
+  ],
   "engines": {
     "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "@su-sws/standards": "^0.1.0"
+  },
+  "exports": {
+    "./bin/create-web-team.mjs": "./bin/create-web-team.mjs",
+    "./src/*": "./src/*"
   }
 }

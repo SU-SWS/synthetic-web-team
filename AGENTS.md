@@ -31,7 +31,9 @@ problems are solved. Run `sws prior-art find "<what you are building>"` or read
 - Prior art tells you **how we solved a shape of problem**. Standards tell you
   **what to build it with**. When they disagree, standards win.
 - **Repeated identical choices across repos are a convention**, not drift.
-  Adopt them.
+  Adopt them — but **count lineages, not repos.** Sibling repos made by
+  copy-forking share one decision, not several, and that decision may be frozen
+  rather than current.
 - Prior art **cannot tell you why** a dependency is there, or **where the org
   is going**. Both need a person. Never infer purpose from presence, and never
   present current practice as intent.
@@ -59,6 +61,15 @@ policy behind them, offer a fix, and move on. Do not block, do not lecture, and
 do not refuse to proceed because a check failed. A person who finds this tool
 obstructive will stop using it, and then nothing is compliant.
 
+**Carrot, not stick.** Almost everything in the Stanford web ecosystem is an
+incentive rather than a mandate, and this tool has to be attractive to work with
+or it gets bypassed — someone who feels blocked simply goes their own way, and
+then you have no influence at all. **Policy governs only a sliver of a site**,
+mostly the page furniture in `standards/policy/brand.md`. Decanter is the easiest
+compliant path, not a hard line: design creativity above the footer and Identity
+Bar is welcome, including adopting a `www.stanford.edu` pattern before it lands in
+Decanter. Be the reason someone stays, not the reason they leave.
+
 If someone cannot fix something now, record it in `.sws/acknowledged.yml` with a
 reason and a review date. That is a supported action, not a workaround.
 
@@ -74,12 +85,27 @@ you" beats a confident wrong link.
 Do not recommend or rank vendors for anything with legal, policy, or
 procurement implications. State the obligation, name the office, stop.
 
+## Installing this into a project
+
+If you are an agent asked to set up a Stanford site, install non-interactively
+and read the result rather than the prose:
+
+```bash
+npx @su-sws/create-web-team --json --answers '{"siteName":"...","unit":"..."}'
+```
+
+Act on three fields: `next[]` for what to do next, `incomplete[]` for manifest
+fields that are still placeholders (**ask the user, never invent an owner
+email**), and `counts` to tell a fresh install from a no-op re-run. Verify with
+`npx sws doctor --format json`.
+
 ## Where things are
 
 | Path | What |
 |---|---|
-| `standards/policy/` | Stanford requirements: MinSec, MinWeb, accessibility, privacy, brand, escalation |
-| `standards/patterns/` | How SWS builds: conventions, discoverability, content, IA |
+| `standards/policy/` | Stanford requirements: MinSec, MinWeb, accessibility, privacy, brand, identity, procurement, escalation. Each file dated with `reviewed:` |
+| `standards/patterns/` | How SWS builds: Decanter, components, content, IA, forms, discoverability, conventions |
+| `standards/stack/` | `reference-versions.yml`, a dated snapshot for the canary to diff. Advisory. **Nothing installs from it** |
 | `standards/recipes/` | Build contracts, with acceptance criteria per recipe |
 | `standards/fragments/` | Byte-exact compliance content. The Global Footer lives here |
 | `standards/prior-art/` | Existing SWS work, with era, lineage, and judgment |

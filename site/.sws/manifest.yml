@@ -43,10 +43,43 @@ skills_installed: 25
 
 resolved:
   astro: "7.2.1"
-  decanter: "8.0.0-alpha.1"
+  decanter: "8.0.0-beta.0"     # installed via `decanter@beta`; `latest` is 7.5.3
   tailwindcss: "4.3.3"
+  "@playwright/test": "1.62.1"
+  "@axe-core/playwright": "4.13.0"
+  axe-core: "4.13.0"           # transitive, and the version the report cites
+
+accessibility_testing:
+  tool: axe-core via @axe-core/playwright, run by `sws a11y`
+  tags: [wcag2a, wcag2aa, wcag21a, wcag21aa]
+  last_result: 0 violations across 1 route, 24 passes, 1 incomplete
+  caveat: >
+    Automation covers roughly 30 percent of issues per ODA guidance. The manual
+    WCAG 2.1 AA checklist has not been done for this site.
+
+performance:
+  tool: "`sws perf`, first-party uncompressed bytes in Chromium"
+  budget: standards/stack/performance-budget.yml v1
+  last_result: 42.1 KB of 800 KB budget, 2 first-party requests
+  third_party_origins:
+    - https://fonts.googleapis.com
+    - https://fonts.gstatic.com
+  third_party_note: >
+    157 KB of fonts from two Google origins. Not a decision anyone made: Decanter
+    ships no font assets, so the CDN reference is its default. Flagged here
+    because a third-party origin is a MinPriv disclosure question as well as a
+    performance cost. Self-hosting the two faces would remove both.
 
 prior_art:
+  - what: Decanter 7-to-8 class migration
+    from: https://github.com/SU-SWS/decanter/blob/main/UPGRADE.md
+    how: >
+      Upgrading alpha.1 to beta.0 required renaming foggy-light and foggy-dark to
+      fog-light and fog-dark in three files. Verified the beta's colors.css no
+      longer defines a foggy token, so the old classes compiled to nothing: a
+      silent background-colour regression with a green build. This is the failure
+      mode the class-delta table in standards/patterns/decanter.md exists to
+      prevent.
   - what: Global Footer markup
     from: standards/fragments/global-footer.yml
     how: >

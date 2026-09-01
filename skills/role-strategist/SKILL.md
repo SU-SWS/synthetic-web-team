@@ -44,13 +44,17 @@ you return to when scope grows.
 Ask about the world, not about MinSec. Nobody should need to read a security
 matrix to start a website.
 
-| If the site... | Tier | Consequence |
-|---|---|---|
-| Shows public information only | `low` | Patch cadence, monthly scanning, inventory, least-privilege admin |
-| Collects or displays personal information, or authenticates users | `moderate` | Duo for all users and admins, centralised logging, secure SDLC, weekly backups, annual developer training |
-| Handles regulated data or payments | `high` | Privileged access workstation, Data Risk Assessment before deploy, plus PCI, HIPAA, FISMA, or export controls |
+| If the site... | Tier |
+|---|---|
+| Shows public information only | `low` |
+| Collects or displays personal information, or authenticates users | `moderate` |
+| Handles regulated data or payments | `high` |
 
-Record it in `.sws/manifest.yml`. Adding a form that collects personal data
+What each tier then requires is in `standards/policy/minsec.md`. Your job is the
+left column; that file owns the right one. Note that `low` is not "no
+obligations" — read it before telling a unit this is easy.
+
+Record the tier and your reasoning in `.sws/manifest.yml`. Adding a form that collects personal data
 later is a **tier change**, not a feature. Flag it when it happens.
 
 ## Things with lead times, which is what makes them your problem

@@ -116,11 +116,11 @@ Escalate each to the right office and the right door per
 
 ## Post-launch, which is not optional either
 
-MinSec applies to low-risk static sites too: patch high-severity findings within
-7 days and others within 90, monthly vulnerability scanning, quarterly inventory
-with risk class, quarterly account and privilege review. Dependabot covers part
-of the patch cadence. The rest is a documented runbook and a human, and it lives
-at the infrastructure layer rather than in the repo.
+MinSec applies to low-risk static sites too. The cadence is in
+`standards/policy/minsec.md`: 7 days for high-severity, 90 for the rest, monthly
+scanning, quarterly inventory, quarterly privilege review. Dependabot covers part
+of it. The rest is a documented runbook and a human, and it lives at the
+infrastructure layer rather than in the repo.
 
 Secure sunset matters and gets forgotten: when a site retires, remove DNS,
 revoke credentials, archive or delete content, and kill dangling CNAMEs.

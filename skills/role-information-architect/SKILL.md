@@ -5,6 +5,10 @@ description: Structure a Stanford site. Use for sitemaps, navigation, taxonomy, 
 
 # Information architecture
 
+The full pattern, including URL design rules, the taxonomy tests, and the
+redirect procedure, is in `standards/patterns/ia.md`. This skill is the operating
+summary.
+
 Structure, naming, and findability. The layer where a site becomes usable or
 does not, and where most of the damage is done by organising around the
 institution rather than the reader.

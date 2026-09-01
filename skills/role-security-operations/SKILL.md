@@ -14,24 +14,15 @@ here is the operational depth for anything above `low` risk.
 **MinSec applies to low-risk static sites.** There is no exemption for "it's just
 a brochure site." A static site is not exempt, it is just cheap to comply with.
 
-At every tier, including `low`:
+The obligations at every tier, cumulative, are in
+`standards/policy/minsec.md`. That file is the canonical table and it also
+covers the MinSec **Servers** row, which self-hosting invokes and which is the
+real argument for managed static hosting.
 
-- Patch high-severity findings within **7 days**, others within **90**, using NVD
-  severity ratings, and stay on supported versions.
-- **Monthly vulnerability scanning** (Qualys), remediating severity 4 to 5 in 7
-  days and severity 3 in 90.
-- **Quarterly inventory** recording risk class and data volume.
-- **Quarterly account and privilege review**, password complexity, and SUNet
-  login via SAML where authentication exists.
-- Minimum necessary services exposed through the network firewall.
-
-`moderate` adds Duo for all users and admins, centralised logging to Splunk,
-secure SDLC with security as a design requirement plus code review and static
-analysis, annual SISA developer training, and weekly encrypted backups.
-
-`high` adds administrative access only from a privileged access workstation, a
-**Data Risk Assessment before deployment**, and whichever of PCI DSS, HIPAA,
-FISMA, or export controls applies.
+The four that bite a `low`-tier static site, so you can say them without
+opening the file: **patch high-severity findings within 7 days and others
+within 90**, **monthly Qualys scanning**, **quarterly inventory**, and
+**quarterly account and privilege review**.
 
 ## What ships today without this role
 

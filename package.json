@@ -11,9 +11,16 @@
   "scripts": {
     "sync-skills": "node scripts/sync-skills.mjs",
     "validate": "node scripts/validate-skills.mjs && node scripts/validate-criteria.mjs",
-    "check": "npm run validate && npm run sync-skills -- --check"
+    "check": "npm run validate && npm run sync-skills -- --check",
+    "pack:all": "mkdir -p .pack && npm pack --workspaces --pack-destination ./.pack"
   },
   "engines": {
     "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "devDependencies": {
+    "yaml": "^2.8.1"
   }
 }

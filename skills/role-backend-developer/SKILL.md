@@ -40,8 +40,9 @@ not CSS:
 
 - **Decoupled Drupal**: `cardinalsites-nextjs`, `csp-nextjs`, `summer-nextjs` use
   `graphql-request` plus `graphql-codegen` against Drupal. `sulgryphon-nextjs`
-  uses `next-drupal` instead. All four deliberately run `--webpack` rather than
-  Turbopack, consistently enough to be intentional.
+  uses `next-drupal` instead. All four run `--webpack` rather than Turbopack —
+  a point-in-time decision rather than a forward choice. **Turbopack is the
+  forward default for new Next.js work.**
 - **Storyblok**: the ADAPT and OOD family. `ccc-bulletin` is the current-version
   reference at `@storyblok/react` 6.x.
 

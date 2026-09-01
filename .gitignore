@@ -15,6 +15,28 @@ dist
 .agents/skills/
 .claude/skills/
 
+# axe results, derived from a build. Regenerate with `sws a11y`; never commit.
+# Committing them would let a stale pass travel with the repo, and `sws check`
+# treats results older than the build as `unknown` precisely to stop that.
+**/.sws/axe-results.json
+**/.sws/perf-results.json
+
+# Local score history, for `sws doctor`'s "since your last run". Per-developer,
+# not shared state: the project trend lives in the Site health issue body. See
+# packages/cli/src/history.mjs for why there are two.
+**/.sws/score-history.json
+
+# Content staged into @su-sws/standards at pack time by its prepack script, and
+# removed again by postpack. npm cannot include files from outside a package
+# directory, and the repository root is the single source of truth, so the copy
+# is made only for the duration of a pack. See packages/standards/scripts/stage.mjs.
+packages/standards/standards/
+packages/standards/skills/
+packages/standards/AGENTS.md
+
+# Tarballs from `npm run pack:all`.
+.pack/
+
 # Local prior-art index. Contains paths from the user's own disk and must never
 # be committed or transmitted.
 .sws/prior-art.local.yml

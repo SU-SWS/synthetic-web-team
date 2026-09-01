@@ -424,8 +424,11 @@ repos:
         csp-nextjs, which is an intentional sibling instance for a different
         client. See that entry.
       - >
-        Deliberately runs --webpack, opting OUT of Turbopack. All four repos in
-        this family do. Ask why before recommending Turbopack anywhere.
+        Runs --webpack, opting out of Turbopack. All four repos in this family
+        do. ASKED AND ANSWERED 2026-09-01: point-in-time decision, NOT a forward
+        choice. Turbopack is the forward default for Next.js sites. Note the four
+        repos are one lineage, so this is one decision copy-forked, not four
+        independent votes.
     priority: high
 
   - name: csp-nextjs
@@ -562,16 +565,36 @@ repos:
 #     centrally licenses no cookie banner service. Documented one-off, not a
 #     pattern. Never name a consent vendor; route to the Privacy Office.
 #
-# STILL OPEN
+# ANSWERED BY SWS, 2026-09-01. All four. Kept here with the answers, because the
+# questions are the more reusable artefact: each one is a thing repo inspection
+# could never have established.
 #
-# 1. `adapt-auth-sdk` is referenced at ^1.0.20 and ^2.1.0 but is not public.
-#    What does it wrap, and is it the sanctioned path for Stanford auth?
-# 2. All four decoupled-drupal repos pin `--webpack`, opting out of Turbopack.
-#    Is that a known issue we should document?
-# 3. Headless component libraries are inconsistent: react-aria, @base-ui/react,
-#    MUI, headlessui. Is there an intended house choice? This is the layer where
-#    accessibility is usually won or lost.
-# 4. NEW, from A1: how should a unit site treat a pattern that exists on
-#    www.stanford.edu but not yet in Decanter 8? Wait for it to land, or adopt
-#    early and risk a parallel vocabulary?
+# 1. `adapt-auth-sdk` -- what is it, and is it sanctioned?
+#    ANSWER: a SAML auth library for ALUMNI-based websites only.
+#    `weblogin-auth-sdk` is the PREFERRED package for everything else: also
+#    SAML, integrating with Weblogin, Stanford's primary SSO. So the two repos
+#    using adapt-auth-sdk are NOT a general endorsement.
+#    -> standards/policy/identity.md
+#
+# 2. All four decoupled-drupal repos pin `--webpack`. Known issue?
+#    ANSWER: a point-in-time decision to not adopt Turbopack. NOT a forward
+#    choice. Turbopack IS the forward choice for Next.js sites.
+#    Note the four repos are ONE lineage, so this was one decision copy-forked,
+#    not four independent votes. See the "count lineages, not repos" clause in
+#    README.md -- this question is where that clause came from.
+#    -> standards/patterns/sws-conventions.md, record of error, row 4
+#
+# 3. Is there an intended house headless component library?
+#    ANSWER: no, there is none. Confirmed absence, not an oversight. And this is
+#    precisely why this project matters: with no house choice to lean on, its
+#    guidance is the control that reaches the a11y and compliance win.
+#    -> standards/patterns/components.md
+#
+# 4. Adopt a www.stanford.edu pattern not yet in Decanter 8?
+#    ANSWER: yes, go ahead. Decanter 8 is NOT a hard line on design choices.
+#    Almost everything in the Stanford ecosystem is a carrot rather than a
+#    stick, and the toolchain must be attractive to work with -- anyone who gets
+#    blocked simply goes their own way. Only the POLICIES bind, and they govern
+#    only a sliver of the aesthetic.
+#    -> standards/policy/brand.md, "What is actually binding"
 # ==============================================================================

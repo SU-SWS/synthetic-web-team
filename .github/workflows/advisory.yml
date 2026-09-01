@@ -27,9 +27,23 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v7
         with: { node-version: '24' }
-      - run: npm ci --prefix packages/cli
+      # Root install, not --prefix packages/cli. This is an npm WORKSPACE repo:
+      # one lockfile at the root, and @su-sws/standards is linked from
+      # packages/ rather than fetched. A per-package `npm ci` cannot work
+      # because that dependency is not published yet -- it fails with E404.
+      - run: npm ci
       - name: Scan for committed credentials
-        run: node packages/cli/bin/sws.mjs check --standards standards --format terminal
+        # --no-publish and --no-summary are LOAD-BEARING, not tidiness.
+        #
+        # This job exists only for the secrets gate. It runs from the repository
+        # root, where there is no build output, so almost every check reports
+        # `unknown` and the score is meaninglessly low. Without these flags it
+        # would publish that score over the real one from static.yml -- and both
+        # workflows trigger on push to main, so they would also race for the
+        # same issue. The report belongs to the workflow that built the site.
+        run: >
+          node packages/cli/bin/sws.mjs check --standards standards
+          --format terminal --no-publish --no-summary
         # Exits 1 on a blocking finding. On a trunk push the credential is
         # already in history, so the message says rotate first.
 
@@ -42,17 +56,26 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: '24' }
 
+      # This job previously installed nothing while two of its steps imported
+      # yaml, and jobs do not share a filesystem -- so it could never have
+      # passed. Caught while adding the publishability gate.
+      - run: npm ci
+
       - name: Validate skills against the portability constraints
         run: node scripts/validate-skills.mjs
 
+      # Fails, deliberately. This was a warning, and the six shared sws-* skills
+      # then sat missing from both emitted paths for three weeks without anyone
+      # noticing. A drift check that cannot go red does not detect drift.
+      # These are generated files: the fix is always `npm run sync-skills`.
       - name: Confirm emitted skill copies are not stale
-        run: node scripts/sync-skills.mjs --check || (echo "::warning::run npm run sync-skills"; true)
+        run: node scripts/sync-skills.mjs --check
 
       - name: Validate every YAML in standards/
         run: |
           node -e '
           const fs=require("fs"),path=require("path");
-          const yaml=require("./packages/cli/node_modules/yaml");
+          const yaml=require("yaml");
           let bad=0;
           (function walk(d){for(const n of fs.readdirSync(d)){const p=path.join(d,n);
             if(fs.statSync(p).isDirectory())walk(p);
@@ -64,14 +87,116 @@ jobs:
       - name: Criteria and checks map in both directions
         run: node scripts/validate-criteria.mjs
 
-  # Weekly, plus on demand: generate a project from the recipe against current
-  # latest and see whether upstream broke it. This replaces the starter template
-  # as our early warning system.
-  canary:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with: { node-version: '24' }
-      - run: echo "Recipe canary is not implemented yet. See PROJECT-PLAN.md Phase 3."
+      # Packing is the only way to learn that a `files` list is wrong or that
+      # @su-sws/standards' prepack stopped staging content -- and both fail
+      # silently right up until someone publishes. So pack for real, then assert
+      # the content package actually contains content.
+      - name: Packages are publishable
+        run: |
+          npm run pack:all
+          for f in .pack/*.tgz; do echo "  $f"; done
+          node -e '
+          const { execFileSync } = require("node:child_process");
+          const list = (t) => execFileSync("tar", ["tzf", t], { encoding: "utf8" })
+            .split("\n").map((s) => s.replace(/^package\//, "")).filter(Boolean);
+
+          const std = list(".pack/su-sws-standards-0.1.0.tgz");
+          const need = [
+            "AGENTS.md", "index.mjs",
+            "standards/fragments/global-footer.yml",
+            "standards/recipes/astro-static/acceptance.yml",
+            "standards/policy/minweb.md",
+            "standards/stack/performance-budget.yml",
+          ];
+          const missing = need.filter((n) => !std.includes(n));
+          const skills = std.filter((n) => /^skills\/.+\/SKILL\.md$/.test(n)).length;
+          const policy = std.filter((n) => /^standards\/policy\/.+\.md$/.test(n)).length;
+
+          let bad = 0;
+          if (missing.length) { console.log(`::error::standards tarball missing: ${missing.join(", ")}`); bad++; }
+          if (skills < 25) { console.log(`::error::standards tarball has ${skills} skills, expected 25`); bad++; }
+          if (policy < 8) { console.log(`::error::standards tarball has ${policy} policy files, expected 8`); bad++; }
+
+          const cli = list(".pack/su-sws-sws-cli-0.1.0.tgz");
+          for (const m of ["bin/sws.mjs","src/checks.mjs","src/axe.mjs","src/perf.mjs","src/report.mjs","src/history.mjs","src/github.mjs","src/browser.mjs"]) {
+            if (!cli.includes(m)) { console.log(`::error::sws-cli tarball missing ${m}`); bad++; }
+          }
+
+          const mcp = list(".pack/su-sws-mcp-0.1.0.tgz");
+          for (const m of ["bin/sws-mcp.mjs","src/server.mjs","src/tools.mjs","src/scaffold.mjs"]) {
+            if (!mcp.includes(m)) { console.log(`::error::mcp tarball missing ${m}`); bad++; }
+          }
+
+          console.log(`standards: ${std.length} files, ${skills} skills, ${policy} policy`);
+          console.log(`sws-cli:   ${cli.length} files`);
+          console.log(`mcp:       ${mcp.length} files`);
+          process.exit(bad ? 1 : 0)'
+
+      # The server speaks a protocol; asserting the files exist is not enough.
+      # Drive a real initialize/tools-list handshake over stdio and confirm the
+      # five tools are advertised. This is the cheapest test that would catch a
+      # server which packs cleanly and then fails to start.
+      - name: MCP server answers the protocol
+        run: |
+          node -e '
+          const { spawn } = require("node:child_process");
+          const c = spawn("node", ["packages/mcp/bin/sws-mcp.mjs"], { stdio: ["pipe","pipe","pipe"] });
+          let buf = "", seen = null;
+          c.stdout.on("data", (d) => {
+            buf += d;
+            let i;
+            while ((i = buf.indexOf("\n")) !== -1) {
+              const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+              if (!line) continue;
+              let m; try { m = JSON.parse(line); } catch {
+                console.log(`::error::non-protocol output on stdout: ${line.slice(0,120)}`);
+                process.exit(1);
+              }
+              if (m.id === 2) { seen = m.result.tools.map((t) => t.name).sort(); }
+            }
+          });
+          c.stdin.write(JSON.stringify({jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"2025-11-25",capabilities:{},clientInfo:{name:"ci",version:"0"}}}) + "\n");
+          c.stdin.write(JSON.stringify({jsonrpc:"2.0",method:"notifications/initialized"}) + "\n");
+          c.stdin.write(JSON.stringify({jsonrpc:"2.0",id:2,method:"tools/list"}) + "\n");
+          setTimeout(() => {
+            c.kill();
+            const want = ["sws_check","sws_decanter_token","sws_footer_html","sws_get_standard","sws_scaffold"];
+            if (!seen) { console.log("::error::server did not answer tools/list"); process.exit(1); }
+            const missing = want.filter((w) => !seen.includes(w));
+            if (missing.length) { console.log(`::error::tools missing: ${missing.join(", ")}`); process.exit(1); }
+            console.log(`mcp server advertises: ${seen.join(", ")}`);
+            process.exit(0);
+          }, 12000)'
+
+      # A pack run that is interrupted leaves staged copies behind. They are
+      # gitignored, so this catches the case where postpack silently stopped.
+      - name: Staged content was cleaned up
+        run: |
+          for p in packages/standards/standards packages/standards/skills packages/standards/AGENTS.md; do
+            if [ -e "$p" ]; then echo "::error::$p left behind; postpack did not run"; exit 1; fi
+          done
+          echo "staged copies cleaned"
+
+# ---------------------------------------------------------------------------
+# NOT HERE, DELIBERATELY: the recipe canary.
+#
+# The design (PROJECT-PLAN.md section 9) is a weekly job that scaffolds each
+# recipe from scratch against current-latest, applies it, runs `sws check`, and
+# opens an issue on failure. That is still the right answer and it is still the
+# only mitigation for "install latest, pin nothing."
+#
+# Deferred 2026-09-01, by decision: the project is not in production, so no
+# Stanford unit is exposed to upstream drift. Revisit before the first pilot.
+# Recorded as an accepted, unmitigated risk in PROJECT-PLAN.md standing risks
+# rather than left implied, because silent divergence is the only kind this
+# project treats as a problem.
+#
+# A stub job used to live here and echoed "not implemented yet". Removed: a job
+# that always succeeds while doing nothing is worse than an absent one, since it
+# reports green in the Actions UI.
+#
+# NEXT INSTEAD: a standards freshness pipeline. Different target -- the canary
+# watches upstream packages, freshness watches whether OUR OWN L0 is still true.
+# That is the failure we have actually had. Scope is sketched in
+# PROJECT-PLAN.md section 9 under "Standards freshness".
+# ---------------------------------------------------------------------------

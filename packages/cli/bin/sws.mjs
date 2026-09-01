@@ -8,14 +8,30 @@
 //   - A check that cannot run reports `unknown`, never `pass`.
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { join, resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import YAML from 'yaml';
 import { ALL, findHtml } from '../src/checks.mjs';
-import { score, renderTerminal, renderMarkdown, renderJson, group } from '../src/report.mjs';
+import { runAxe, RESULTS_PATH as AXE_RESULTS_PATH } from '../src/axe.mjs';
+import { runPerf, RESULTS_PATH as PERF_RESULTS_PATH } from '../src/perf.mjs';
+import {
+  score, renderTerminal, renderMarkdown, renderJson, group,
+  renderPrComment, renderIssueBody, renderHtml, renderBadge,
+} from '../src/report.mjs';
+import * as history from '../src/history.mjs';
+import * as gh from '../src/github.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+// Resolved once, at load. Null when the package is absent, which is normal: a
+// vendored `standards/` in the project is the common case and takes precedence.
+const standardsFromPackage = await (async () => {
+  try {
+    const { standardsDir } = await import('@su-sws/standards');
+    return standardsDir ?? null;
+  } catch { return null; }
+})();
 
 const { values: flags, positionals } = parseArgs({
   allowPositionals: true,
@@ -27,6 +43,9 @@ const { values: flags, positionals } = parseArgs({
     out: { type: 'string' },
     strict: { type: 'boolean', default: false },
     'no-summary': { type: 'boolean', default: false },
+    'no-publish': { type: 'boolean', default: false },
+    'html': { type: 'string' },
+    'badge': { type: 'string' },
     help: { type: 'boolean', short: 'h', default: false },
   },
 });
@@ -34,11 +53,26 @@ const { values: flags, positionals } = parseArgs({
 const cmd = positionals[0] ?? 'doctor';
 const root = resolve(process.cwd());
 
+// With --format json, stdout is exactly one JSON document. Every other line --
+// the trend, publish confirmations, warnings -- goes to stderr.
+//
+// This was a real bug: the trend line was appended to stdout after the JSON, so
+// `sws doctor --format json | jq` failed, and the MCP server's sws_check tool
+// reported "output that is not JSON" while looking at valid JSON with a
+// sentence stuck to the end of it. Machine-readable means machine-readable.
+const note = (...a) => (flags.format === 'json' ? console.error(...a) : console.log(...a));
+
 const USAGE = `
   sws <command>
 
   doctor            Friendly local report. Always exits 0.
   check             Full run for CI. Exits non-zero only on a blocking finding.
+  a11y              Run axe over every built route. Writes .sws/axe-results.json,
+                    which check and doctor then read. Always exits 0.
+                    Needs @playwright/test and @axe-core/playwright in THIS
+                    project, plus: npx playwright install chromium
+  perf              Measure the performance budget in a real browser. Writes
+                    .sws/perf-results.json. Needs @playwright/test. Exits 0.
   prior-art scan    Index Stanford projects on this machine. Never transmitted.
   version
 
@@ -49,6 +83,15 @@ const USAGE = `
   --out <file>      Write the report to a file as well as stdout
   --strict          Treat every failure as blocking. Opt-in, off by default.
   --no-summary      Do not append to \$GITHUB_STEP_SUMMARY.
+  --no-publish      Do not write the PR comment or the Site health issue.
+  --html <file>     Also write a standalone HTML report.
+  --badge <file>    Write a shields.io endpoint JSON for a README badge.
+
+  In CI, check upserts ONE PR comment on a pull request, or ONE persistent
+  "Site health" issue on a push to the default branch. Both are updated in
+  place, never duplicated. Needs issues:write and pull-requests:write.
+  Publishing never fails the build: a network or permission error is reported
+  and the exit code is unaffected.
 
   In GitHub Actions the report is appended to the job summary automatically,
   unless --format markdown (you are handling output) or --no-summary. One
@@ -59,6 +102,10 @@ if (flags.help) { console.log(USAGE); process.exit(0); }
 
 // --- locate things ----------------------------------------------------------
 
+// A project normally vendors `standards/` (the wizard copies it in), so the
+// local lookups come first and win. The package fallback exists for two real
+// cases: `npx @su-sws/sws-cli` in a project that did not vendor them, and a
+// consumer who deliberately depends on the package instead of copying.
 function findStandards() {
   if (flags.standards) return resolve(flags.standards);
   for (const c of [
@@ -66,7 +113,7 @@ function findStandards() {
     join(root, '.sws', 'standards'),
     resolve(HERE, '..', '..', '..', 'standards'),
   ]) if (existsSync(c)) return c;
-  return null;
+  return standardsFromPackage;
 }
 
 function findDist() {
@@ -207,12 +254,18 @@ async function run() {
       state: 'unknown',
       detail: c.manual
         ? 'manual step, not automatable'
-        : `no check produced a result. Usually means a prerequisite is missing: ${
-            c.check === 'footer' || c.check === 'identity' || c.check === 'a11y' || c.check === 'seo'
-              ? 'no build output, so run the build first'
-              : c.check === 'decanter'
-                ? 'dependencies are not installed'
-                : 'see the recipe'}`,
+        // Declared debt reads differently from a missing prerequisite, and
+        // conflating them was how `perf.budget` looked like a build problem for
+        // weeks. Say "not built yet" plainly; the points stay withheld either way.
+        : c.unimplemented
+          ? `no check implemented yet, so its ${c.weight ?? 0} point(s) are withheld. ${
+              String(c.unimplemented).trim().replace(/\s+/g, ' ')}`
+          : `no check produced a result. Usually means a prerequisite is missing: ${
+              c.check === 'footer' || c.check === 'identity' || c.check === 'a11y' || c.check === 'seo'
+                ? 'no build output, so run the build first'
+                : c.check === 'decanter'
+                  ? 'dependencies are not installed'
+                  : 'see the recipe'}`,
       weight: c.weight ?? 0,
       severity: c.severity ?? 'info',
       blocking: false,
@@ -257,9 +310,187 @@ async function run() {
     writeFileSync(process.env.GITHUB_STEP_SUMMARY, renderMarkdown(payload) + '\n', { flag: 'a' });
   }
 
+  // --- trend, artifacts, publishing ----------------------------------------
+  //
+  // Two histories, deliberately not reconciled. The LOCAL one is a
+  // per-developer convenience for `doctor`'s "since your last run"; the SHARED
+  // one lives in the Site health issue body so the project trend is not
+  // polluted by one person's local runs. See src/history.mjs.
+
+  const ghCtx = gh.context();
+  const entry = history.entryFor({
+    score: sc.value, findings, sha: ghCtx?.sha, ref: ghCtx?.ref, runId: ghCtx?.runId,
+  });
+
+  // Local delta. Recorded for both commands, shown only by doctor: in CI the
+  // shared trend is the meaningful one and two numbers would confuse.
+  const localBefore = history.readLocal(root);
+  history.appendLocal(root, entry);
+  if (cmd === 'doctor') {
+    const t = history.trend(sc.value, localBefore);
+    if (t) {
+      note(t.delta === 0
+        ? `  Unchanged since your last local run.\n`
+        : `  Score ${sc.value}, ${t.text} since your last local run.\n`);
+    }
+  }
+
+  // Read the shared history BEFORE composing anything, because the trend line
+  // has to compare against the previous run rather than this one.
+  let existingIssue = null;
+  let sharedHistory = [];
+  const wantsPublish = ghCtx && ghCtx.token && !flags['no-publish'] && cmd === 'check';
+  if (wantsPublish) {
+    const found = await gh.findHealthIssue(ghCtx);
+    if (found.error) console.error(`  note: could not read the Site health issue (${found.error})`);
+    existingIssue = found.issue ?? null;
+    sharedHistory = history.parseFromBody(existingIssue?.body);
+  }
+
+  const trend = history.trend(sc.value, sharedHistory.length ? sharedHistory : localBefore);
+  const spark = history.sparkline([...sharedHistory, entry]);
+
+  if (flags.html) {
+    mkdirSync(dirname(resolve(flags.html)), { recursive: true });
+    writeFileSync(resolve(flags.html), renderHtml(payload, { trend, spark, sha: ghCtx?.sha, runUrl: ghCtx?.runUrl }));
+  }
+  if (flags.badge) {
+    mkdirSync(dirname(resolve(flags.badge)), { recursive: true });
+    writeFileSync(resolve(flags.badge), renderBadge(sc) + '\n');
+  }
+
+  if (wantsPublish) {
+    const isPr = Boolean(ghCtx.pr);
+    if (isPr) {
+      const r = await gh.upsertPrComment(ghCtx, renderPrComment(payload, { trend, runUrl: ghCtx.runUrl }));
+      if (r.error) console.error(`  note: PR comment failed (${r.error})`);
+      else if (r.action) note(`  PR comment ${r.action}: ${r.url}`);
+    } else {
+      const body = renderIssueBody(payload, {
+        trend, spark, runUrl: ghCtx.runUrl, sha: ghCtx.sha,
+      }) + '\n\n' + history.embedInBody([...sharedHistory, entry]);
+      const r = await gh.upsertHealthIssue(ghCtx, body, existingIssue);
+      if (r.error) console.error(`  note: Site health issue failed (${r.error})`);
+      else if (r.action) note(`  Site health issue ${r.action}: ${r.url}`);
+    }
+  } else if (ghCtx && !ghCtx.token && cmd === 'check' && !flags['no-publish']) {
+    console.error('  note: in CI without GITHUB_TOKEN, so no PR comment or issue was written.');
+  }
+
   if (cmd === 'doctor') return 0;                       // never gates
   if (blocking.length) return 1;
   if (flags.strict && findings.some((f) => f.state === 'fail')) return 1;
+  return 0;
+}
+
+// --- a11y -------------------------------------------------------------------
+// Separate command, not folded into `check`, for two reasons: `check` must stay
+// fast and runnable without a browser, and CI wants axe as its own step so a
+// browser download failure is legible instead of buried in a compliance report.
+//
+// Always exits 0. It is a measurement, not a gate: the resulting finding is
+// scored by `check` like everything else.
+
+async function a11y() {
+  const dist = findDist();
+  const html = dist ? findHtml(dist) : [];
+  console.log(`  axe: ${html.length} route(s) from ${dist ? relative(root, dist) || '.' : 'no build output'}`);
+
+  const r = await runAxe({ root, dist, html });
+
+  if (r.status !== 'ok') {
+    console.log(`\n  Did not complete: ${r.status}`);
+    console.log(`  ${r.detail}`);
+    console.log(`\n  Recorded in ${AXE_RESULTS_PATH}. This reports as \`unknown\`, never as a pass,`);
+    console.log('  so the criterion withholds its points rather than flattering the score.');
+    return 0;
+  }
+
+  const v = r.totals.violations;
+  console.log(`  axe ${r.versions.axe} on ${r.versions.browser}, tags: ${r.tags.join(', ')}`);
+  if (!v) {
+    console.log(`\n  0 violations across ${r.totals.routes} route(s).`);
+    console.log('  That is a floor, not a conformance claim: automation covers roughly 30%');
+    console.log('  of accessibility issues per ODA guidance. The manual checklist covers the rest.');
+  } else {
+    console.log(`\n  ${v} violation(s):\n`);
+    for (const route of r.routes.filter((x) => x.counts?.violations)) {
+      console.log(`  ${route.route}`);
+      for (const x of route.violations) {
+        console.log(`    ${x.impact ?? 'unknown'}  ${x.id}${x.nodeCount > 1 ? ` (${x.nodeCount} nodes)` : ''}  ${x.help}`);
+        if (x.nodes[0]?.target) console.log(`      ${x.nodes[0].target}`);
+        console.log(`      ${x.helpUrl}`);
+      }
+      console.log('');
+    }
+  }
+  if (r.totals.incomplete) {
+    console.log(`  ${r.totals.incomplete} incomplete result(s) need human review. axe could not decide;`);
+    console.log('  these are not failures and are not scored. See the results file.');
+  }
+  console.log(`  Full detail: ${AXE_RESULTS_PATH}`);
+  return 0;
+}
+
+// --- perf -------------------------------------------------------------------
+// Budgets first-party uncompressed bytes and request counts, not Lighthouse
+// scores. See standards/stack/performance-budget.yml for why. Always exits 0.
+
+async function perf() {
+  const standards = findStandards();
+  const dist = findDist();
+  const html = dist ? findHtml(dist) : [];
+  console.log(`  perf: ${html.length} route(s) from ${dist ? relative(root, dist) || '.' : 'no build output'}`);
+
+  const r = await runPerf({ root, dist, html, standards, manifest: loadManifest() });
+
+  if (r.status !== 'ok') {
+    console.log(`\n  Did not complete: ${r.status}`);
+    console.log(`  ${r.detail}`);
+    console.log(`\n  Recorded in ${PERF_RESULTS_PATH}. Reports as \`unknown\`, never as a pass.`);
+    return 0;
+  }
+
+  const L = r.budget.limits;
+  console.log(`  budget v${r.budget.version}, measuring ${r.budget.measures}`);
+  if (Object.keys(r.budget.overrides).length) {
+    console.log(`  project override: ${JSON.stringify(r.budget.overrides)}`);
+    if (r.budget.overrideReason) console.log(`    reason: ${r.budget.overrideReason.trim().split('\n')[0]}`);
+  }
+  console.log('');
+
+  for (const route of r.routes) {
+    const f = route.firstParty;
+    const flag = r.breaches.some((b) => b.route === route.route) ? '!' : ' ';
+    console.log(`  ${flag} ${route.route}  ${f.total_kb} KB / ${L.total_kb} KB, ${f.requests} req`);
+    const parts = Object.entries(f.by_type_kb).filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`);
+    if (parts.length) console.log(`      ${parts.join('  ')}`);
+    if (route.timings_ms_unscored) {
+      console.log(`      unscored: DCL ${route.timings_ms_unscored.domContentLoaded}ms, load ${route.timings_ms_unscored.load}ms`);
+    }
+  }
+
+  if (r.breaches.length) {
+    console.log(`\n  ${r.breaches.length} breach(es):`);
+    for (const b of r.breaches) {
+      console.log(`    ${b.route}  ${b.key.replace(/_kb$/, '')} ${b.actual} > ${b.limit}${b.overridden ? ' (overridden limit)' : ''}`);
+    }
+    console.log('\n  Usual wins: fewer and correctly sized images, fewer islands, no');
+    console.log('  client-side framework for static content.');
+  } else {
+    console.log(`\n  Within budget on all ${r.totals.routes} route(s).`);
+  }
+
+  // Third party is reported, never scored. It is also a privacy signal.
+  if (r.totals.third_party_origins) {
+    console.log(`\n  ${r.totals.third_party_origins} third-party origin(s), ${r.totals.third_party_kb} KB, not counted against the budget:`);
+    for (const o of r.thirdPartyOrigins) console.log(`    ${o}`);
+    console.log('  These are a privacy surface as well as a performance cost: MinPriv treats');
+    console.log('  a new third-party service as disclosable, and it can trigger a DRA.');
+    console.log('  See standards/policy/privacy.md.');
+  }
+  console.log(`\n  Full measurement: ${PERF_RESULTS_PATH}`);
   return 0;
 }
 
@@ -269,6 +500,12 @@ switch (cmd) {
   case 'doctor':
   case 'check':
     process.exit(await run());
+    break;
+  case 'a11y':
+    process.exit(await a11y());
+    break;
+  case 'perf':
+    process.exit(await perf());
     break;
   case 'prior-art':
     console.log('prior-art scan is not implemented yet. It will index Stanford');

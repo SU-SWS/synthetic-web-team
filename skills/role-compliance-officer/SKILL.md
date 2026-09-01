@@ -40,7 +40,9 @@ domains, so moving off the primary domain does not shed the standards.
 ## Procurement, which is the thinnest part today
 
 Any purchased product needs a **VPAT or ACR dated within the past 12 months**
-against the required WCAG level. The gap: nobody currently reads them carefully.
+against the required WCAG level. `standards/policy/procurement.md` has the
+signals worth checking in a report. The gap: nobody currently reads them
+carefully.
 Vendors routinely self-report "supports" for criteria they partially meet, and the
 remarks column is where the truth lives. A VPAT review worth the name checks the
 remarks, not the ratings.

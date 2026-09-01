@@ -119,14 +119,32 @@ criteria:
     weight: 10
     policy: accessibility
     mechanism: >
-      Requires a REAL BROWSER. Run axe-core via @axe-core/playwright against
-      the built output. axe does not run reliably in a DOM shim; attempting it
-      produces a silent no-op.
+      Requires a REAL BROWSER. `sws a11y` serves the build output over
+      localhost, drives Chromium via Playwright, and runs axe-core with
+      @axe-core/playwright on every built route, writing
+      .sws/axe-results.json. `sws check` reads that file; it does not run a
+      browser itself. So the order is: build, then `sws a11y`, then `sws
+      check`. axe does not run reliably in a DOM shim; attempting it produces
+      a silent no-op.
     reports_unknown_when: >
-      Chromium is unavailable, the build output is missing, or axe fails to
-      initialise. MUST report `unknown` with the reason, never `pass`. An
-      unknown a11y result withholds the full 10 points from the score rather
-      than awarding them.
+      MUST report `unknown` with the reason, never `pass`, in every one of
+      these cases, because an unknown withholds all 10 points rather than
+      awarding them:
+        - no results file, so axe was never run
+        - @playwright/test or @axe-core/playwright is not installed
+        - Chromium cannot launch
+        - a route errored, so the run is only partial
+        - the results predate the current build; a stale pass is not a pass
+        - the results cover fewer routes than the build produced
+        - axe returned zero classified rules, which means it did not run even
+          though it returned successfully. This is the historical failure the
+          guard in packages/cli/src/axe.mjs exists to catch
+    note: >
+      The runner waits for CSS animations to settle before auditing. Without
+      that wait, axe measures colour mid-fade and reports false
+      color-contrast failures: this project's own site produced four, at
+      ratios of 1.05 to 1.55, from `opacity-0` plus a delayed `fadeInUp`.
+      Entry animations are common, so do not remove the wait.
 
   - id: a11y.skiplink
     requires: A skip navigation link is the first focusable element on every page.
@@ -199,10 +217,12 @@ criteria:
     policy: patterns
     mechanism: >
       Read node_modules/decanter/package.json version, not the declared range
-      in the project's package.json. As of 2026-08-10 dist-tag `latest` is
-      7.4.0 and `alpha` is 8.0.0-alpha.1, so a bare `npm i decanter` yields
-      v7. When this fails, say which tag to use rather than just reporting the
-      version, because the fix is non-obvious.
+      in the project's package.json. As of 2026-09-01 dist-tag `latest` is
+      7.5.3, `beta` is 8.0.0-beta.0 and `alpha` is 8.0.0-alpha.1, so a bare
+      `npm i decanter` yields v7. When this fails, say `npm i decanter@beta`
+      rather than just reporting the version, because the fix is non-obvious.
+      Re-read the tags before trusting these numbers; they moved once already,
+      when the alpha briefly occupied `latest` in August 2026.
 
   - id: decanter.entry-css
     requires: The entry CSS imports decanter.
@@ -287,7 +307,7 @@ criteria:
       A named business owner and a named technical web administrator, both with
       valid Stanford affiliation and email, are discoverable in the footer or
       on an About page, and recorded in .sws/manifest.yml.
-    check: ownership
+    check: manifest
     severity: warn
     weight: 5
     policy: minweb
@@ -398,6 +418,7 @@ criteria:
       If the site collects personal information or introduces third-party
       services, a Data Risk Assessment is filed before deploy.
     check: manifest
+    manual: true
     severity: warn
     weight: 0
     policy: minpriv
@@ -555,6 +576,7 @@ criteria:
       environment (other than `github-pages`) makes a pull request mandatory
       on the default branch.
     check: workflow
+    manual: true
     severity: info
     weight: 0
     policy: null
@@ -578,11 +600,44 @@ criteria:
       not running the check.
 
   - id: perf.budget
-    requires: Lighthouse performance budget met on the built output.
+    requires: >
+      Every built route is within the performance budget in
+      standards/stack/performance-budget.yml, measured as first-party
+      uncompressed transfer bytes and request count.
     check: perf
     severity: info
     weight: 3
     policy: null
+    mechanism: >
+      `sws perf` serves the build over localhost, drives Chromium via
+      Playwright, waits for animations to settle, and records per-route
+      first-party bytes by type plus request counts to .sws/perf-results.json.
+      `sws check` reads that file. Order: build, `sws perf`, `sws check`.
+
+      NOT Lighthouse, deliberately. A Lighthouse performance score varies by
+      ten points or more between runs on a shared CI runner, and a self-moving
+      number inside a trended compliance score teaches people to ignore the
+      score, which is the failure the whole advisory design exists to avoid.
+      Bytes are exact and reproducible. Navigation timings ARE recorded as
+      unscored context so a person can look; they never affect the result.
+
+      Third-party bytes are excluded from the budget, because counting them
+      would make the check depend on the network and fail in an offline CI.
+      They are reported separately with their origins, which is useful twice
+      over: a third-party request is a performance cost AND a privacy surface
+      that MinPriv treats as disclosable. See standards/policy/privacy.md.
+    reports_unknown_when: >
+      MUST report `unknown` with the reason, never `pass`:
+        - no results file, so the budget was never measured
+        - @playwright/test is not installed, or Chromium cannot launch
+        - standards/stack/performance-budget.yml is missing or unparseable
+        - a route errored, so the run is only partial
+        - the results predate the current build
+        - the results cover fewer routes than the build produced
+    note: >
+      A project may override any limit in .sws/manifest.yml under
+      `performance_budget:` with a reason. That is a recorded divergence, not a
+      workaround, and the report says which limits were overridden.
 
   # ----------------------------------------------------------- provenance
   - id: manifest.present

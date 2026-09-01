@@ -14,8 +14,15 @@ The first version of this document proposed four corrections to the project's st
 | `sa11y` is the house dev a11y tool | It is a **content-author** tool in Visual Editor overlays | Inferred purpose from presence. A dependency tells you *what*, never *why* |
 | Use Cypress, since Playwright appears nowhere | **Playwright**, because that is where the market is going | Read current practice as intent. Where a team is heading is not in its lockfiles |
 | npm, never pnpm | npm primary, yarn secondary. Correct | Fine |
+| Ask before recommending Turbopack, since four repos opt out | **Turbopack is the forward choice.** The four `--webpack` pins are one point-in-time decision, copy-forked | Counted repos instead of lineages. Four siblings are one data point |
 
-The lesson is in the third clause of the precedence rule (see `standards/prior-art/README.md`): prior art establishes what an org *does*, and cannot establish *why* or *where it is going*. Both require asking a person. An agent that mines repos and skips that conversation will confidently entrench the present.
+The last row was added 2026-09-01, three weeks after the others, and it is the most useful of the four because it failed a *different* clause. The first three misread purpose or direction. This one misread **sample size**: I treated four repos in one family as four independent votes, when copy-forking means they are one decision replicated. And copy-forking is a practice this project deliberately endorses, so the pattern will recur.
+
+**Count lineages, not repos.** Before treating agreement as a convention, ask whether the repos are siblings. If they are, you have found a frozen decision rather than a live convention.
+
+The broader lesson is in the third clause of the precedence rule (see `standards/prior-art/README.md`): prior art establishes what an org *does*, and cannot establish *why* or *where it is going*. Both require asking a person. An agent that mines repos and skips that conversation will confidently entrench the present.
+
+Scoreboard, which is the honest summary: **five proposed corrections, four wrong.** The one that was right was the one that changed nothing.
 
 ## The one real correction
 
@@ -158,7 +165,7 @@ The resulting guidance, which generalises well beyond cookies: no banner is requ
 
 **No house headless-component library.** `react-aria` and `react-stately` in `sulgryphon-nextjs`, `@base-ui/react` in the decoupled family, MUI in `ccc-bulletin` and `adapt-directory`, `@headlessui/react` in the ADAPT family. This is the layer where accessibility is usually won or lost, so it is worth asking whether there should be a house choice. `sulgryphon-nextjs` picking react-aria is the strongest a11y signal in the set.
 
-**The decoupled Drupal family opts out of Turbopack** with `--webpack` across all four repos. Consistent enough to be deliberate. Ask why before recommending Turbopack.
+**The decoupled Drupal family runs `--webpack` across all four repos.** Asked, and answered 2026-09-01: **a point-in-time decision to not adopt Turbopack, not a forward choice. Turbopack is the forward default for Next.js sites.** Recommend Turbopack for new work; do not convert an existing `--webpack` project to match. This is the fourth entry in the record of error above, and the sharpest one — see the note on lineage.
 
 **Node floors vary** from `>=20` to `>=24`, most on 22. Since recipes no longer pin, this only matters as a reason not to fail an existing project for its Node version.
 

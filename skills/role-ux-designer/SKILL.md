@@ -8,8 +8,15 @@ description: Design the interaction and visual layer of a Stanford site. Use for
 Interaction design, visual design, and lightweight user research. On most SWS
 projects one person does all three, so this role does too.
 
-The Stanford design language is already decided. Your job is composition,
-behaviour, and the decisions Decanter does not make for you.
+The Stanford design language gives you a strong starting point. Your job is
+composition, behaviour, and the decisions Decanter does not make for you.
+
+**Decanter is not a hard line on design.** Only the page furniture is binding —
+the Global Footer and the Identity Bar, per `standards/policy/brand.md`. Above
+that, design creativity is welcome, including borrowing a `www.stanford.edu`
+pattern that has not landed in Decanter 8 yet. Stanford works on carrots rather
+than sticks: someone who feels design-policed stops using the toolchain, which
+helps brand less than an unusual component hurts it.
 
 ## Compose, do not invent
 
@@ -39,22 +46,15 @@ in the local footer above it.
 ## A specific trap: www.stanford.edu is not Decanter
 
 The Stanford homesite runs **its own design system**, derived from Decanter and
-currently influencing Decanter 8. It sits upstream of the design system rather
-than downstream.
+currently influencing Decanter 8. It sits upstream rather than downstream.
 
-So:
+Its **brand furniture is authoritative**; its **tokens and CSS are a parallel
+vocabulary**. Copying its CSS into a Decanter project looks approximately right
+and does not use the design system, a failure that **passes visual review and is
+invisible in a screenshot**. Read it for direction, not as a target.
 
-- Its **brand furniture is authoritative**, because brand is brand and it is the
-  canonical site.
-- Its **tokens and CSS are a parallel vocabulary.** Copying them into a Decanter
-  project produces something that looks approximately right and does not use the
-  design system. That failure passes visual review and is invisible in a
-  screenshot, which is what makes it worth naming.
-- It is a **preview of where Decanter 8 is going.** Read it for direction, not
-  as a target to match today.
-
-Same caution for `decanter.stanford.edu` and the Figma library, which currently
-document v7: good for visual intent, not for v8 token names.
+Same caution for `decanter.stanford.edu` and the Figma library, which document
+v7. Full detail in `standards/policy/brand.md`.
 
 ## Accessibility is a design decision, mostly made before code
 
@@ -86,18 +86,17 @@ has provided almost nothing.
 
 ## Forms
 
-Where accessibility and usability converge hardest.
+Where accessibility, usability, and privacy converge hardest. The full pattern
+is `standards/patterns/forms.md`; read it before designing one.
 
-- Visible labels above fields. Placeholders are not labels.
-- Group related fields with `fieldset` and `legend`.
-- Mark required fields in text, not with a colour or a bare asterisk.
-- Errors inline, next to the field, plus a summary at the top for long forms.
-- Never validate on blur while someone is still typing.
-- Ask for the minimum. Every field is a MinPriv question about why you need it.
+The four that are design decisions rather than markup: **visible labels above
+fields** (placeholders are not labels), **required marked in text** rather than
+colour or a bare asterisk, **errors inline plus a summary** for long forms, and
+**ask for the minimum**, because every field is a MinPriv question about why you
+need it.
 
-`adapt-online-giving` is the best form reference at SWS, with the caveat that it
-is high-risk-tier work with Stripe and authentication. Borrow the interaction
-patterns, never the data handling.
+Design-side trap: a form is also how a `low`-tier site becomes `moderate`. Raise
+that before it is built, not after.
 
 ## No component workshop
 

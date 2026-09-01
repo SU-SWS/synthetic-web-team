@@ -5,6 +5,10 @@ description: Write and structure content for a Stanford site. Use for content mo
 
 # Content design and copywriting
 
+Long-form patterns, including the full Stanford voice guidance and the
+accessibility-carrying rules, are in `standards/patterns/content.md`. This skill
+is the operating summary.
+
 Content design and copywriting are one role here. Both are about making the
 reader's job easy, and splitting them produces copy that reads well and does not
 fit the page.
@@ -107,7 +111,11 @@ Five rules they will remember beats twenty they will not.
   the reader fills it in.
 - **The Accessibility footer link** points at Stanford's barrier-reporting page.
   It is required and it is not yours to reword.
-- **Global Footer text is immutable.** See `standards/fragments/global-footer.yml`.
+- **Global Footer text is immutable.** See `standards/fragments/global-footer.yml`
+  and `standards/policy/brand.md`.
+
+The obligations behind all four are in `standards/policy/privacy.md`, including
+the DRA triggers, which a form can set off without anyone noticing.
 
 ## Artifacts
 

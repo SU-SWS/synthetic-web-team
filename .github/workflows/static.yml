@@ -59,6 +59,11 @@ jobs:
           node-version: '24'
       - uses: actions/configure-pages@v6
 
+      # The CLI and its workspace-linked @su-sws/standards, installed once from
+      # the repository root. Must precede any step that runs sws.
+      - name: Install the toolchain
+        run: npm ci
+
       - name: Install
         working-directory: site
         run: npm install
@@ -71,7 +76,7 @@ jobs:
           echo "decanter $V (main: $M)"
           case "$V" in
             8.*) ;;
-            *) echo "::error::decanter resolved to $V, expected 8.x. A bare 'npm install decanter' currently gets v7. Use decanter@alpha until 8.0.0 is on latest."; exit 1 ;;
+            *) echo "::error::decanter resolved to $V, expected 8.x. A bare 'npm install decanter' currently gets v7. Use decanter@beta until 8.0.0 is on latest (latest is 7.5.3 as of 2026-09-01)."; exit 1 ;;
           esac
           test "$M" = "src/css/index.css" || { echo "::error::decanter main is $M, expected src/css/index.css (v7 detected)"; exit 1; }
 
@@ -79,15 +84,57 @@ jobs:
         working-directory: site
         run: npm run build
 
-      # Advisory. ONE invocation: the CLI appends to the job summary itself when
-      # it detects GITHUB_STEP_SUMMARY. Calling it twice and also redirecting
-      # printed the report three times on the first real run.
-      - name: Compliance report
+      # axe runs as its own step, before the report that reads its output.
+      # Separate on purpose: a browser download failure is legible here, and
+      # buried inside a compliance report it is not. Always exits 0 -- a
+      # failure to run becomes `unknown` in the report, never a false pass.
+      - name: Accessibility (axe, WCAG 2.1 AA)
         working-directory: site
         continue-on-error: true
         run: |
-          npm --prefix ../packages/cli ci || npm --prefix ../packages/cli install
-          node ../packages/cli/bin/sws.mjs check --standards ../standards
+          npx --yes playwright install --with-deps chromium
+          node ../packages/cli/bin/sws.mjs a11y
+
+      # Byte budget, not Lighthouse: a Lighthouse score swings ten points
+      # between runs on a shared runner, and this score is trended. Reuses the
+      # browser installed above.
+      - name: Performance budget
+        working-directory: site
+        continue-on-error: true
+        run: node ../packages/cli/bin/sws.mjs perf
+
+      # Advisory. ONE invocation: the CLI appends to the job summary itself when
+      # it detects GITHUB_STEP_SUMMARY. Calling it twice and also redirecting
+      # printed the report three times on the first real run.
+      # GITHUB_TOKEN is NOT in the environment by default; without it the CLI
+      # silently skips publishing and says so on stdout.
+      #
+      # The badge goes INSIDE dist so it deploys with the site, which is what
+      # lets the README badge work with no gist, no secret, and no service
+      # beyond shields.io. That is safe because `badge.json` at the dist root is
+      # in CLI_ARTIFACTS (see packages/cli/src/browser.mjs) and therefore
+      # excluded from the build-staleness calculation.
+      #
+      # Anything ELSE written into dist between the build and `sws check` will
+      # invalidate the axe and perf measurements, which then report `unknown`
+      # and withhold their points. So --html goes outside dist.
+      - name: Compliance report
+        working-directory: site
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node ../packages/cli/bin/sws.mjs check --standards ../standards \
+            --html ../compliance-report.html \
+            --badge dist/badge.json
+
+      - name: Upload the HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-report
+          path: compliance-report.html
+          if-no-files-found: warn
 
       - uses: actions/upload-pages-artifact@v5
         with:

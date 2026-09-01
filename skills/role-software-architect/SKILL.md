@@ -34,7 +34,8 @@ survives the fork. The `engineering:architecture` skill has a fuller ADR workflo
 if you want one.
 
 Real example worth documenting if you encounter it: all four decoupled Drupal
-repos run `next dev --webpack`, deliberately opting out of Turbopack. Consistent
+repos run `next dev --webpack`, opting out of Turbopack. **Point-in-time, not
+forward: Turbopack is the forward default for new Next.js sites.** Consistent
 enough to be intentional, and nobody has written down why.
 
 ## Existing architectural patterns at SWS

@@ -7,8 +7,16 @@ description: Run and interpret the Stanford compliance report. Use when the user
 
 ```bash
 sws doctor        # friendly local report, always exits 0
+sws a11y          # run axe over the built routes, always exits 0
+sws perf          # measure the performance budget, always exits 0
 sws check         # the full run, used in CI
 ```
+
+`sws a11y` needs `@playwright/test`, `@axe-core/playwright`, and a browser in the
+project. It writes `.sws/axe-results.json`; `doctor` and `check` read that file
+rather than launching a browser themselves. **Order matters: build, `a11y`, then
+`check`.** If the a11y criterion reads `unknown`, the reason is in the finding —
+usually axe was never run, or the results predate the current build.
 
 Findings come from the recipe's `acceptance.yml`, which is the definition of
 correct for that project. Read it rather than inventing criteria.
@@ -72,17 +80,13 @@ A green run means **roughly 30 percent** of accessibility issues are absent, per
 ODA's own guidance. It is a floor, not conformance. The manual WCAG 2.1 AA
 checklist covers the rest, and Siteimprove applies further criteria after launch.
 
-**Siteimprove and axe are not comparable.** Siteimprove runs Alfa, its own
-ACT-rules engine, not axe-core. Its score spans A, AA, **and AAA** plus
-WAI-ARIA authoring practices and Best Practices, so AAA and best-practice
-findings drag a number whose policy target is 2.1 AA. Its scoring is proprietary
-and mostly site-wide, meaning one violation anywhere can cap the score, with only
-about 30 points available from per-page work. It also reports "Potential Issues"
-requiring human confirmation, a bucket with no axe equivalent and the usual
-explanation for "Siteimprove found more than axe."
+**Siteimprove and axe are not comparable**, and someone will ask why the two
+numbers differ. Siteimprove runs its own engine (Alfa), scores AAA and
+best-practice findings that are outside a 2.1 AA target, and weights most issues
+site-wide. `standards/policy/accessibility.md` has the full explanation.
 
-Present them side by side with distinct labels, never as one number or a delta.
-ACT rule IDs are the only clean join key if a correlation is ever needed.
+When reporting: present them side by side with distinct labels, **never as one
+number or a delta.**
 
 ## Accepting a finding
 
@@ -105,6 +109,18 @@ this tool. Resurface expired `review_by` dates once, kindly, without lecturing.
 **Never edit `acceptance.yml` or a fragment to make a project pass.** Fragments
 change when upstream changes, with a date. If a criterion genuinely seems wrong,
 say so and let a person decide.
+
+## Where the report goes
+
+`sws check` publishes itself when it detects GitHub Actions: a **persistent "Site
+health" issue** on a push to the default branch, or **one PR comment** on a pull
+request. Both are updated in place rather than duplicated. `sws doctor` shows a
+local "since your last run" delta from a gitignored file, which is separate from
+the project trend on purpose — one person's local runs should not move the shared
+number.
+
+Publishing never fails the build. If a token or permission is missing the CLI
+says so on stdout and carries on.
 
 ## Tone
 

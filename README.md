@@ -1,6 +1,10 @@
 # Synthetic Web Team
 
+[![Stanford compliance](https://img.shields.io/endpoint?url=https%3A%2F%2Fsu-sws.github.io%2Fsynthetic-web-team%2Fbadge.json)](https://su-sws.github.io/synthetic-web-team/)
+
 **A portable agent team that reproduces Stanford Web Services practice inside whichever AI coding tool you already use.**
+
+<sub>The badge reads its own score from `badge.json`, which the site deploys — no gist, no secret, no service beyond shields.io. It will show `inaccessible` until the first deploy publishes the file.</sub>
 
 Open Claude Code, Cursor, VS Code, Codex, or Antigravity in a Stanford project and get the working knowledge of a full SWS web team: strategy, information architecture, content design, UX, front end, accessibility, discoverability, and delivery. The output is a Stanford site that is compliant by default and that you can actually maintain.
 
@@ -13,22 +17,79 @@ Early. The plan is complete and reviewed; the implementation is partway through.
 | | |
 |---|---|
 | Project plan | Done. [`PROJECT-PLAN.md`](PROJECT-PLAN.md) |
-| Standards (policy, patterns, prior art) | In progress, substantial |
+| Standards (L0) | **Complete for v1.** 8 policy files, 7 patterns, prior art, 2 recipes, the footer fragment, reference versions |
 | `astro-static` recipe | Written, and **executed end to end** against a real build |
 | `next-netlify` recipe | Written, extends `astro-static`. Not yet executed end to end |
 | Shared skills | 6 of 6 done |
 | Role skills | **8 of 8 built, 11 of 11 stubs.** 25 skills total, all validated |
-| Documentation site | **Working.** [`site/`](site/), built by our own recipe, scores 90/100 with zero failures |
-| `sws` CLI | **Working.** `doctor` and `check` run 12 check modules against 63 criteria |
-| Install wizard | **Working.** Editor detection, tier derivation, 68-file install |
-| Recipe canary | Not started. Next piece, and it gates "install latest" being safe |
-| MCP server | Not started |
+| Documentation site | **Working.** [`site/`](site/), built by our own recipe, scores 91/100 with zero failures |
+| `sws` CLI | **Working.** `doctor` and `check` run 13 check modules against 63 criteria. `sws a11y` runs axe and `sws perf` measures a byte budget, both in real Chromium |
+| Report delivery | **Working.** PR comment and a persistent "Site health" issue, both updated in place. Score trend, sparkline, HTML artifact, README badge |
+| Install wizard | **Working, agent-first.** Non-interactive by default off a TTY, `--json` result with machine-readable next steps, `--answers` input, idempotent re-runs that preserve project state |
+| Publishable packages | **Working, not yet published.** Three packages pack cleanly and were verified by installing the tarballs into a clean project with no repository present |
+| Recipe canary | **Deliberately deferred**, 2026-09-01. Not in production, so nobody is exposed to upstream drift yet. Revisit before the first pilot |
+| Standards freshness CI | Planned, and the priority ahead of the canary. Keeps policy, prior art, and sourced facts from going stale |
+| MCP server | **Working.** [`packages/mcp/`](packages/mcp/). 5 tools, 26 resources, verified over the real stdio protocol |
 
-End to end, verified: `create-web-team` installs, an agent follows the recipe, `sws check` reports **92/100 with zero automated failures**. The remaining 8 points are 7 findings that are honestly unautomatable (manual WCAG checklist, ODA review, subdomain approval, MFA attestation) plus axe, which needs a real browser and therefore reports `unknown` rather than pretending to pass.
+End to end, verified: `create-web-team` installs, an agent follows the recipe, then `npm run build && sws a11y && sws perf && sws check` reports **100/100 with zero automated failures** — 45 criteria passing, none to fix, 8 unchecked. axe runs in real Chromium against every built route and finds 0 violations at WCAG 2.1 AA; the byte budget passes at 42 KB of 800. **Every one of the 8 unchecked items is genuinely unautomatable** — the manual WCAG checklist, ODA review, subdomain approval, MFA attestation, the DRA question — and each says so with a reason rather than being quietly dropped.
 
-**You can use it today by copying files by hand.** The wizard is what makes that pleasant, not what makes it work.
+**A green axe run is a floor, not a conformance claim.** It covers roughly 30 percent of accessibility issues per ODA guidance, and this project says so in the report itself.
 
-## Try it now
+## Install
+
+**The primary caller is an agent, so that is the first-class path.** One command,
+no prompts, one JSON document on stdout, stable exit codes:
+
+```bash
+npx @su-sws/create-web-team --json --answers '{
+  "siteName": "Stanford Bioengineering",
+  "unit": "Bioengineering",
+  "purpose": "Help prospective graduate students apply",
+  "url": "https://bioe.stanford.edu",
+  "businessOwnerName": "...", "businessOwnerEmail": "...@stanford.edu",
+  "techAdminName": "...",     "techAdminEmail": "...@stanford.edu",
+  "collectsPersonalData": false, "authenticates": false
+}'
+```
+
+**Non-interactive is the default whenever stdin is not a TTY**, so an agent
+cannot hang on a prompt. With `--json`, stdout is exactly one JSON document and
+every human-readable line goes to stderr.
+
+Three fields in the result are the ones an agent should act on:
+
+| Field | Why it matters |
+|---|---|
+| `next[]` | What to do next, **as data**: `read-contract`, `orient`, `follow-recipe`, `complete-manifest`, `verify`. Each has a path or command and a `why` |
+| `incomplete[]` | Manifest fields that are still placeholders. **Ask the user for these; do not invent them** — MinWeb requires a named business owner and technical administrator with valid Stanford email |
+| `counts` | `created` / `updated` / `unchanged` / `preserved`. A re-run reports `unchanged`, so "already installed" is a truthful answer rather than a second claim of success |
+
+Exit codes: `0` success or dry run, `2` bad input or no content found, `3` a human
+declined at the confirmation prompt.
+
+Re-running is safe. `.sws/manifest.yml` and `.sws/acknowledged.yml` are project
+state and are **preserved**, never overwritten — everything else is content and is
+rewritten from source.
+
+### If you are a human
+
+Same command without `--json`. It detects your editors, asks a handful of
+questions, and shows you the file list before writing anything. `--dry-run`
+reports what it would do and writes nothing; `--interactive` forces prompts even
+without a TTY.
+
+Nothing is published to npm yet. Until it is, install from a checkout — the
+wizard resolves its content from the repository, the current directory, or the
+`@su-sws/standards` package, in that order:
+
+```bash
+git clone https://github.com/SU-SWS/synthetic-web-team
+cd synthetic-web-team && npm install
+cd /path/to/your/project
+node /path/to/synthetic-web-team/packages/create-web-team/bin/create-web-team.mjs
+```
+
+Or copy the files by hand, which is all the wizard is really doing:
 
 ```bash
 # From your project root
@@ -61,12 +122,16 @@ node packages/cli/bin/sws.mjs doctor --standards standards
 |---|---|
 | [`AGENTS.md`](AGENTS.md) | The behavioral contract. 100 lines, read by every tool |
 | [`skills/`](skills/) | The team: 25 skills, each one `SKILL.md` with two frontmatter keys. 8 built roles, 11 honest stubs, 6 shared |
-| [`standards/policy/`](standards/policy/) | Stanford requirements: MinSec, MinWeb, accessibility, privacy, brand, and which office to escalate to |
-| [`standards/patterns/`](standards/patterns/) | How SWS actually builds, derived from reading 11 production repos |
+| [`standards/policy/`](standards/policy/) | Stanford requirements: MinSec, MinWeb, accessibility, privacy, brand, identity, procurement, escalation. Each file carries a `reviewed:` date |
+| [`standards/patterns/`](standards/patterns/) | How SWS actually builds: Decanter, components, content, IA, forms, discoverability, plus conventions derived from reading 11 production repos |
+| [`standards/stack/`](standards/stack/) | `reference-versions.yml`, a dated baseline. Advisory — nothing installs from it. Plus `performance-budget.yml`, the byte budget `sws perf` enforces |
 | [`standards/recipes/`](standards/recipes/) | Build contracts with machine-checkable acceptance criteria |
 | [`standards/fragments/`](standards/fragments/) | Byte-exact compliance content, like the Global Footer link set |
 | [`standards/prior-art/`](standards/prior-art/) | Existing SWS work, with era, lineage, and judgment attached |
-| [`packages/cli/`](packages/cli/) | The `sws` CLI. 10 check modules, terminal / JSON / markdown output |
+| [`packages/standards/`](packages/standards/) | `@su-sws/standards`. Ships L0 and L1 as content, plus a path resolver so tooling need not guess |
+| [`packages/create-web-team/`](packages/create-web-team/) | `@su-sws/create-web-team`. The wizard |
+| [`packages/cli/`](packages/cli/) | `@su-sws/sws-cli`. 13 check modules, axe and performance runners in real Chromium, terminal / JSON / markdown output |
+| [`packages/mcp/`](packages/mcp/) | `@su-sws/mcp`. The same standards as MCP tools and resources, for agents that prefer calling a tool to shelling out |
 
 ## Five decisions that surprise people
 
@@ -76,9 +141,11 @@ node packages/cli/bin/sws.mjs doctor --standards standards
 
 **Advisory, not blocking.** Findings are reports, PR comments, and a visible score that trends. Exactly one thing fails a build: committed credentials, because that harm is irreversible. A tool that fails your build over a contrast ratio gets uninstalled by Friday, and then nothing is compliant.
 
+The report is designed to **find the reader** rather than expecting the reader to find CI. A push to `main` rewrites one long-lived "Site health" issue in place — findable by someone who has never opened the Actions tab, and it notifies watchers. A pull request gets one comment, also updated in place, because a new comment per push is noise people mute. The score trend lives in that issue's body as an HTML comment, which is why it needs no database, no artifact that expires, and no commit churn.
+
 **Push to `main` deploys.** Pull requests are first-class but never required, and nothing in the setup makes one mandatory. Many campus editors work through the GitHub web UI and will not open a pull request to fix a typo. With a CMS, git disappears entirely.
 
-**Recipes extend each other.** `next-netlify` declares `extends: astro-static` and contains only its differences: three criteria that do not apply, two whose mechanism changes, and ten that are new. The 52 shared criteria live in one place, so they cannot drift between recipes. Two CI gates enforce the contract in both directions: every criterion maps to an implemented check or is marked manual, and every finding a check can emit has a criterion somewhere. The second gate exists because the first one missed a check that ran for days scoring nothing.
+**Recipes extend each other.** `next-netlify` declares `extends: astro-static` and contains only its differences: three criteria that do not apply, two whose mechanism changes, and ten that are new. The 52 shared criteria live in one place, so they cannot drift between recipes. Four CI gates enforce the contract in both directions: every criterion maps to a check, is marked manual, or declares `unimplemented:` with a reason; every finding a check can emit has a criterion somewhere; every criterion naming a check has a check that emits its id; and every `check:` names a module that exists. Each gate was added after the previous set missed something real — the last two because five criteria named checks that emitted nothing and one named a module that had never existed.
 
 **Prior art is step zero.** SWS has built a lot of sites and most problems are solved. The agent checks existing work before inventing anything, under a rule with three clauses, the third of which is that prior art cannot tell you *why* a choice was made or *where* the team is going. Both need a person. That clause exists because ignoring it produced three wrong conclusions in an afternoon, [written up as a record of error](standards/patterns/sws-conventions.md).
 

@@ -19,8 +19,11 @@ page here.
   beyond `github-pages`.** Each of those silently converts push-to-main into a
   pull-request requirement. If a project already has them, leave them and report;
   someone may have added them deliberately.
-- **`.gitignore` covers `node_modules`, build output, and `.sws/prior-art.local.yml`**,
-  which is a local index that must never be committed.
+- **`.gitignore` covers `node_modules`, build output, `.sws/prior-art.local.yml`**
+  (a local index that must never be committed) **and `.sws/axe-results.json`**
+  (derived from a build; committing it lets a stale pass travel with the repo).
+  Anchor the `.sws` patterns with `**/` if the site lives in a subdirectory — a
+  leading-slash pattern only matches at the repo root, which bit this project.
 - **Dependabot on**, grouped, weekly. This is part of the MinSec patch cadence
   rather than housekeeping.
 - **A README that says what the site is, who owns it, and how to edit it.** For
@@ -58,8 +61,22 @@ page. A single issue rewritten rather than duplicated is findable by someone who
 has never opened the Actions tab, notifies watchers, and keeps history in its own
 edit trail.
 
-Requires `issues: write` and `pull-requests: write`. Drop either and a
-destination silently stops working.
+`sws check` does all of this itself when it detects Actions. Three things to get
+right, each of which silently disables a destination:
+
+1. **`issues: write` and `pull-requests: write`** in the workflow permissions.
+2. **`GITHUB_TOKEN` in the step's `env`.** It is *not* in the environment by
+   default. Without it the CLI skips publishing and says so on stdout.
+3. **Only ONE workflow should publish** — the one that built the site. A second
+   `sws check` running from the repository root has no build output, scores
+   meaninglessly low, and will overwrite the real report. Pass `--no-publish`
+   there. This project hit exactly that with its own secrets-gate job.
+
+The score trend lives in the Site health issue body as an HTML comment, so it
+needs no database, no artifact that can expire, and no committed file to
+conflict. `--html` writes a standalone report for an artifact and `--badge`
+writes shields.io endpoint JSON; put the badge inside the build output so it
+deploys with the site.
 
 ## Everything is advisory except one thing
 
@@ -89,6 +106,34 @@ is redundant.
 **Playwright plus `@axe-core/playwright`** against every route in the built
 output, asserting zero violations tagged `wcag2a`, `wcag2aa`, `wcag21a`,
 `wcag21aa`.
+
+The CLI ships this. Install the two packages plus a browser in the project, then
+run it as its own CI step **after the build and before `sws check`**:
+
+```bash
+npm i -D @playwright/test @axe-core/playwright
+npx playwright install chromium
+sws a11y      # writes .sws/axe-results.json; always exits 0
+sws perf      # writes .sws/perf-results.json; always exits 0
+sws check     # reads both
+```
+
+**The performance budget is bytes, not Lighthouse.** `sws perf` measures
+first-party uncompressed transfer bytes and request counts per route against
+`standards/stack/performance-budget.yml`. A Lighthouse score moves ten points
+between runs on a shared CI runner, and a self-moving number inside a trended
+compliance score teaches people to ignore the score. Navigation timings are
+recorded but never scored.
+
+It also lists **third-party origins**, which is a privacy signal as much as a
+performance one: MinPriv treats a new third-party service as disclosable. Any
+limit can be overridden in `.sws/manifest.yml` under `performance_budget:` with
+a reason, and the report says which limits were overridden.
+
+`sws check` deliberately does not launch a browser, so it stays fast and
+installable anywhere. Keep axe a separate step: a browser download failure is
+legible on its own line and invisible inside a compliance report. Never commit
+`.sws/axe-results.json` — results older than the build report as `unknown`.
 
 Playwright is the forward default even though `adapt-stanford-homesite`,
 `adapt-directory`, and `ccc-bulletin` all run Cypress with e2e and component
@@ -120,13 +165,11 @@ provenance rather than a gate.
 ## After launch, which is also yours
 
 MinSec applies to low-risk static sites too, and this is the part people assume
-does not apply:
-
-- **Patch** high-severity findings within 7 days, others within 90.
-- **Monthly vulnerability scanning.**
-- **Quarterly inventory** with risk class and data volume.
-- **Quarterly account and privilege review.**
-- **MFA or SSO-with-MFA** on every administrative login.
+does not apply. The full cadence is in `standards/policy/minsec.md`; the short
+version is patch high-severity within 7 days and others within 90, monthly
+scanning, quarterly inventory, quarterly privilege review, and **MFA or
+SSO-with-MFA on every administrative login** per
+`standards/policy/minweb.md`.
 
 Dependabot covers part of the patch cadence. The rest is a documented runbook and
 a named human, and it lives at the infrastructure layer rather than in the repo.

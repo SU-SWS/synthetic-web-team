@@ -120,7 +120,34 @@ ls node_modules/decanter/node_modules 2>/dev/null                     # expect n
 
 If `main` is `tailwind.config.js` you have v7. If `node_modules/decanter/node_modules/tailwindcss` exists, you have v7 **and** a nested Tailwind 3 sitting underneath a top-level Tailwind 4, which produces a build that half works and error messages that make no sense. Delete `node_modules` and the lockfile and reinstall with the right tag.
 
-`tailwindcss` and `@tailwindcss/forms` arrive transitively through Decanter 8. Verified. Do not install them directly.
+`tailwindcss` arrives transitively through Decanter 8. Verified. Do not install it directly.
+
+**Accessibility and performance testing.** Install `@playwright/test` and `@axe-core/playwright`, then `npx playwright install chromium`. After every build and before `sws check`, run both measurements:
+
+```bash
+npm run build
+sws a11y     # axe-core over every route, WCAG 2.1 AA tags
+sws perf     # first-party byte budget per route
+sws check    # reads both
+```
+
+**Do not write your own files into the build output between the build and
+`sws check`.** Both measurements record the build's newest mtime and report
+`unknown` if the build is newer — a stale pass is not a pass — so a step that
+drops a file into `dist/` after `sws a11y` silently costs you those points. Write
+generated reports outside `dist`. (`sws check --badge dist/badge.json` is the one
+exception: the CLI knows it wrote that file and excludes it. This bit this
+project's own Pages workflow before the exception existed.)
+
+Each serves the build over localhost, drives Chromium, and waits for animations to settle. **Add `**/.sws/axe-results.json` and `**/.sws/perf-results.json` to `.gitignore`** — both are derived from a build, and `sws check` treats results older than the build as `unknown` so a stale pass cannot travel with the repo. Use the `**/` prefix: a leading-slash pattern only matches at the repo root, which bit this project when its own site moved into a subdirectory.
+
+The budget lives in `standards/stack/performance-budget.yml` and is bytes rather than Lighthouse scores, for reasons given in that file. Override any limit in `.sws/manifest.yml` under `performance_budget:` with a reason if this site genuinely needs different numbers.
+
+`@tailwindcss/forms` also still arrives transitively, but in Decanter 8 its reset
+and the form classes are **only emitted if the project imports them**. If this
+site has a form, the entry CSS needs a second line,
+`@import 'decanter/forms';`, or the form classes and the form-element reset are
+silently absent. See `standards/patterns/forms.md`.
 
 ### 3. Wire Tailwind and Decanter
 

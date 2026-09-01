@@ -1,0 +1,30 @@
+{
+  "name": "@su-sws/mcp",
+  "version": "0.1.0",
+  "description": "MCP server exposing Stanford Web Services standards, the Global Footer contract, Decanter tokens, and the advisory compliance report to any MCP client.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "bin": {
+    "sws-mcp": "./bin/sws-mcp.mjs"
+  },
+  "exports": {
+    ".": "./src/server.mjs"
+  },
+  "files": ["bin", "src"],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@su-sws/standards": "^0.1.0",
+    "@su-sws/sws-cli": "^0.1.0",
+    "@su-sws/create-web-team": "^0.1.0",
+    "yaml": "^2.8.1",
+    "zod": "^4.1.13"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SU-SWS/synthetic-web-team.git",
+    "directory": "packages/mcp"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

@@ -25,7 +25,7 @@ const POINTER = (target) => `<!--
 
 export function plan({ root, source, editors, answers, tier }) {
   const files = [];
-  const add = (path, contents, note) => files.push({ path, contents, note });
+  const add = (path, contents, note, opts = {}) => files.push({ path, contents, note, ...opts });
 
   // ---- universal core -----------------------------------------------------
   add('AGENTS.md', readFileSync(join(source, 'AGENTS.md'), 'utf8'),
@@ -50,10 +50,19 @@ export function plan({ root, source, editors, answers, tier }) {
   };
   walk(join(source, 'standards'), 'standards');
 
+  // PROJECT STATE, NOT CONTENT. These two accumulate real answers, resolved
+  // versions, recorded divergences, and accepted risks with review dates. They
+  // are never overwritten once they exist.
+  //
+  // This was a data-loss bug, and an agent-shaped one: a re-run "to be sure the
+  // install happened" replaced real business-owner and technical-administrator
+  // emails with nulls. MinWeb requires both to be identifiable, so the wizard
+  // was quietly undoing the one thing it exists to record. Everything else here
+  // is content and is safe to rewrite.
   add('.sws/manifest.yml', manifestYaml({ answers, tier, editors, skills: skills.length }),
-    'what this project is, and what was decided');
+    'what this project is, and what was decided', { preserve: true });
   add('.sws/acknowledged.yml', ACKNOWLEDGED_TEMPLATE,
-    'accepted risks, with reasons and review dates');
+    'accepted risks, with reasons and review dates', { preserve: true });
 
   // ---- per editor, thin pointers only -------------------------------------
   for (const e of editors) {
@@ -106,15 +115,34 @@ Follow the agent contract in \`AGENTS.md\`. Skills are in \`.agents/skills/\`.
 `;
   }
 
-  // MCP config files: emit an empty, valid, commented shell rather than
-  // inventing servers. The wizard does not know which the person is entitled to
-  // use, and a wrong entry produces confusing tool failures.
+  // MCP config: wire up OUR server and nothing else.
+  //
+  // This used to emit an empty shell, on the reasoning that the wizard cannot
+  // know which servers a person is entitled to use. That still holds for third
+  // parties -- a wrong entry produces confusing tool failures -- but it does not
+  // hold for @su-sws/mcp, which is ours, optional, and read-only apart from
+  // sws_scaffold (which itself defaults to a dry run).
+  //
+  // The server is a SECOND entry point, never a requirement: everything it
+  // exposes is also a file in standards/ that the agent can read directly. If
+  // the client cannot start it, nothing else stops working.
   if (path.endsWith('mcp.json') || path.endsWith('mcp_config.json')) {
-    return JSON.stringify({ mcpServers: {} }, null, 2) + '\n';
+    return JSON.stringify({
+      mcpServers: {
+        sws: {
+          command: 'npx',
+          args: ['-y', '@su-sws/mcp'],
+        },
+      },
+    }, null, 2) + '\n';
   }
   if (path === '.codex/config.toml') {
     return '# Stanford Web Services. AGENTS.md and .agents/skills/ are read automatically.\n' +
-           '# Add [mcp_servers.NAME] blocks here if you use MCP with Codex.\n';
+           '#\n' +
+           '# Optional: the SWS MCP server, a second entry point to the same standards.\n' +
+           '# [mcp_servers.sws]\n' +
+           '# command = "npx"\n' +
+           '# args = ["-y", "@su-sws/mcp"]\n';
   }
   return null;
 }
@@ -197,10 +225,39 @@ const ACKNOWLEDGED_TEMPLATE = `# Accepted risks.
 []
 `;
 
+/**
+ * Write, and report what actually changed per file.
+ *
+ * The per-file verdict exists because the primary caller is an AGENT, which may
+ * re-run an install to be sure it happened. "83 files written" on the second run
+ * is technically true and practically a lie: nothing changed, and an agent
+ * reporting "I installed 83 files" to its user would be wrong. So each file
+ * comes back as created | updated | unchanged, and the caller can say
+ * "already installed, nothing to do" and mean it.
+ *
+ * Comparison is by content, not mtime: a re-run of the same version must be
+ * `unchanged` even though the source files have newer timestamps.
+ */
 export function write(root, files) {
+  const results = [];
   for (const f of files) {
     const p = join(root, f.path);
-    mkdirSync(dirname(p), { recursive: true });
-    writeFileSync(p, f.contents);
+    let status = 'created';
+    if (existsSync(p)) {
+      if (f.preserve) status = 'preserved';
+      else status = readFileSync(p, 'utf8') === f.contents ? 'unchanged' : 'updated';
+    }
+    if (status === 'created' || status === 'updated') {
+      mkdirSync(dirname(p), { recursive: true });
+      writeFileSync(p, f.contents);
+    }
+    results.push({ path: f.path, status });
   }
+  return {
+    results,
+    created: results.filter((r) => r.status === 'created').length,
+    updated: results.filter((r) => r.status === 'updated').length,
+    unchanged: results.filter((r) => r.status === 'unchanged').length,
+    preserved: results.filter((r) => r.status === 'preserved').length,
+  };
 }

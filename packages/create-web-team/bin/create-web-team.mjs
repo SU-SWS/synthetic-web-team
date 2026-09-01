@@ -25,6 +25,9 @@ const { values: flags, positionals } = parseArgs({
     yes: { type: 'boolean', default: false },
     'dry-run': { type: 'boolean', default: false },
     editors: { type: 'string' },
+    answers: { type: 'string' },
+    json: { type: 'boolean', default: false },
+    interactive: { type: 'boolean', default: false },
     help: { type: 'boolean', short: 'h', default: false },
   },
 });
@@ -32,32 +35,148 @@ const { values: flags, positionals } = parseArgs({
 const root = resolve(positionals[1] ?? '.');
 const mode = positionals[0] === 'add' ? 'add' : 'new';
 
+// ---------------------------------------------------------------------------
+// AGENTS ARE THE PRIMARY CALLER, so non-interactive is the DEFAULT and prompting
+// is the special case.
+//
+// This inverted after testing what an agent actually experiences. Prompts used
+// to be gated on `!--yes` alone, which produced two failure modes and no useful
+// output in either:
+//
+//   stdin closed          exit 13, no diagnostic
+//   stdin an open pipe    HUNG FOREVER, which is the worst possible outcome for
+//                         a caller that cannot answer and cannot see the prompt
+//
+// A robot has no TTY. So: prompt only when there is demonstrably a human on both
+// ends, or when --interactive is passed explicitly. Everything else runs to
+// completion and reports.
+const hasHuman = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+const interactive = flags.interactive || (hasHuman && !flags.yes && !flags.json);
+
+// With --json, stdout is a single JSON document and nothing else. Prose goes to
+// stderr, so a caller can pipe stdout straight into a parser.
+const say = (...a) => (flags.json ? console.error(...a) : console.log(...a));
+
 if (flags.help) {
   console.log(`
   create-web-team [add] [dir]
 
   Installs the Stanford Web Services agent team into a project.
 
+  FOR AGENTS. This is the first-class path. One command, no prompts, parseable
+  output, stable exit codes:
+
+    npx @su-sws/create-web-team --json --answers '{"siteName":"...","unit":"..."}'
+
+  Non-interactive is the DEFAULT whenever stdin is not a TTY, so an agent cannot
+  hang on a prompt. With --json, stdout is exactly one JSON document and all
+  prose goes to stderr.
+
+  --json           Emit one JSON document on stdout. Implies non-interactive.
+  --answers <json> Answers as JSON, or a path to a .json file. Without this an
+                   unattended run uses placeholder values, which then sit in
+                   .sws/manifest.yml looking like real ones.
   --source <dir>   Where the standards live (default: auto-detect)
   --editors <ids>  Comma-separated, skips detection. e.g. claude-code,cursor
-  --yes            Accept defaults, no prompts. For CI and testing.
-  --dry-run        Show what would be written, write nothing.
+  --yes            Accept defaults, no prompts.
+  --interactive    Force prompts even without a TTY.
+  --dry-run        Report what would be written, write nothing.
+
+  Answer keys: siteName, unit, purpose, url, recipe, businessOwnerName,
+  businessOwnerEmail, techAdminName, techAdminEmail, and the booleans
+  collectsPersonalData, authenticates, payments, regulated (these four derive
+  the compliance tier).
+
+  Exit codes: 0 success or dry run, 2 bad input or no content found,
+  3 nothing written because a human declined.
 `);
   process.exit(0);
 }
 
-function findSource() {
-  if (flags.source) return resolve(flags.source);
-  for (const c of [resolve(HERE, '..', '..', '..'), process.cwd()]) {
-    if (existsSync(join(c, 'AGENTS.md')) && existsSync(join(c, 'skills'))) return c;
+// Where the content comes from, in order of specificity.
+//
+// The third case is the one that matters and the one that was missing: under
+// `npx` there is no repository, so walking up from this file lands in
+// node_modules and finds nothing. @su-sws/standards exists to answer this, and
+// it resolves its own layout (packed or repo) so this function does not have to.
+async function findSource() {
+  const looksRight = (c) => c
+    && existsSync(join(c, 'AGENTS.md'))
+    && existsSync(join(c, 'skills'))
+    && existsSync(join(c, 'standards'));
+
+  // An explicit --source is still checked. Previously it was returned unchecked,
+  // so a wrong path surfaced later as an unhandled ENOENT and exit 1 instead of
+  // a structured error -- which for an agent is the difference between a fixable
+  // message and a stack trace.
+  if (flags.source) {
+    const p = resolve(flags.source);
+    return looksRight(p) ? p : { badSource: p };
   }
+
+  // 1. a repository checkout containing this package, 2. the current directory
+  for (const c of [resolve(HERE, '..', '..', '..'), process.cwd()]) {
+    if (looksRight(c)) return c;
+  }
+
+  // 3. the published content package
+  try {
+    const { contentRoot } = await import('@su-sws/standards');
+    if (looksRight(contentRoot)) return contentRoot;
+  } catch { /* not installed: fall through to the error below */ }
+
   return null;
 }
 
-const source = findSource();
+// One exit path for failures, so a caller never has to parse prose to find out
+// what went wrong.
+function die(code, error, detail) {
+  if (flags.json) {
+    console.log(JSON.stringify({ ok: false, error, detail, root, mode }, null, 2));
+  } else {
+    console.error(`  ${error}`);
+    if (detail) console.error(`  ${detail}`);
+  }
+  process.exit(code);
+}
+
+// ---- answers supplied up front, which is how an agent should do it ---------
+//
+// Without this an unattended run silently uses DEFAULTS, and "Example Unit"
+// with empty owner emails lands in .sws/manifest.yml looking like a real
+// answer. MinWeb requires both owners to be identifiable, so writing
+// placeholders is worse than writing nothing.
+function suppliedAnswers() {
+  if (!flags.answers) return null;
+  let raw = flags.answers;
+  if (!raw.trimStart().startsWith('{')) {
+    const p = resolve(raw);
+    if (!existsSync(p)) die(2, `--answers file not found: ${p}`);
+    raw = readFileSync(p, 'utf8');
+  }
+  try {
+    const j = JSON.parse(raw);
+    if (!j || typeof j !== 'object' || Array.isArray(j)) throw new Error('not a JSON object');
+    const known = new Set(Object.keys(DEFAULTS));
+    const unknown = Object.keys(j).filter((k) => !known.has(k));
+    if (unknown.length) {
+      die(2, `--answers has unknown key(s): ${unknown.join(', ')}`,
+        `Known keys: ${[...known].join(', ')}`);
+    }
+    return j;
+  } catch (err) {
+    die(2, `--answers is not valid JSON: ${err.message}`);
+  }
+}
+
+const source = await findSource();
+if (source?.badSource) {
+  die(2, `--source is not a standards source: ${source.badSource}`,
+    'Expected it to contain AGENTS.md, skills/ and standards/.');
+}
 if (!source) {
-  console.error('Could not find the standards source. Pass --source <dir>.');
-  process.exit(2);
+  die(2, 'Could not find the standards content.',
+    'Expected a repository checkout, the current directory, or @su-sws/standards installed. Pass --source <dir>.');
 }
 
 const B = (s) => (process.stdout.isTTY ? `\x1b[1m${s}\x1b[0m` : s);
@@ -74,7 +193,8 @@ const DEFAULTS = {
 };
 
 async function interview() {
-  if (flags.yes) return { ...DEFAULTS };
+  const supplied = suppliedAnswers();
+  if (!interactive) return { ...DEFAULTS, ...(supplied ?? {}) };
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const ask = async (q, dflt = '') => {
@@ -86,7 +206,7 @@ async function interview() {
     return a ? a.startsWith('y') : dflt;
   };
 
-  const A = { ...DEFAULTS };
+  const A = { ...DEFAULTS, ...(supplied ?? {}) };
   console.log(`\n${B('Stanford Web Services')}  ${D('project setup')}\n`);
 
   console.log(D('  What is this site?'));
@@ -126,7 +246,7 @@ if (flags.editors) {
 }
 let chosen = editors.filter((e) => e.detected);
 
-if (!flags.yes && !flags.editors) {
+if (interactive && !flags.editors) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   console.log(`\n${D('  Which AI tools do you use? Detected ones are pre-selected.')}`);
   editors.forEach((e, i) => {
@@ -148,13 +268,97 @@ if (!chosen.length) {
   console.log(`  ${D('AGENTS.md plus .agents/skills and .claude/skills.')}`);
 }
 
+// --- the machine-readable result --------------------------------------------
+//
+// One JSON document on stdout, defined once and used by both the dry-run and the
+// real path so they cannot describe the same install differently.
+//
+// `next` is DATA, not prose. The caller of this tool is an agent whose whole
+// reason for installing is to then act, and "Hand your agent
+// standards/recipes/astro-static/RECIPE.md" is a sentence a robot has to parse
+// out of decorated terminal output. Each step names a kind, a path or command,
+// and why — so the agent can pick the one it is able to do.
+//
+// `incomplete` is the field that matters most. An unattended install writes
+// placeholder owners into .sws/manifest.yml, and MinWeb requires both owners to
+// be identifiable. Rather than pretend that is done, the result says which
+// fields are still placeholders so the agent can ask its user.
+function emitJson({ written, write: wr }) {
+  const placeholder = [];
+  if (!answers.businessOwnerEmail) placeholder.push('owners.business.email');
+  if (!answers.businessOwnerName) placeholder.push('owners.business.name');
+  if (!answers.techAdminEmail) placeholder.push('owners.technical.email');
+  if (!answers.techAdminName) placeholder.push('owners.technical.name');
+  if (answers.siteName === 'Example Unit') placeholder.push('site.name');
+  if (!answers.url) placeholder.push('site.url');
+
+  const next = [];
+  next.push({
+    kind: 'read-contract', path: 'AGENTS.md',
+    why: 'The behavioral contract. Read it before doing anything else in this project.',
+  });
+  next.push({
+    kind: 'orient', skill: 'sws-onboard',
+    why: 'Reads .sws/manifest.yml and states the stack, tier, and decisions already made.',
+  });
+  if (mode === 'new') {
+    next.push({
+      kind: 'follow-recipe', path: `standards/recipes/${answers.recipe}/RECIPE.md`,
+      why: 'The build contract, with acceptance criteria. Follow it rather than improvising.',
+    });
+  }
+  if (placeholder.length) {
+    next.push({
+      kind: 'complete-manifest', path: '.sws/manifest.yml', fields: placeholder,
+      why: 'These are placeholders, not answers. MinWeb requires a named business owner and technical administrator with valid Stanford email. Ask the user; do not invent them.',
+    });
+  }
+  if (chosen.some((e) => e.emits.some((x) => x.endsWith('mcp.json')))) {
+    next.push({
+      kind: 'optional-mcp', command: 'npx -y @su-sws/mcp --help',
+      why: 'An MCP server for these standards was added to your client config. It is a second entry point, never a requirement: sws_get_standard, sws_footer_html, sws_check, sws_decanter_token, sws_scaffold. Everything it exposes is also a file under standards/. Remove the entry if you do not want it.',
+    });
+  }
+  next.push({
+    kind: 'verify', command: 'npx sws doctor --format json',
+    why: 'Advisory compliance report. Exits 0 always. Run `sws a11y` and `sws perf` first if the site is built.',
+  });
+
+  console.log(JSON.stringify({
+    ok: true,
+    schema: 1,
+    tool: '@su-sws/create-web-team',
+    mode,
+    written,
+    root,
+    source,
+    interactive,
+    tier: { tier: tier.tier, because: tier.because, adds: tier.adds },
+    answers,
+    editors: chosen.map((e) => ({ id: e.id, label: e.label, emits: e.emits })),
+    counts: {
+      files: files.length,
+      skills: skillCount,
+      standards: stdCount,
+      ...(wr ? { created: wr.created, updated: wr.updated, unchanged: wr.unchanged, preserved: wr.preserved } : {}),
+    },
+    files: wr ? wr.results : files.map((x) => ({ path: x.path, status: 'planned' })),
+    incomplete: placeholder,
+    next,
+    notes: [
+      'Everything is advisory except committed credentials, which are the one blocking check.',
+      'Automated accessibility testing covers roughly 30 percent of issues per ODA guidance. A passing report is a floor, not a conformance claim.',
+    ],
+  }, null, 2));
+}
+
 // --- tier explanation, before the file list ---------------------------------
 
-console.log(`\n  ${B('Compliance tier: ' + tier.tier.toUpperCase())}  ${D('because ' + tier.because)}`);
-for (const a of tier.adds) console.log(`    ${D('·')} ${a}`);
+say(`\n  ${B('Compliance tier: ' + tier.tier.toUpperCase())}  ${D('because ' + tier.because)}`);
+for (const a of tier.adds) say(`    ${D('·')} ${a}`);
 if (tier.tier !== 'low') {
-  console.log(`\n  ${B('This is above a basic static site.')} ${D('A Data Risk Assessment may be')}`);
-  console.log(`  ${D('required before deploy. Route to UIT Security: standards/policy/escalation.md')}`);
+  say(`\n  ${B('This is above a basic static site.')} ${D('A Data Risk Assessment may be')}`);
+  say(`  ${D('required before deploy. Route to UIT Security: standards/policy/escalation.md')}`);
 }
 
 // --- review, then write -----------------------------------------------------
@@ -165,41 +369,62 @@ const skillCount = files.filter((f) => f.path.endsWith('SKILL.md')).length;
 const stdCount = files.filter((f) => f.path.startsWith('standards/')).length;
 const shown = files.filter((f) => !f.path.endsWith('SKILL.md') && !f.path.startsWith('standards/'));
 
-console.log(`\n  ${B('Files to write')}  ${D(root)}\n`);
+say(`\n  ${B('Files to write')}  ${D(root)}\n`);
 for (const f of shown) {
-  console.log(`    ${f.path}${f.note ? D('  ' + f.note) : ''}`);
+  say(`    ${f.path}${f.note ? D('  ' + f.note) : ''}`);
 }
-console.log(`    ${D(`+ ${skillCount} skill files across .agents/skills and .claude/skills`)}`);
-console.log(`    ${D(`+ ${stdCount} files under standards/`)}`);
+say(`    ${D(`+ ${skillCount} skill files across .agents/skills and .claude/skills`)}`);
+say(`    ${D(`+ ${stdCount} files under standards/`)}`);
 
 if (flags['dry-run']) {
-  console.log(`\n  ${D('Dry run. Nothing written.')}\n`);
+  say(`\n  ${D('Dry run. Nothing written.')}\n`);
+  if (flags.json) emitJson({ written: false, write: null });
   process.exit(0);
 }
 
-if (!flags.yes) {
+if (interactive) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const go = (await rl.question(`\n  Write these ${files.length} files? ${D('[Y/n]')}: `)).trim().toLowerCase();
   await rl.close();
-  if (go && !go.startsWith('y')) { console.log('\n  Nothing written.\n'); process.exit(0); }
+  if (go && !go.startsWith('y')) {
+    // Exit 3, not 0: a human declining is a different outcome from success, and
+    // a caller should be able to tell them apart.
+    say('\n  Nothing written.\n');
+    process.exit(3);
+  }
 }
 
-write(root, files);
-console.log(`\n  ${B('Done.')} ${files.length} files written.\n`);
+const result = write(root, files);
+
+// Say what actually changed, not how many files were considered. On a re-run
+// this reads "nothing to do", which is the truth and what a caller should
+// report onward.
+if (result.created === 0 && result.updated === 0) {
+  say(`\n  ${B('Already installed.')} ${result.unchanged + result.preserved} files, nothing to change.\n`);
+} else {
+  const parts = [];
+  if (result.created) parts.push(`${result.created} created`);
+  if (result.updated) parts.push(`${result.updated} updated`);
+  if (result.unchanged) parts.push(`${result.unchanged} unchanged`);
+  if (result.preserved) parts.push(`${result.preserved} preserved`);
+  say(`\n  ${B('Done.')} ${parts.join(', ')}.\n`);
+}
 
 // --- what happens next ------------------------------------------------------
 
-console.log(`  ${B('Next')}`);
+say(`  ${B('Next')}`);
 if (mode === 'new') {
-  console.log(`    1. Scaffold the site. Hand your agent standards/recipes/${answers.recipe}/RECIPE.md,`);
-  console.log(`       ${D('or run the upstream scaffolder yourself: npm create astro@latest')}`);
-  console.log(`    2. Check it:  npx sws doctor`);
+  say(`    1. Scaffold the site. Hand your agent standards/recipes/${answers.recipe}/RECIPE.md,`);
+  say(`       ${D('or run the upstream scaffolder yourself: npm create astro@latest')}`);
+  say(`    2. Check it:  npx sws doctor`);
 } else {
-  console.log(`    1. Check it:  npx sws doctor`);
+  say(`    1. Check it:  npx sws doctor`);
 }
-console.log(`    3. Fill in the blanks in .sws/manifest.yml: owners, Siteimprove, ODA review.`);
-console.log('');
-console.log(`  ${D('Everything is advisory. The only thing that fails a build is a committed')}`);
-console.log(`  ${D('credential. If something cannot be fixed now, record it in')}`);
-console.log(`  ${D('.sws/acknowledged.yml with a reason and a review date.')}`);
-console.log('');
+say(`    3. Fill in the blanks in .sws/manifest.yml: owners, Siteimprove, ODA review.`);
+say('');
+say(`  ${D('Everything is advisory. The only thing that fails a build is a committed')}`);
+say(`  ${D('credential. If something cannot be fixed now, record it in')}`);
+say(`  ${D('.sws/acknowledged.yml with a reason and a review date.')}`);
+say('');
+
+if (flags.json) emitJson({ written: true, write: result });

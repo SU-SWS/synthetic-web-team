@@ -26,6 +26,10 @@ obligations, and route to UIT Security.
 
 ## What is actually true at Stanford
 
+The authoritative summary, including the OIDC constraints and the yearly RP
+secret expiry, is `standards/policy/identity.md`. Repeated here because a stub
+that makes you open another file to learn the one dangerous fact is a bad stub.
+
 Verified as of August 2026, and worth knowing even in stub form:
 
 - **SAML 2.0 via Shibboleth is the primary recommended path** for enterprise web
@@ -50,9 +54,11 @@ SWS repos: `passport-saml`, `xml-encryption`, `jose`, plus `node-vault` for
 secrets. It is the reference for this work and the key input to the v2 role. Note
 its era is Decanter 7, so borrow the auth patterns and not the CSS.
 
-`adapt-auth-sdk` appears at `^1.0.20` and `^2.1.0` in `adapt-directory` and
-`adapt-online-giving` but is not public. **Open question:** what it wraps and
-whether it is the sanctioned path. Ask before recommending it.
+**Which SDK, answered 2026-09-01.** `weblogin-auth-sdk` is **the preferred
+package for all Stanford auth** — SAML, integrating with **Weblogin**, the
+primary SSO. `adapt-auth-sdk` is SAML too but is **for alumni-based websites
+only**. It appears in `adapt-directory` and `adapt-online-giving`; do not read
+those usages as a general endorsement. See `standards/policy/identity.md`.
 
 ## What to do now
 

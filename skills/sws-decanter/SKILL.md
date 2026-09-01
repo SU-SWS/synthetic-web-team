@@ -9,6 +9,22 @@ Stanford's design system. **Version 8 is CSS-first on Tailwind 4.** Version 7
 was a Tailwind 3 JavaScript preset. These are architecturally different and the
 difference is the single most common source of failure.
 
+## Install it with the beta tag, or you get v7
+
+**Checked 2026-09-01.** `latest` is **7.5.3**, `beta` is **8.0.0-beta.0**.
+
+```bash
+npm i decanter@beta     # correct today
+npm i decanter          # gets 7.5.3. WRONG for new work
+```
+
+A bare install getting v7 is the opposite of what was briefly true in August,
+when the alpha sat on `latest`. Drop the tag once 8.0.0 reaches `latest`, and
+record whatever resolved in `.sws/manifest.yml`.
+
+The git form (`github:SU-SWS/decanter#v8`) appears in existing SWS projects and
+is valid. Never flag it as an error.
+
 ## The whole integration
 
 ```css
@@ -16,7 +32,17 @@ difference is the single most common source of failure.
 @import 'decanter';
 ```
 
-That is it. One line.
+One line — **unless the site has a form**, which needs a second import:
+
+```css
+@import 'decanter';
+@import 'decanter/forms';
+```
+
+Omitting it silently drops `.input`, `.select`, `.textarea`, `.checkbox`,
+`.radio`, `.label`, `.legend`, `.fieldset` and the global form-element reset.
+Nothing errors; the form just renders unstyled. `decanter/forms` is not
+standalone — import it alongside `decanter` or `decanter/minimal`.
 
 ```js
 // astro.config.mjs
@@ -36,8 +62,10 @@ Verified working against real builds. Specifically:
   Reaching for one signals a v7 mental model.
 - **Do not install `@astrojs/tailwind`.** Dead package, supports neither current
   Astro nor Tailwind 4. Use `@tailwindcss/vite`.
-- **Do not install `tailwindcss` or `@tailwindcss/forms` directly.** Both arrive
-  transitively through Decanter.
+- **Do not install `tailwindcss` directly.** It arrives transitively.
+- **Do not install `@tailwindcss/forms` directly.** It still arrives
+  transitively; in v8 only its *styles* are gated behind the `decanter/forms`
+  entry point (see below).
 
 For Next, use `@tailwindcss/postcss` instead of the Vite plugin. See
 `ccc-bulletin` for a working example.
@@ -101,6 +129,7 @@ token, never the hex.
 | Import | When |
 |---|---|
 | `@import 'decanter'` | Default. Use this |
+| `@import 'decanter/forms'` | **Required if the site has a form.** Not standalone |
 | `@import 'decanter/minimal'` | Only when something else already owns base element styling, such as a Drupal theme |
 | `@import 'decanter/colors'` | Tokens only |
 
@@ -113,8 +142,10 @@ components, utilities, and variants are identical. On a fresh Astro site
 
 Decanter ships no font assets. Import `fonts.css` for the full set or
 `fonts-basic.css` for sans, serif, and the Stanford ligature logo font. Google
-Fonts supplies Source Sans 3, Source Serif 4, Roboto Slab, and Roboto Mono; the
-logo ligature font comes from the University Communications media CDN.
+Fonts supplies Source Sans 3 and Source Serif 4; the logo ligature font comes
+from the University Communications media CDN. **Decanter 8 dropped Roboto Slab
+and Roboto Mono**: `font-slab` is gone and `font-mono` falls through to
+Tailwind's system stack.
 
 Use **Heroicons**. Do not use FontAwesome Pro: `adapt-stanford-homesite` does,
 behind a licence-gated preinstall token check, and a unit site inheriting that
@@ -144,6 +175,17 @@ for visual intent, not for v8 token names.
 
 The consumption model changes entirely: `presets: [require('decanter')]` becomes
 `@import 'decanter'`, and `tailwind.config.js` goes away. Tailwind 3 to 4 is a
-separate migration with its own codemod. Check for an `UPGRADE.md` in the
-Decanter repo before hand-rolling a class-level migration, and consult SWS about
-the v7-to-v8 class delta rather than guessing which utilities moved.
+separate migration with its own codemod.
+
+**The class-level delta is documented.** Upstream `UPGRADE.md` has the full table
+and `standards/patterns/decanter.md` reproduces it with the four traps called out.
+Do not guess which utilities moved, and do not re-derive it.
+
+The traps, in one line each: `type-N` is smaller than `text-mN` below `lg`;
+`children:` → `*:` reverses variant order and the intuitive form is wrong;
+`break-words` still compiles but silently loses its v7 behaviour, so switch to
+`wrap-anywhere`; and `aspect-w-*` / `aspect-h-*` stop generating anything.
+
+Also audit for `.a11y-hidden` and `.accessibility-hidden`, removed in 7.5.0.
+Elements using them become **visible** rather than erroring, and if you wanted
+screen-reader-only text you need `sr-only`, not a rename.

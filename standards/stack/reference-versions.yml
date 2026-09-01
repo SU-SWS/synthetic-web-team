@@ -1,0 +1,131 @@
+# Reference versions: a dated snapshot, NOT a pin file.
+#
+# ==============================================================================
+# NOTHING INSTALLS FROM THIS FILE. Read that again before editing it.
+#
+# Recipes install at current latest and record what resolved in
+# .sws/manifest.yml. This file is a baseline to diff against, so someone can say
+# "astro moved a major since we last looked" instead of "something changed."
+#
+# It was built for the recipe canary. The canary is DEFERRED as of 2026-09-01
+# (not in production, nobody exposed yet -- see PROJECT-PLAN.md standing risks),
+# so until the standards freshness pipeline lands, the consumer of this file is a
+# human doing a periodic check. That is worse, and it is why the `rechecked:`
+# block below exists: a partial recheck with a date beats a whole-file snapshot
+# nobody trusts.
+#
+# An earlier draft of this project had a constraints.yml of allowed major
+# ranges. On reflection that was a version-pinning scheme wearing a different
+# hat, recreating the rot that dropping starter packages was meant to avoid.
+# So: this file is ADVISORY and DATED. A number here going stale is the
+# expected outcome, not a defect. The canary's job is to notice, not to block.
+#
+# The one genuinely load-bearing constraint in the whole project is
+# `decanter: 8, never 7`, and it lives in standards/patterns/decanter.md as
+# prose, because a thing-to-avoid ages better than a version-to-require.
+# ==============================================================================
+
+snapshot: 2026-08-10
+verified_against: npm registry
+recorded_by: sheamck@stanford.edu
+
+# Partial recheck 2026-09-01: decanter dist-tags only. Everything else in this
+# file still carries the 2026-08-10 date and has not been re-verified.
+rechecked:
+  - date: 2026-09-01
+    scope: decanter dist-tags and the 8.x line
+    source: npm view decanter dist-tags, plus upstream UPGRADE.md
+
+# How the canary should read this file.
+canary:
+  compare: major          # a minor or patch move is noise; a major move is news
+  on_major_move: open an issue naming the package, the old major, and the new one
+  on_missing_package: open an issue; a package disappearing is more interesting
+                      than a package moving
+  never: fail a consumer's build because a number here is old
+
+runtime:
+  node: "24.15"           # Active LTS. Not 20 (ruled out by engines), not 26 (Current)
+  npm: "12.0.2"           # requires node 24.15+
+  pnpm: "11.21.0"
+
+astro:
+  astro: "7.2.0"
+  "@astrojs/mdx": "7.0.5"
+  "@astrojs/sitemap": "3.7.3"
+  "@astrojs/react": "6.0.2"
+  "@astrojs/netlify": "8.2.0"
+  "@astrojs/vercel": "11.0.5"
+
+next:
+  next: "16.3.0"
+
+styling:
+  # THE one load-bearing constraint: 8, never 7. v7 is a Tailwind 3 JS preset,
+  # v8 is CSS-first on Tailwind 4, and mixing them fails silently.
+  #
+  # DIST-TAGS RECHECKED 2026-09-01, and they moved since the August snapshot:
+  #   latest = 7.5.3          <- a bare `npm i decanter` now gets v7
+  #   beta   = 8.0.0-beta.0   <- use this
+  #   alpha  = 8.0.0-alpha.1
+  # In August the alpha briefly sat on `latest`. It no longer does, which is the
+  # safer arrangement: existing v7 consumers are not pulled forward. Recipes must
+  # therefore install `decanter@beta` explicitly. Drop the tag when 8.0.0 ships
+  # to `latest`.
+  # RESOLVED: the v7->v8 class delta is now documented upstream in UPGRADE.md.
+  decanter: "8.0.0-beta.0"
+  decanter_dist_tag_required: "beta"
+  tailwindcss: "^4.1.16"        # decanter 8's own dependency, arrives transitively
+  "@tailwindcss/vite": "4.3.3"  # the Astro compile path
+  "@tailwindcss/postcss": null   # the Next compile path; version not captured
+  "@tailwindcss/typography": "0.5.20"
+  # @tailwindcss/forms: still a declared dependency of decanter 8 (^0.5.11) and
+  # still installs transitively. What changed in v8 is that its reset and the
+  # form classes are only EMITTED when the project imports `decanter/forms`.
+  # Package = transitive. Styles = opt-in. Do not install it directly.
+  # DO NOT USE @astrojs/tailwind: dead since Astro 6, last published 2025-03-26.
+
+# No component workshop. Deliberate, not an omission:
+# see standards/patterns/components.md.
+
+testing:
+  "@playwright/test": "1.62.1"
+  "axe-core": "4.13.0"
+  "@axe-core/playwright": "4.12.1"
+  "@axe-core/cli": "4.12.1"
+  vitest: "4.1.10"
+  vite: "8.2.1"
+
+cms:
+  "@storyblok/astro": "10.2.3"
+  "@storyblok/react": "7.2.4"
+  storyblok: "4.22.0"           # CLI
+
+search:
+  "@docsearch/react": "5.0.0"
+  algoliasearch: "5.56.0"
+  "react-instantsearch": "7.42.0"
+
+hosting:
+  "netlify-cli": "27.1.1"
+  vercel: "58.9.0"              # appears once across 11 SWS repos
+
+# Verified 2026-08-10. Check releases at generation time rather than trusting
+# these, because Actions majors move on GitHub's schedule, not npm's.
+github_actions:
+  "actions/configure-pages": "v5"
+  "actions/upload-pages-artifact": "v4"   # NOTE: excludes dotfiles
+  "actions/deploy-pages": "v5"            # v4 also valid; must be >= artifact major
+  # Artifact actions v3 are no longer supported for Pages (Dec 2024 deprecation).
+
+# Things deliberately absent, so their absence is not read as an oversight.
+not_recorded:
+  - what: "@astrojs/tailwind"
+    why: Dead package. Named here only so nobody adds it back.
+  - what: tailwindcss as a direct dependency
+    why: Arrives transitively through Decanter. Installing it directly is the
+         v7 mental model.
+  - what: a component workshop
+    why: These sites have few components and one consumer.
+  - what: any Drupal or Acquia version
+    why: v2 scope.

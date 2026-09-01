@@ -272,7 +272,8 @@ live_exemplars:
     rating: exemplary
     use_for:
       - Transactional form flows, which is the best available Decanter form
-        reference and directly relevant to `standards/patterns/forms.md`
+        reference. Harvest it into standards/patterns/ when the forms pattern
+        gets written; there is no forms.md yet.
     do_not_use_for: [implementation]
     note: >
       Almost certainly a Moderate-or-higher risk tier. Do not treat its data

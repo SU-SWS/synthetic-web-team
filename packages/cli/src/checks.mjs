@@ -15,6 +15,9 @@ import { join, relative, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { parse } from 'node-html-parser';
 import YAML from 'yaml';
+import { RESULTS_PATH as AXE_RESULTS_PATH, SCHEMA as AXE_SCHEMA } from './axe.mjs';
+import { RESULTS_PATH as PERF_RESULTS_PATH, SCHEMA as PERF_SCHEMA } from './perf.mjs';
+import { newestMtime } from './browser.mjs';
 
 const read = (p) => readFileSync(p, 'utf8');
 const readYaml = (p) => YAML.parse(read(p));
@@ -363,19 +366,86 @@ export function seo({ root, html, dist }) {
 // --------------------------------------------------------------------------
 // a11y: needs a real browser, so this reports unknown by design
 // --------------------------------------------------------------------------
+// axe: this module does not run axe, it reads what `sws a11y` recorded. Keeping
+// the browser out of `sws check` means check stays fast and installable
+// everywhere; the tradeoff is that a missing results file is a normal state and
+// must read as `unknown` rather than as a failure.
+//
+// Four things become `unknown`, and the third is the one people get wrong:
+//   1. no results file            axe was never run
+//   2. status is not `ok`         deps missing, no browser, or a partial run
+//   3. results predate the build  a stale pass is not a pass
+//   4. schema mismatch            do not guess at an old shape
+// --------------------------------------------------------------------------
 
-export function a11y({ root, html }) {
+export function axeFinding({ root, dist, html }) {
+  // The finding id is repeated literally at every call site rather than held in
+  // a variable. Deliberate: scripts/validate-criteria.mjs proves every emitted
+  // id has a criterion by grepping this file statically, and a variable is
+  // invisible to it. The gate caught exactly that when this module was written.
+  const p = join(root, AXE_RESULTS_PATH);
+
+  if (!existsSync(p)) {
+    return dunno('a11y.axe.routes', !html.length
+      ? 'no built HTML found; run the build, then `sws a11y`'
+      : 'axe has not been run. Run `sws a11y` (needs @playwright/test and @axe-core/playwright in this project)');
+  }
+
+  let r;
+  try { r = JSON.parse(read(p)); }
+  catch (err) { return dunno('a11y.axe.routes', `${AXE_RESULTS_PATH} is not valid JSON (${err.message}); re-run \`sws a11y\``); }
+
+  if (r.schema !== AXE_SCHEMA) {
+    return dunno('a11y.axe.routes', `${AXE_RESULTS_PATH} is schema ${r.schema ?? '?'}, this CLI expects ${AXE_SCHEMA}; re-run \`sws a11y\``);
+  }
+  if (r.status !== 'ok') {
+    return dunno('a11y.axe.routes', `axe did not complete (${r.status}): ${r.detail ?? 'no detail recorded'}`);
+  }
+
+  // Staleness. If anything in dist is newer than the recorded build state, the
+  // results describe a build that no longer exists.
+  if (dist && existsSync(dist)) {
+    const now = newestMtime(dist);
+    if (typeof r.distMtime === 'number' && now > r.distMtime + 1000) {
+      return dunno('a11y.axe.routes', `axe results predate the current build (build is ${Math.round((now - r.distMtime) / 1000)}s newer); re-run \`sws a11y\``);
+    }
+  }
+
+  const routes = Array.isArray(r.routes) ? r.routes : [];
+  if (!routes.length) return dunno('a11y.axe.routes', 'axe results record no routes; re-run `sws a11y`');
+
+  // Every built page should have been audited. A results file covering three of
+  // twelve routes is not evidence about the other nine.
+  if (html.length && routes.length < html.length) {
+    return dunno('a11y.axe.routes', `axe covered ${routes.length} of ${html.length} built page(s); re-run \`sws a11y\``);
+  }
+
+  const offenders = routes.filter((x) => (x.counts?.violations ?? 0) > 0);
+  const total = offenders.reduce((a, x) => a + x.counts.violations, 0);
+  const engine = r.versions?.axe ? `axe ${r.versions.axe}` : 'axe';
+
+  if (!offenders.length) {
+    return ok('a11y.axe.routes', `${engine}: 0 violations across ${routes.length} route(s) at ${r.tags?.join(', ') ?? 'WCAG 2.1 AA'}`);
+  }
+
+  // Per item, not in aggregate. "The page has violations" is not actionable.
+  const detail = offenders.slice(0, 4).map((x) => {
+    const worst = x.violations.slice(0, 3)
+      .map((v) => `${v.id}${v.nodeCount > 1 ? ` x${v.nodeCount}` : ''}`).join(', ');
+    return `${x.route}: ${worst}`;
+  }).join(' | ');
+
+  return bad('a11y.axe.routes',
+    `${engine}: ${total} violation(s) on ${offenders.length} of ${routes.length} route(s). ${detail}`,
+    `Full detail with selectors and help URLs is in ${AXE_RESULTS_PATH}. Each violation lists a helpUrl explaining the fix.`);
+}
+
+// --------------------------------------------------------------------------
+
+export function a11y({ root, dist, html }) {
   const out = [];
 
-  if (!html.length) {
-    out.push(dunno('a11y.axe.routes', 'no built HTML found; run the build first'));
-  } else {
-    const hasPw = existsSync(join(root, 'node_modules', '@axe-core', 'playwright'));
-    out.push(dunno('a11y.axe.routes',
-      hasPw
-        ? '@axe-core/playwright is installed but axe is not run by this CLI; run your Playwright suite'
-        : 'axe requires a real browser. Install @playwright/test and @axe-core/playwright and run it in your test suite'));
-  }
+  out.push(axeFinding({ root, dist, html }));
 
   // Static structural checks that genuinely can run here.
   if (html.length) {
@@ -413,6 +483,62 @@ export function a11y({ root, html }) {
   out.push(dunno('a11y.manual-checklist',
     'automation covers roughly 30% of issues per ODA guidance; the manual WCAG 2.1 AA checklist is not automatable'));
   return out;
+}
+
+// --------------------------------------------------------------------------
+// perf: reads what `sws perf` recorded, same contract as axe. Budgets
+// first-party uncompressed bytes and request counts, not Lighthouse scores;
+// the reasoning is in standards/stack/performance-budget.yml.
+// --------------------------------------------------------------------------
+
+export function perf({ root, dist, html }) {
+  const p = join(root, PERF_RESULTS_PATH);
+
+  if (!existsSync(p)) {
+    return [dunno('perf.budget', !html.length
+      ? 'no built HTML found; run the build, then `sws perf`'
+      : 'performance budget has not been measured. Run `sws perf` (needs @playwright/test in this project)')];
+  }
+
+  let r;
+  try { r = JSON.parse(read(p)); }
+  catch (err) { return [dunno('perf.budget', `${PERF_RESULTS_PATH} is not valid JSON (${err.message}); re-run \`sws perf\``)]; }
+
+  if (r.schema !== PERF_SCHEMA) {
+    return [dunno('perf.budget', `${PERF_RESULTS_PATH} is schema ${r.schema ?? '?'}, this CLI expects ${PERF_SCHEMA}; re-run \`sws perf\``)];
+  }
+  if (r.status !== 'ok') {
+    return [dunno('perf.budget', `measurement did not complete (${r.status}): ${r.detail ?? 'no detail recorded'}`)];
+  }
+  if (dist && existsSync(dist) && typeof r.distMtime === 'number') {
+    const now = newestMtime(dist);
+    if (now > r.distMtime + 1000) {
+      return [dunno('perf.budget', `budget results predate the current build (build is ${Math.round((now - r.distMtime) / 1000)}s newer); re-run \`sws perf\``)];
+    }
+  }
+  const routes = Array.isArray(r.routes) ? r.routes : [];
+  if (!routes.length) return [dunno('perf.budget', 'budget results record no routes; re-run `sws perf`')];
+  if (html.length && routes.length < html.length) {
+    return [dunno('perf.budget', `budget covered ${routes.length} of ${html.length} built page(s); re-run \`sws perf\``)];
+  }
+
+  const worst = r.totals.worst_total_kb;
+  const limit = r.budget.limits.total_kb;
+  const overridden = Object.keys(r.budget.overrides ?? {});
+  const suffix = overridden.length ? `. Project override on ${overridden.join(', ')}` : '';
+
+  if (!r.breaches.length) {
+    return [ok('perf.budget',
+      `worst route ${worst} KB of ${limit} KB budget, first-party uncompressed, across ${routes.length} route(s)${suffix}`)];
+  }
+
+  // Per item. "Over budget" is not actionable; "js is 210 KB against 150" is.
+  const detail = r.breaches.slice(0, 4)
+    .map((b) => `${b.route} ${b.key.replace(/_kb$/, '')} ${b.actual}${b.key.endsWith('_kb') ? ' KB' : ''} > ${b.limit}`)
+    .join(' | ');
+
+  return [bad('perf.budget', `${r.breaches.length} budget breach(es). ${detail}`,
+    `Full measurement in ${PERF_RESULTS_PATH}. The usual wins on a Stanford site are fewer and correctly sized images, fewer islands, and no client-side framework for static content. If the budget is genuinely wrong for this site, override it in .sws/manifest.yml under performance_budget with a reason.`)];
 }
 
 // --------------------------------------------------------------------------
@@ -579,7 +705,18 @@ export function workflow({ root }) {
   return out;
 }
 
-export function manifest({ root }) {
+// Consent tooling, by package name and by the script hosts these products load
+// from. Stanford requires NO cookie banner: the Global Footer's Privacy link
+// carries the disclosure, and guidance actively tells units not to build one.
+// So finding one of these is not a failure in itself, it is an undeclared
+// deliberate choice, which is the thing this project cares about.
+const CONSENT_TOOLING = [
+  'onetrust', 'cookiebot', 'cookieyes', 'osano', 'termly', 'iubenda',
+  'klaro', 'tarteaucitron', 'cookieconsent', 'usercentrics', 'trustarc',
+  'quantcast', 'civic-cookie-control', 'cookiehub', 'cookiefirst',
+];
+
+export function manifest({ root, html }) {
   const p = join(root, '.sws', 'manifest.yml');
   if (!existsSync(p)) {
     return [
@@ -587,6 +724,8 @@ export function manifest({ root }) {
         'Records standards version, resolved versions, tier, owners, prior art, and divergences.'),
       dunno('minweb.siteimprove', 'no manifest to read'),
       dunno('minweb.ownership', 'no manifest to read'),
+      dunno('manifest.divergences-explained', 'no manifest to read'),
+      dunno('privacy.consent-tooling-declared', 'no manifest to read'),
     ];
   }
   const m = readYaml(p) || {};
@@ -603,6 +742,44 @@ export function manifest({ root }) {
     ? ok('minweb.ownership', `business: ${b.email}, technical: ${t.email}`)
     : bad('minweb.ownership', 'business owner and/or technical administrator missing a stanford.edu email',
         'MinWeb requires both be identifiable with valid Stanford affiliation.'));
+
+  // Divergence is supported and expected. Only SILENT divergence is a problem,
+  // so what gets checked is the presence of a reason, never the choice itself.
+  const divs = Array.isArray(m.divergences) ? m.divergences : [];
+  const named = (d) => d?.changed || d?.from || '(unnamed)';
+  if (!divs.length) {
+    out.push(na('manifest.divergences-explained', 'no divergences recorded'));
+  } else {
+    const silent = divs.filter((d) => !String(d?.reason ?? '').trim());
+    out.push(silent.length
+      ? bad('manifest.divergences-explained',
+          `${silent.length} of ${divs.length} divergence(s) record no reason: ${silent.map(named).join('; ')}`,
+          'Add a one-line `reason:` and the `cost_accepted:`. Deviating is supported; not saying why is not.')
+      : ok('manifest.divergences-explained', `${divs.length} divergence(s), each with a reason`));
+  }
+
+  // Consent tooling: declared, or flagged. Not banned, because a unit may have
+  // a real reason, but it is never the default and it needs the Privacy Office.
+  const found = new Set();
+  for (const name of Object.keys(deps(root))) {
+    const hit = CONSENT_TOOLING.find((c) => name.toLowerCase().includes(c));
+    if (hit) found.add(hit);
+  }
+  for (const f of html) {
+    const markup = read(f).toLowerCase();
+    for (const c of CONSENT_TOOLING) if (markup.includes(c)) found.add(c);
+  }
+  const declared = m.privacy?.consent_tooling;
+  if (!found.size) {
+    out.push(ok('privacy.consent-tooling-declared', 'no consent tooling present, which is the Stanford default'));
+  } else if (String(declared ?? '').trim()) {
+    out.push(ok('privacy.consent-tooling-declared',
+      `${[...found].join(', ')} present and declared in .sws/manifest.yml`));
+  } else {
+    out.push(bad('privacy.consent-tooling-declared',
+      `${[...found].join(', ')} present but not declared in .sws/manifest.yml`,
+      'No cookie banner is required at Stanford; the Global Footer Privacy link carries the disclosure. If you are keeping this, record it under privacy.consent_tooling with the reason, and consult the University Privacy Office.'));
+  }
 
   return out;
 }
@@ -757,4 +934,4 @@ export function next({ root, html }) {
   return out;
 }
 
-export const ALL = { footer, identity, decanter, seo, a11y, secrets, hygiene, build, workflow, manifest, security, next };
+export const ALL = { footer, identity, decanter, seo, a11y, perf, secrets, hygiene, build, workflow, manifest, security, next };

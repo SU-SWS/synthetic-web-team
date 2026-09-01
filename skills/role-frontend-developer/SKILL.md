@@ -11,6 +11,9 @@ about how to write the code.
 
 ## Semantic HTML is the whole accessibility foundation
 
+Component conventions, the no-workshop decision, and the state inventory are in
+`standards/patterns/components.md`.
+
 Most accessibility failures are a `div` that should have been a `button`.
 
 - **Real elements before ARIA.** A `button` is focusable, keyboard-operable, and
@@ -58,8 +61,10 @@ for `GET` only. Know that going in rather than discovering it.
 
 `ccc-bulletin` is the reference for Next with Decanter 8 and Tailwind 4 through
 `@tailwindcss/postcss`. Note the decoupled Drupal family deliberately runs
-`--webpack` rather than Turbopack across all four repos, which is consistent
-enough to be intentional. Ask before recommending Turbopack.
+`--webpack` rather than Turbopack across all four repos. **That is a
+point-in-time decision, not a forward choice** (confirmed with SWS 2026-09-01):
+**Turbopack is the forward default for Next.js sites.** Recommend it for new
+work. Do not convert an existing `--webpack` project just to match.
 
 ## Conventions from the repos
 
@@ -94,10 +99,12 @@ content.
 
 ## Do not
 
-- Create `tailwind.config.js`. Decanter 8 has no JS config.
-- Install `@astrojs/tailwind`. Dead package.
-- Install `tailwindcss` or `@tailwindcss/forms` directly. Both arrive through
-  Decanter.
+- Create `tailwind.config.js`, install `@astrojs/tailwind`, or install
+  `tailwindcss` directly. All three are v7 mental models;
+  `standards/patterns/decanter.md` has the reasoning and the full avoid-list.
+- Install `@tailwindcss/forms` directly. In Decanter 8 it sits behind the
+  `decanter/forms` entry point, which a site with a form must `@import`
+  explicitly or the form silently renders unstyled.
 - Hardcode Stanford hex values. Use the token.
 - Remove a focus outline without replacing it with something better.
 - Put canonical facts in an image, a PDF, or a client-rendered component.
@@ -106,9 +113,16 @@ content.
 ## Testing
 
 Playwright plus `@axe-core/playwright` against every built route, asserting zero
-violations tagged `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`. Playwright is the
-forward default even though three SWS repos use Cypress; never convert an
-existing Cypress suite.
+violations tagged `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`. Run it with
+`sws a11y` after the build. Playwright is the forward default even though three
+SWS repos use Cypress; never convert an existing Cypress suite.
+
+**If axe reports color-contrast failures with near-white foregrounds and ratios
+close to 1, suspect an animation rather than a design defect.** axe reads
+computed colour, so an element captured mid-fade measures the blend against its
+backdrop. `sws a11y` waits for animations to settle for exactly this reason. A
+hand-rolled harness that does not wait will report false positives on any page
+with entry animations.
 
 If a11y assertions are needed at component level, Vitest plus `axe-core` gets
 there without a workshop. Reach for that when a component set earns real reuse.

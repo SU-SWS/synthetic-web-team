@@ -48,11 +48,15 @@ without being asked.
 MinSec. If the work you are about to do would change the tier, say so before
 doing it, because the tier drives real requirements.
 
-| Tier | Triggered by | Adds |
-|---|---|---|
-| `low` | Public information only | Patch cadence, monthly scanning, inventory, least-privilege admin |
-| `moderate` | Personal data, authenticated users | Duo for all users and admins, centralised logging, secure SDLC, weekly backups, annual developer training |
-| `high` | Regulated data, payments | Privileged access workstation, Data Risk Assessment before deploy, plus PCI, HIPAA, FISMA or export controls as applicable |
+| Tier | Triggered by |
+|---|---|
+| `low` | Public information only |
+| `moderate` | Personal data, authenticated users |
+| `high` | Regulated data, payments |
+
+The obligations each tier attaches are in `standards/policy/minsec.md`, which is
+the canonical table. Read it rather than reciting from memory; it is cumulative
+and people routinely forget that `low` has real requirements too.
 
 Adding a form that collects personal information, an authentication flow, or a
 payment processor is a **tier change**, not a feature. Flag it, name the new

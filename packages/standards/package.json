@@ -1,0 +1,29 @@
+{
+  "name": "@su-sws/standards",
+  "version": "0.1.0",
+  "description": "Stanford Web Services standards and agent team: policy, patterns, recipes, fragments, prior art, and the role skills. Content only, no application code.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": "./index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "standards",
+    "skills",
+    "AGENTS.md"
+  ],
+  "scripts": {
+    "stage": "node scripts/stage.mjs",
+    "prepack": "node scripts/stage.mjs",
+    "postpack": "node scripts/stage.mjs --clean"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SU-SWS/synthetic-web-team.git",
+    "directory": "packages/standards"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

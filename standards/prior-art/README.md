@@ -24,9 +24,15 @@ The rule above is necessary but incomplete, and the first inspection pass proved
 A repo on Decanter 7 and Tailwind 3 is not a CSS reference. A repo on Next 13 is not a framework reference. Note the era, take the problem shape, leave the implementation.
 
 **Repeated independent choices are knowledge. Standards should change.**
-Five repos choosing `sa11y`, seven pinning the same `cnbuilder` version, four opting out of Turbopack, and zero choosing pnpm are not drift. They are facts about how SWS works that no amount of research or reasoning would have surfaced. When production repos consistently agree with each other and disagree with our standards, **our standards are probably wrong.** Eleven production repos outrank one author's assumption.
+Five repos choosing `sa11y`, seven pinning the same `cnbuilder` version, and zero choosing pnpm are not drift. They are facts about how SWS works that no amount of research or reasoning would have surfaced. When production repos consistently agree with each other and disagree with our standards, **our standards are probably wrong.** Eleven production repos outrank one author's assumption.
 
 The test: *is this repo doing something old, or is the org doing something consistently?* One repo on Decanter 7 is dated. Nine repos avoiding a tool we recommend is a signal about the tool.
+
+**Count lineages, not repos.** This clause said "independent" from the start, and the word is load-bearing. An earlier version of this section cited *"four opting out of Turbopack"* alongside the examples above. That example was **wrong, and it was checked with SWS on 2026-09-01**: the four decoupled-Drupal repos run `--webpack` because of one point-in-time decision to not adopt Turbopack, and Turbopack is in fact the forward choice for Next.js. The four repos are **one family**, so the flag was copied along with everything else.
+
+This is the failure mode copy-forking creates, and copy-forking is a practice this project explicitly endorses: `csp-nextjs` was made by copying `cardinalsites-nextjs`, deliberately and correctly. The consequence for inspection is that **N repos in one lineage agreeing is one data point, not N.** Four sibling repos sharing a flag is weaker evidence than two unrelated repos sharing one.
+
+So before treating agreement as a convention, ask whether the repos are siblings. If they are, you have found a **frozen decision**, which is a fact about the past. Whether it is still the intent needs the third clause below — a person.
 
 ### Third clause: prior art cannot tell you why, or where the org is going
 
