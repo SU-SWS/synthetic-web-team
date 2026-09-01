@@ -1,0 +1,60 @@
+---
+// A terminal/editor panel, after the Decanter 8 docs aesthetic: window dots, a
+// filename, a language pill, a copy button.
+//
+// Highlighting is Astro's <Code>, which is Shiki running at BUILD time. Zero
+// client JavaScript for syntax colour — the alternative (a client highlighter)
+// would cost more than every other script on this page combined.
+//
+// The copy button is progressive enhancement. Without JavaScript the code is
+// still selectable text in a <pre>, which is the point of putting it there.
+import { Code } from 'astro:components';
+
+interface Props {
+  label: string;
+  lang?: string;
+  code: string;
+  /** Shown as the language pill. Defaults to `lang` uppercased. */
+  tag?: string;
+  id?: string;
+}
+
+const { label, lang = 'bash', code, tag, id } = Astro.props;
+const pillText = tag ?? lang.toUpperCase();
+const copyId = id ?? `code-${Math.random().toString(36).slice(2, 9)}`;
+---
+
+<div class="overflow-hidden rounded-md border border-black-90 bg-black-true">
+  <div class="flex items-center gap-12 border-b border-black-90 px-16 py-12">
+    <span class="flex gap-6" aria-hidden="true">
+      <span class="size-10 rounded-full bg-spirited"></span>
+      <span class="size-10 rounded-full bg-illuminating"></span>
+      <span class="size-10 rounded-full bg-palo-verde"></span>
+    </span>
+    <span class="text-14 text-black-20">{label}</span>
+    <span
+      class="rounded-sm border border-black-90 px-8 py-2 text-12 font-semibold tracking-wide text-black-30"
+      >{pillText}</span
+    >
+    <button
+      type="button"
+      class="ml-auto cursor-pointer rounded-sm border border-black-90 bg-transparent px-12 py-6 text-13 text-black-20 hover:border-black-40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+      data-copy={copyId}>Copy</button
+    >
+  </div>
+  <div id={copyId} class="code-card-body overflow-x-auto p-16 text-15">
+    <Code code={code.trim()} lang={lang} theme="github-dark-default" />
+  </div>
+</div>
+
+<style is:global>
+  /* Shiki emits its own background; the card already provides one. */
+  .code-card-body pre {
+    margin: 0;
+    background: transparent !important;
+  }
+  .code-card-body code {
+    font-size: inherit;
+    line-height: 1.7;
+  }
+</style>

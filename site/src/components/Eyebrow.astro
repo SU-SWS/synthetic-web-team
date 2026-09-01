@@ -1,0 +1,20 @@
+---
+// The small uppercase label above a section heading, from the Decanter docs
+// pattern.
+//
+// The `tone` prop exists for a contrast reason, not a stylistic one. Digital red
+// on the light background measures about 6.8:1, but on the near-black section
+// background it drops to roughly 4:1 — under the 4.5:1 that small text needs. So
+// dark sections get a warm accent that clears the bar instead. Verified by
+// `sws a11y`.
+interface Props {
+  tone?: 'light' | 'dark';
+  class?: string;
+}
+const { tone = 'light', class: className = '' } = Astro.props;
+const colour = tone === 'dark' ? 'text-poppy-light' : 'text-digital-red';
+---
+
+<p class={`mb-16 text-14 font-semibold uppercase tracking-[0.12em] ${colour} ${className}`}>
+  <slot />
+</p>
