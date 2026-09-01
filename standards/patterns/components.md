@@ -69,6 +69,16 @@ common regression in a redesign.
 
 **Icons:** Heroicons.
 
+## Motion
+
+Entry motion belongs to the block, not the component: wrap it at the call site
+with `data-animate` (or `AnimateInView`) rather than baking an animation into
+every component. That keeps the set of motions on a site finite and lets a
+reviewer see it in one place.
+
+State motion — hover, focus, active, open — belongs in the component's CSS, is
+capped at 200ms, and must not move layout. See [`motion.md`](motion.md).
+
 ## Design the states, not the happy path
 
 A component is not done when it renders the expected content. Cover:

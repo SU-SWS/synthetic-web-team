@@ -45,6 +45,7 @@ resolved:
   astro: "7.2.1"
   decanter: "8.0.0-beta.0"     # installed via `decanter@beta`; `latest` is 7.5.3
   tailwindcss: "4.3.3"
+  motion: "13.1.1"             # vanilla entry, not motion/react. See `motion:` below
   "@playwright/test": "1.62.1"
   "@axe-core/playwright": "4.13.0"
   axe-core: "4.13.0"           # transitive, and the version the report cites
@@ -52,15 +53,73 @@ resolved:
 accessibility_testing:
   tool: axe-core via @axe-core/playwright, run by `sws a11y`
   tags: [wcag2a, wcag2aa, wcag21a, wcag21aa]
-  last_result: 0 violations across 1 route, 24 passes, 1 incomplete
+  last_result: 0 violations across 1 route, 26 rules / 495 nodes passing, 1 incomplete
+  incomplete_detail: >
+    One color-contrast result, on hero text over the decorative gradient. axe
+    could not determine the background. Reviewed by hand and recorded under
+    `design.contrast_review`; that review found and fixed a genuine failure.
+  coverage_note: >
+    Node coverage matters here because entry motion hides below-fold content
+    until it scrolls into view, and axe skips invisible elements. On the previous
+    version of this page, unscrolled it audited 116 nodes and reported a clean
+    pass; scrolled, 145. The runner now scrolls before auditing. The redesigned
+    page audits 496.
   caveat: >
     Automation covers roughly 30 percent of issues per ODA guidance. The manual
     WCAG 2.1 AA checklist has not been done for this site.
 
+design:
+  aesthetic: >
+    After the Decanter 8 beta documentation site
+    (deploy-preview-162--decanter.netlify.app): dark near-black sections
+    alternating with fog-light, an uppercase eyebrow above each heading, large
+    tight-tracked headings, and code in terminal-style panels with window dots,
+    a filename, a language pill and a copy button.
+  syntax_highlighting: >
+    Astro's <Code> component, which is Shiki at BUILD time. Zero client
+    JavaScript for syntax colour; a client-side highlighter would have cost more
+    than every other script on this page combined.
+  contrast_review: >
+    axe reported color-contrast as INCOMPLETE for the hero, not passing: the
+    decorative grid and plum bloom made the background indeterminate. Those
+    pairs were therefore computed by hand against the worst-case blended
+    background (#471f40 = black + plum at 42% + grid at 18%).
+    white #FFFFFF 13.65:1 pass. black-20 #D5D5D4 9.30:1 pass.
+    black-30 #C0C0BF 7.50:1 pass.
+    digital-red-xlight #F83535 3.61:1 FAIL at 13px, needing 4.5:1.
+    That last one was a real WCAG failure axe could not report. The version pill
+    became white on solid digital red (7.26:1), which is also something axe can
+    measure. This is the roughly 70 percent automation cannot see, made concrete.
+
+motion:
+  pattern: standards/patterns/motion.md
+  library: "motion 13.1.1, vanilla API (animate + inView), not motion/react"
+  implementation: src/scripts/animate-in-view.ts
+  behaviour: viewport entry, once, 500ms easeOut, 150ms stagger between siblings
+  hero: not animated -- already in the viewport, and the h1 is the LCP element
+  why_not_react: >
+    The SWS reference implementation (sws-astro AnimateInView) uses motion/react
+    in a React island, which is right for that project because it is already
+    React-based. Measured here on the same page and the same animations:
+    motion/react plus React 19 cost 266.7 KB of JavaScript and breached the
+    150 KB js budget; the vanilla API cost 60.4 KB and passed. 77 percent less
+    for identical motion, so React was not added.
+  no_js_behaviour: >
+    Content is never hidden without JavaScript. The hidden starting state is
+    scoped to a `.js` class added by an inline script before first paint, so if
+    the script does not run nothing is hidden. Verified with JavaScript
+    disabled: 0 of 13 animated blocks invisible. The React path bakes
+    opacity:0 into the server HTML and does not have this property.
+
 performance:
   tool: "`sws perf`, first-party uncompressed bytes in Chromium"
   budget: standards/stack/performance-budget.yml v1
-  last_result: 42.1 KB of 800 KB budget, 2 first-party requests
+  last_result: 101.2 KB of 800 KB budget, 3 first-party requests (js 60.4)
+  measurement_note: >
+    Measured after scrolling the page, because lazily hydrated islands do not
+    request their JavaScript until they approach the viewport. Before that fix
+    the same page reported 52.9 KB and 2 requests, omitting the animation
+    JavaScript entirely.
   third_party_origins:
     - https://fonts.googleapis.com
     - https://fonts.gstatic.com

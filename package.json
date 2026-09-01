@@ -1,8 +1,7 @@
 {
-  "name": "@su-sws/synthetic-web-team",
+  "name": "@su-sws/sws",
   "version": "0.1.0",
-  "private": true,
-  "description": "A portable agent team that reproduces Stanford Web Services practice in any AI coding tool.",
+  "description": "Stanford Web Services standards and agent team: policy, patterns, recipes, fragments, prior art, 25 role skills, the install wizard, and the advisory compliance CLI.",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
@@ -12,15 +11,45 @@
     "sync-skills": "node scripts/sync-skills.mjs",
     "validate": "node scripts/validate-skills.mjs && node scripts/validate-criteria.mjs",
     "check": "npm run validate && npm run sync-skills -- --check",
-    "pack:all": "mkdir -p .pack && npm pack --workspaces --pack-destination ./.pack"
+    "pack:all": "mkdir -p .pack && npm pack --pack-destination ./.pack && npm pack -w @su-sws/mcp --pack-destination ./.pack"
   },
   "engines": {
     "node": ">=22.12.0"
   },
   "workspaces": [
+    ".",
     "packages/*"
   ],
   "devDependencies": {
     "yaml": "^2.8.1"
+  },
+  "bin": {
+    "sws": "packages/cli/bin/sws.mjs",
+    "create-web-team": "packages/create-web-team/bin/create-web-team.mjs"
+  },
+  "files": [
+    "AGENTS.md",
+    "standards",
+    "skills",
+    "packages/cli/bin",
+    "packages/cli/src",
+    "packages/create-web-team/bin",
+    "packages/create-web-team/src"
+  ],
+  "dependencies": {
+    "node-html-parser": "^7.0.1",
+    "yaml": "^2.8.1"
+  },
+  "peerDependencies": {
+    "@playwright/test": "*",
+    "@axe-core/playwright": "*"
+  },
+  "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    },
+    "@axe-core/playwright": {
+      "optional": true
+    }
   }
 }

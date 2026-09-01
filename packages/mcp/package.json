@@ -10,12 +10,13 @@
   "exports": {
     ".": "./src/server.mjs"
   },
-  "files": ["bin", "src"],
+  "files": [
+    "bin",
+    "src"
+  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@su-sws/standards": "^0.1.0",
-    "@su-sws/sws-cli": "^0.1.0",
-    "@su-sws/create-web-team": "^0.1.0",
+    "@su-sws/sws": "^0.1.0",
     "yaml": "^2.8.1",
     "zod": "^4.1.13"
   },

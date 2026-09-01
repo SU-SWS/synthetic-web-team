@@ -100,26 +100,29 @@ jobs:
           const list = (t) => execFileSync("tar", ["tzf", t], { encoding: "utf8" })
             .split("\n").map((s) => s.replace(/^package\//, "")).filter(Boolean);
 
-          const std = list(".pack/su-sws-standards-0.1.0.tgz");
+          const sws = list(".pack/su-sws-sws-0.1.0.tgz");
           const need = [
-            "AGENTS.md", "index.mjs",
+            "AGENTS.md",
+            "packages/cli/bin/sws.mjs",
+            "packages/create-web-team/bin/create-web-team.mjs",
             "standards/fragments/global-footer.yml",
             "standards/recipes/astro-static/acceptance.yml",
             "standards/policy/minweb.md",
             "standards/stack/performance-budget.yml",
           ];
-          const missing = need.filter((n) => !std.includes(n));
-          const skills = std.filter((n) => /^skills\/.+\/SKILL\.md$/.test(n)).length;
-          const policy = std.filter((n) => /^standards\/policy\/.+\.md$/.test(n)).length;
+          const missing = need.filter((n) => !sws.includes(n));
+          const skills = sws.filter((n) => /^skills\/.+\/SKILL\.md$/.test(n)).length;
+          const policy = sws.filter((n) => /^standards\/policy\/.+\.md$/.test(n)).length;
+          const cliSrc = sws.filter((n) => /^packages\/cli\/src\/.+\.mjs$/.test(n)).length;
 
           let bad = 0;
-          if (missing.length) { console.log(`::error::standards tarball missing: ${missing.join(", ")}`); bad++; }
-          if (skills < 25) { console.log(`::error::standards tarball has ${skills} skills, expected 25`); bad++; }
-          if (policy < 8) { console.log(`::error::standards tarball has ${policy} policy files, expected 8`); bad++; }
-
-          const cli = list(".pack/su-sws-sws-cli-0.1.0.tgz");
-          for (const m of ["bin/sws.mjs","src/checks.mjs","src/axe.mjs","src/perf.mjs","src/report.mjs","src/history.mjs","src/github.mjs","src/browser.mjs"]) {
-            if (!cli.includes(m)) { console.log(`::error::sws-cli tarball missing ${m}`); bad++; }
+          if (missing.length) { console.log(`::error::@su-sws/sws tarball missing: ${missing.join(", ")}`); bad++; }
+          if (skills < 25) { console.log(`::error::tarball has ${skills} skills, expected 25`); bad++; }
+          if (policy < 8) { console.log(`::error::tarball has ${policy} policy files, expected 8`); bad++; }
+          if (cliSrc < 7) { console.log(`::error::tarball has ${cliSrc} cli src modules, expected 7+`); bad++; }
+          // The plan, the docs site and the MCP package must never ship inside it.
+          for (const leak of ["PROJECT-PLAN.md", "site/", "packages/mcp/"]) {
+            if (sws.some((n) => n.startsWith(leak))) { console.log(`::error::${leak} leaked into the package`); bad++; }
           }
 
           const mcp = list(".pack/su-sws-mcp-0.1.0.tgz");
@@ -127,9 +130,8 @@ jobs:
             if (!mcp.includes(m)) { console.log(`::error::mcp tarball missing ${m}`); bad++; }
           }
 
-          console.log(`standards: ${std.length} files, ${skills} skills, ${policy} policy`);
-          console.log(`sws-cli:   ${cli.length} files`);
-          console.log(`mcp:       ${mcp.length} files`);
+          console.log(`@su-sws/sws: ${sws.length} files, ${skills} skills, ${policy} policy, ${cliSrc} cli modules`);
+          console.log(`@su-sws/mcp: ${mcp.length} files`);
           process.exit(bad ? 1 : 0)'
 
       # The server speaks a protocol; asserting the files exist is not enough.
@@ -167,15 +169,6 @@ jobs:
             console.log(`mcp server advertises: ${seen.join(", ")}`);
             process.exit(0);
           }, 12000)'
-
-      # A pack run that is interrupted leaves staged copies behind. They are
-      # gitignored, so this catches the case where postpack silently stopped.
-      - name: Staged content was cleaned up
-        run: |
-          for p in packages/standards/standards packages/standards/skills packages/standards/AGENTS.md; do
-            if [ -e "$p" ]; then echo "::error::$p left behind; postpack did not run"; exit 1; fi
-          done
-          echo "staged copies cleaned"
 
 # ---------------------------------------------------------------------------
 # NOT HERE, DELIBERATELY: the recipe canary.

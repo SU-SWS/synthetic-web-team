@@ -91,6 +91,14 @@ default image loader does not work and you need a custom one.
 `fonts-basic.css`. Preload the one or two faces above the fold and let the rest
 load normally. `font-display: swap` unless you have a reason.
 
+**Motion** uses the `motion` library, and the choice of entry point is a
+budget decision. `motion/react` plus a React island measured **266.7 KB** of
+JavaScript on this project's own docs page; the vanilla `motion` API
+(`animate` + `inView`) measured **60.4 KB** for identical animation. Use the
+React component when the project already has React, and the vanilla API when the
+animation is the only reason you would add it. Pattern, values, and the
+no-JavaScript trap: `standards/patterns/motion.md`.
+
 **Performance budget** in CI, and treat it as a real number. These are
 information sites; a department page that takes four seconds is a failure
 regardless of what the design looks like. The wins are almost always: fewer

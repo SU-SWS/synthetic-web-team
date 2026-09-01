@@ -26,14 +26,6 @@ dist
 # packages/cli/src/history.mjs for why there are two.
 **/.sws/score-history.json
 
-# Content staged into @su-sws/standards at pack time by its prepack script, and
-# removed again by postpack. npm cannot include files from outside a package
-# directory, and the repository root is the single source of truth, so the copy
-# is made only for the duration of a pack. See packages/standards/scripts/stage.mjs.
-packages/standards/standards/
-packages/standards/skills/
-packages/standards/AGENTS.md
-
 # Tarballs from `npm run pack:all`.
 .pack/
 

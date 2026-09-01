@@ -28,6 +28,7 @@ const { values: flags, positionals } = parseArgs({
     answers: { type: 'string' },
     json: { type: 'boolean', default: false },
     interactive: { type: 'boolean', default: false },
+    force: { type: 'boolean', default: false },
     help: { type: 'boolean', short: 'h', default: false },
   },
 });
@@ -80,12 +81,19 @@ if (flags.help) {
   --editors <ids>  Comma-separated, skips detection. e.g. claude-code,cursor
   --yes            Accept defaults, no prompts.
   --interactive    Force prompts even without a TTY.
+  --force          Overwrite files you have edited locally. Off by default.
   --dry-run        Report what would be written, write nothing.
 
   Answer keys: siteName, unit, purpose, url, recipe, businessOwnerName,
   businessOwnerEmail, techAdminName, techAdminEmail, and the booleans
   collectsPersonalData, authenticates, payments, regulated (these four derive
   the compliance tier).
+
+  UPDATING. Re-running is the update: content is rewritten from source, project
+  state (.sws/manifest.yml, .sws/acknowledged.yml) is preserved, and any file you
+  edited yourself is reported as a conflict and left alone. .sws/installed.json
+  records what was written so an edit can be told from an old version. Pass
+  --force to overwrite your edits.
 
   Exit codes: 0 success or dry run, 2 bad input or no content found,
   3 nothing written because a human declined.
@@ -95,11 +103,12 @@ if (flags.help) {
 
 // Where the content comes from, in order of specificity.
 //
-// The third case is the one that matters and the one that was missing: under
-// `npx` there is no repository, so walking up from this file lands in
-// node_modules and finds nothing. @su-sws/standards exists to answer this, and
-// it resolves its own layout (packed or repo) so this function does not have to.
-async function findSource() {
+// The first entry is the important one: `AGENTS.md`, `skills/` and `standards/`
+// ship in the same package as this file (@su-sws/sws), so walking up three
+// directories finds them under `npx` exactly as it does in this repository.
+// That is the whole reason content and tools are one package -- an earlier split
+// needed a separate `@su-sws/standards` import here, and could skew versions.
+function findSource() {
   const looksRight = (c) => c
     && existsSync(join(c, 'AGENTS.md'))
     && existsSync(join(c, 'skills'))
@@ -114,17 +123,10 @@ async function findSource() {
     return looksRight(p) ? p : { badSource: p };
   }
 
-  // 1. a repository checkout containing this package, 2. the current directory
+  // 1. the package this file ships in (also the repo root), 2. the cwd
   for (const c of [resolve(HERE, '..', '..', '..'), process.cwd()]) {
     if (looksRight(c)) return c;
   }
-
-  // 3. the published content package
-  try {
-    const { contentRoot } = await import('@su-sws/standards');
-    if (looksRight(contentRoot)) return contentRoot;
-  } catch { /* not installed: fall through to the error below */ }
-
   return null;
 }
 
@@ -169,14 +171,24 @@ function suppliedAnswers() {
   }
 }
 
-const source = await findSource();
+// The version of @su-sws/sws, which is the content version because content and
+// tools ship in one package. Recorded in .sws/installed.json so `sws doctor` can
+// say whether a project is behind.
+const contentVersion = (() => {
+  for (const c of [resolve(HERE, '..', '..', '..', 'package.json')]) {
+    try { return JSON.parse(readFileSync(c, 'utf8')).version ?? null; } catch { /* next */ }
+  }
+  return null;
+})();
+
+const source = findSource();
 if (source?.badSource) {
   die(2, `--source is not a standards source: ${source.badSource}`,
     'Expected it to contain AGENTS.md, skills/ and standards/.');
 }
 if (!source) {
   die(2, 'Could not find the standards content.',
-    'Expected a repository checkout, the current directory, or @su-sws/standards installed. Pass --source <dir>.');
+    'Expected it beside this tool, or in the current directory. Pass --source <dir>.');
 }
 
 const B = (s) => (process.stdout.isTTY ? `\x1b[1m${s}\x1b[0m` : s);
@@ -328,6 +340,8 @@ function emitJson({ written, write: wr }) {
     ok: true,
     schema: 1,
     tool: '@su-sws/create-web-team',
+    version: contentVersion,
+    previousVersion: wr?.previousVersion ?? null,
     mode,
     written,
     root,
@@ -340,10 +354,15 @@ function emitJson({ written, write: wr }) {
       files: files.length,
       skills: skillCount,
       standards: stdCount,
-      ...(wr ? { created: wr.created, updated: wr.updated, unchanged: wr.unchanged, preserved: wr.preserved } : {}),
+      ...(wr ? {
+        created: wr.created, updated: wr.updated, unchanged: wr.unchanged,
+        preserved: wr.preserved, conflicts: wr.conflicts.length,
+      } : {}),
     },
     files: wr ? wr.results : files.map((x) => ({ path: x.path, status: 'planned' })),
     incomplete: placeholder,
+    conflicts: wr?.conflicts ?? [],
+    orphans: wr?.orphans ?? [],
     next,
     notes: [
       'Everything is advisory except committed credentials, which are the one blocking check.',
@@ -394,7 +413,7 @@ if (interactive) {
   }
 }
 
-const result = write(root, files);
+const result = write(root, files, { force: flags.force, version: contentVersion });
 
 // Say what actually changed, not how many files were considered. On a re-run
 // this reads "nothing to do", which is the truth and what a caller should
@@ -407,7 +426,22 @@ if (result.created === 0 && result.updated === 0) {
   if (result.updated) parts.push(`${result.updated} updated`);
   if (result.unchanged) parts.push(`${result.unchanged} unchanged`);
   if (result.preserved) parts.push(`${result.preserved} preserved`);
+  if (result.conflicts.length) parts.push(`${result.conflicts.length} left alone`);
   say(`\n  ${B('Done.')} ${parts.join(', ')}.\n`);
+}
+
+// Conflicts and orphans, before the next steps: they need a decision.
+if (result.conflicts.length) {
+  say(`  ${B('Left alone because you edited them:')}`);
+  for (const c of result.conflicts) say(`    ${c}`);
+  say(`  ${D('Re-run with --force to take the new versions and discard your edits.')}`);
+  say('');
+}
+if (result.orphans.length) {
+  say(`  ${B('No longer shipped, still in your project:')}`);
+  for (const o of result.orphans) say(`    ${o}`);
+  say(`  ${D('Not deleted. Remove them yourself if you agree they are stale.')}`);
+  say('');
 }
 
 // --- what happens next ------------------------------------------------------

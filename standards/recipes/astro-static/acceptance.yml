@@ -370,19 +370,31 @@ criteria:
     note: Siteimprove is required. Google Analytics is not.
 
   # --------------------------------------------------------------- privacy
-  - id: privacy.no-handrolled-consent
+  - id: privacy.consent-ui-declared
     requires: >
-      No hand-rolled cookie consent banner. None is required at Stanford, and a
-      bespoke one implies a consent mechanism that does not exist while adding
-      an accessibility surface nobody maintains.
+      If consent UI is present in the built output, the choice is recorded in
+      .sws/manifest.yml under privacy.consent_tooling with a reason.
     check: hygiene
-    severity: warn
-    weight: 2
+    severity: info
+    weight: 1
     policy: minpriv
     mechanism: >
-      Detect consent-like UI authored IN THIS REPO: components combining cookie
-      or consent vocabulary with accept/reject affordances. Do NOT flag a
-      third-party consent package, which is covered by the next criterion.
+      Detect consent UI authored IN THIS REPO: a container named like a consent
+      banner, or a control whose own label asks the reader to accept cookies.
+      Pass when it is absent, and pass when it is present and declared. A
+      third-party consent package is covered separately by
+      privacy.consent-tooling-declared.
+
+      Detection must be specific. An earlier version matched the substrings
+      /cookie/ and /(accept|consent)/ anywhere in the document, which failed on
+      this project's own compliant site: "cookie" came from the MANDATED Global
+      Footer link title and "accept" from prose about accepted risks.
+    note: >
+      A cookie banner is NOT forbidden at Stanford, and this criterion does not
+      pretend otherwise. None is REQUIRED, because the Global Footer's Privacy
+      link carries the disclosure — so a banner is a deliberate addition, and
+      the only thing asked here is that the decision be written down. Severity
+      is `info` for that reason: the project has no standing to prohibit it.
 
   - id: privacy.consent-tooling-declared
     requires: >

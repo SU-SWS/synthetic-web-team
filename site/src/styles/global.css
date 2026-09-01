@@ -1,53 +1,86 @@
 @import 'decanter';
 
-/* Smooth scroll behavior */
+/* ---------------------------------------------------------------------------
+   Motion lives in two places, deliberately.
+
+   ENTRY motion (something arriving as you scroll) is JavaScript, via
+   src/components/Animate/AnimateInView.tsx and the `motion` library. It needs
+   viewport detection, and CSS cannot do that without `animation-timeline`
+   support we are not relying on yet.
+
+   STATE motion (hover, focus, active, open) is CSS, right here. It is a
+   response to something the reader did, it must be instant, and it must work
+   with no JavaScript at all.
+
+   The keyframes that used to be in this file are gone. They ran on page LOAD,
+   which meant every below-fold element finished animating before anyone
+   scrolled to it — motion spent where nobody was looking — and they paired with
+   `opacity-0` in the markup, so the content was invisible if the animation never
+   ran. See standards/patterns/motion.md.
+   --------------------------------------------------------------------------- */
+
 html {
   scroll-behavior: smooth;
 }
 
-/* Animation keyframes for scroll-triggered animations */
-@keyframes fadeInUp {
-  from {
+/* ---------------------------------------------------------------------------
+   The hidden starting state for entry motion.
+
+   Read the selector carefully, because both halves are load-bearing:
+
+     .js      only when JavaScript is running. If it is disabled, errored, or
+              still loading, nothing is hidden and the page reads normally.
+              Without this, `motion` renders content that never appears.
+
+     no-preference  only when the reader has NOT asked for reduced motion. This
+              is the real fix, not a shortened animation: someone who set that
+              preference sees static content and no transform at all.
+
+   The animation itself is in src/scripts/animate-in-view.ts.
+   --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  .js [data-animate] {
     opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+    transform: translateY(80px);
   }
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* Button animations */
+/* State feedback only: 200ms, and nothing that moves layout. The previous
+   version used `transition: all` plus a translate, which animates every
+   property including ones that trigger reflow. */
 .button {
-  transition: all 0.3s ease;
-  position: relative;
+  transition:
+    background-color 200ms ease,
+    box-shadow 200ms ease;
 }
 
 .button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 16px rgb(0 0 0 / 0.18);
 }
 
-.button:active {
-  transform: translateY(0);
-}
+/* ---------------------------------------------------------------------------
+   prefers-reduced-motion.
 
-/* Respect motion preferences */
+   Two layers, because they cover different things:
+
+   1. AnimateInView returns the PLAIN element when the preference is set, so
+      entry motion is not shortened, it does not exist. That is the real fix.
+   2. This block is the backstop for CSS transitions and for any third-party or
+      future CSS that forgets. `scroll-behavior: auto` matters as much as the
+      durations: a smooth-scrolled anchor jump is motion too, and it is the one
+      people most often leave in.
+   --------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

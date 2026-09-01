@@ -100,8 +100,10 @@ Beyond tooling: give authors a short, specific guide rather than a link to WCAG.
 - **Global Footer text is immutable.** `standards/fragments/global-footer.yml`,
   and see [`../policy/brand.md`](../policy/brand.md).
 - **The Accessibility footer link** points at Stanford's barrier-reporting page.
-- **Do not write or commission a cookie consent banner.** None is required at
-  Stanford. See [`../policy/privacy.md`](../policy/privacy.md).
+- **No cookie consent banner is required**, because the Global Footer's Privacy
+  link carries the disclosure. It is not forbidden either: if a unit wants one,
+  that is their call and the copy is then yours to write. Do not tell them they
+  cannot. See [`../policy/privacy.md`](../policy/privacy.md).
 - **MinPriv requires a transparency notice before collection.** Any form says what
   is collected, why, and what happens to it, in plain language, before the reader
   fills it in.

@@ -18,7 +18,7 @@ if (args.includes('--help') || args.includes('-h')) {
 
   --root <dir>       Default project directory for sws_check and sws_scaffold.
                      Defaults to the working directory.
-  --standards <dir>  Standards directory. Defaults to the bundled @su-sws/standards.
+  --standards <dir>  Standards directory. Defaults to the copy bundled in @su-sws/sws.
 
   Add to an MCP client config:
 
@@ -39,7 +39,7 @@ const { server, index, contentRoot } = build({
 if (!index.length) {
   console.error('sws-mcp: warning — no standards found, so sws_get_standard and');
   console.error('sws_footer_html will report an error. Pass --standards <dir>, or');
-  console.error('install @su-sws/standards.');
+  console.error('install @su-sws/sws.');
 } else {
   console.error(`sws-mcp: ${index.length} standards indexed from ${contentRoot ?? 'unknown'}`);
 }

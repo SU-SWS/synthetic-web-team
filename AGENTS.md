@@ -19,8 +19,11 @@ contract. Read it once, follow it throughout.
    that blocks a build, because it is the only irreversible harm.
 5. **A named business owner and technical administrator**, both with valid
    Stanford affiliation and email, must be discoverable on the site.
-6. **Do not build a cookie consent banner.** None is required at Stanford. The
-   Global Footer's Privacy link satisfies the disclosure obligation.
+6. **No cookie consent banner is required.** The Global Footer's Privacy link
+   satisfies the disclosure obligation, so a banner is never the default. It is
+   **not forbidden** — a unit may add one. If it does, record the choice in
+   `.sws/manifest.yml` and send the vendor question to the University Privacy
+   Office. Do not tell people they cannot have one.
 
 ## How to work
 

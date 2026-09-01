@@ -26,7 +26,8 @@ Early. The plan is complete and reviewed; the implementation is partway through.
 | `sws` CLI | **Working.** `doctor` and `check` run 13 check modules against 63 criteria. `sws a11y` runs axe and `sws perf` measures a byte budget, both in real Chromium |
 | Report delivery | **Working.** PR comment and a persistent "Site health" issue, both updated in place. Score trend, sparkline, HTML artifact, README badge |
 | Install wizard | **Working, agent-first.** Non-interactive by default off a TTY, `--json` result with machine-readable next steps, `--answers` input, idempotent re-runs that preserve project state |
-| Publishable packages | **Working, not yet published.** Three packages pack cleanly and were verified by installing the tarballs into a clean project with no repository present |
+| Publishable packages | **Working, not yet published.** Two packages — `@su-sws/sws` and `@su-sws/mcp` — verified by installing the tarballs into a clean project with no repository present |
+| Updates | **Working.** Re-install is the update: project state preserved, local edits reported as conflicts rather than overwritten, stale files reported not deleted, staleness nag in `sws doctor` |
 | Recipe canary | **Deliberately deferred**, 2026-09-01. Not in production, so nobody is exposed to upstream drift yet. Revisit before the first pilot |
 | Standards freshness CI | Planned, and the priority ahead of the canary. Keeps policy, prior art, and sourced facts from going stale |
 | MCP server | **Working.** [`packages/mcp/`](packages/mcp/). 5 tools, 26 resources, verified over the real stdio protocol |
@@ -71,6 +72,32 @@ Re-running is safe. `.sws/manifest.yml` and `.sws/acknowledged.yml` are project
 state and are **preserved**, never overwritten — everything else is content and is
 rewritten from source.
 
+### Updating
+
+**Re-running the installer *is* the update.** There is no separate `update`
+command, because the content is vendored into your project rather than resolved
+at runtime — so an update is a re-copy, and the only question is what it is
+allowed to touch.
+
+```bash
+npx @su-sws/create-web-team add .
+```
+
+Three guarantees make that safe to run at any time:
+
+| Verdict | What happens |
+|---|---|
+| `preserved` | `.sws/manifest.yml` and `.sws/acknowledged.yml` are **never** overwritten. They hold your owners, resolved versions, recorded divergences and accepted risks |
+| `conflict` | A file **you edited** is reported and left alone. `--force` overrides |
+| `orphan` | A file we shipped before and no longer do is **reported, not deleted**, every run until you remove it |
+
+`.sws/installed.json` records the hash of everything written, which is what lets
+an update tell a local edit from an old version. **Commit it.** Delete it and you
+lose conflict detection until the next install.
+
+`npx sws doctor` tells you when a project is behind: content and tools ship in
+one package, so the CLI's version *is* the standards version — no network call.
+
 ### If you are a human
 
 Same command without `--json`. It detects your editors, asks a handful of
@@ -79,8 +106,7 @@ reports what it would do and writes nothing; `--interactive` forces prompts even
 without a TTY.
 
 Nothing is published to npm yet. Until it is, install from a checkout — the
-wizard resolves its content from the repository, the current directory, or the
-`@su-sws/standards` package, in that order:
+wizard finds its content beside itself or in the current directory:
 
 ```bash
 git clone https://github.com/SU-SWS/synthetic-web-team
@@ -128,10 +154,17 @@ node packages/cli/bin/sws.mjs doctor --standards standards
 | [`standards/recipes/`](standards/recipes/) | Build contracts with machine-checkable acceptance criteria |
 | [`standards/fragments/`](standards/fragments/) | Byte-exact compliance content, like the Global Footer link set |
 | [`standards/prior-art/`](standards/prior-art/) | Existing SWS work, with era, lineage, and judgment attached |
-| [`packages/standards/`](packages/standards/) | `@su-sws/standards`. Ships L0 and L1 as content, plus a path resolver so tooling need not guess |
-| [`packages/create-web-team/`](packages/create-web-team/) | `@su-sws/create-web-team`. The wizard |
-| [`packages/cli/`](packages/cli/) | `@su-sws/sws-cli`. 13 check modules, axe and performance runners in real Chromium, terminal / JSON / markdown output |
+| [`packages/cli/`](packages/cli/) | The `sws` CLI. 13 check modules, axe and performance runners in real Chromium |
+| [`packages/create-web-team/`](packages/create-web-team/) | The install wizard |
 | [`packages/mcp/`](packages/mcp/) | `@su-sws/mcp`. The same standards as MCP tools and resources, for agents that prefer calling a tool to shelling out |
+
+**Two published packages, not four.** `@su-sws/sws` ships the content, the CLI
+and the wizard together — one version number, so the CLI always knows which
+standards version it carries. `@su-sws/mcp` is separate only so CI does not
+download an MCP SDK to run `sws check`. `packages/cli` and
+`packages/create-web-team` are internal: they are published *inside*
+`@su-sws/sws`, which is why there is no staging script and no empty-looking
+package directory.
 
 ## Five decisions that surprise people
 

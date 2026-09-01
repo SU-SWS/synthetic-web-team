@@ -41,9 +41,25 @@ const jsonLd = {
       href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,300..700;1,300..700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300..700;1,8..60,300..700&display=swap"
     />
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+    <!--
+      MOTION GUARD. Runs before first paint, so it cannot flash.
+      Adds `js` to <html>; the hidden starting state in global.css applies only
+      when that class is present. Two failure modes handled by one line:
+
+        JavaScript disabled or broken   the class is never added, so nothing is
+                                       ever hidden and all content is visible
+        prefers-reduced-motion         handled in CSS, alongside the same rule
+
+      This replaces a <noscript><style> override, which worked but only covered
+      the first case: a script error AFTER the noscript block still left content
+      hidden, because the browser had JavaScript enabled. See
+      standards/patterns/motion.md.
+    -->
+    <script is:inline>document.documentElement.classList.add('js');</script>
   </head>
 
-  <body class="bg-white text-black antialiased">
+  <body class="bg-black text-white antialiased">
     <!-- The only thing permitted above the Identity Bar. -->
     <a
       href="#main-content"
@@ -62,19 +78,56 @@ const jsonLd = {
       </div>
     </div>
 
+    <!--
+      Site header. Below the Identity Bar, which is the only ordering rule that
+      matters here: nothing may go above it except the skip link.
+    -->
+    <header class="sticky top-0 z-40 border-b border-black-90 bg-black/95 backdrop-blur">
+      <div class="mx-auto flex max-w-[144rem] items-center gap-24 px-20 py-16 md:px-30">
+        <a href="/synthetic-web-team/" class="flex items-center gap-10 no-underline">
+          <span class="text-22 font-semibold text-white">Synthetic Web Team</span>
+          <span
+            class="rounded-sm border border-poppy-light px-8 py-2 text-12 font-semibold tracking-wide text-poppy-light"
+            >EARLY</span
+          >
+        </a>
+        <nav aria-label="Sections" class="ml-auto hidden gap-24 md:flex">
+          {
+            [
+              ['#install', 'Install'],
+              ['#verify', 'Verify'],
+              ['#entrypoints', 'Entry points'],
+              ['#inside', 'What is inside'],
+            ].map(([href, label]) => (
+              <a
+                href={href}
+                class="text-17 text-black-20 no-underline hover:text-white hover:underline focus-visible:text-white"
+                >{label}</a
+              >
+            ))
+          }
+        </nav>
+        <a
+          href="https://github.com/SU-SWS/synthetic-web-team"
+          class="ml-auto text-17 text-black-20 no-underline hover:text-white hover:underline md:ml-0"
+          >GitHub</a
+        >
+      </div>
+    </header>
+
     <main id="main-content"><slot /></main>
 
     <!-- Local footer. Unit links go HERE, never inside the Global Footer. -->
-    <div class="border-t border-black-20 bg-fog-light">
+    <div class="border-t border-black-90 bg-black">
       <div class="mx-auto max-w-[144rem] px-20 py-30 md:px-30">
-        <p class="mb-0 text-16 text-black-70">
+        <p class="mb-0 text-16 text-black-30">
           Built and maintained by
-          <a href="https://uit.stanford.edu/sws" class="text-digital-red underline hover:no-underline"
+          <a href="https://uit.stanford.edu/sws" class="text-white underline hover:no-underline"
             >Stanford Web Services</a
           >. Source on
           <a
             href="https://github.com/SU-SWS/synthetic-web-team"
-            class="text-digital-red underline hover:no-underline">GitHub</a
+            class="text-white underline hover:no-underline">GitHub</a
           >, licensed GPL-3.0-or-later.
         </p>
       </div>

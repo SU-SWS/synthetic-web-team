@@ -207,7 +207,7 @@ The last two were wrong in this project's first draft, which is a good argument 
 | What | Where | Notes |
 |---|---|---|
 | Accessibility link | Global Footer | Points at `https://www.stanford.edu/site/accessibility`. Satisfies the barrier-reporting requirement |
-| Privacy link | Global Footer | Points at the central policy. **Do not build a cookie banner.** None is required, and a hand-rolled one implies a consent mechanism that does not exist. If someone insists they need consent management, do not evaluate vendors: send them to the [University Privacy Office](https://privacy.stanford.edu) |
+| Privacy link | Global Footer | Points at the central policy and carries the cookie disclosure, so **no banner is required**. None is forbidden either: if a unit wants one, record it in `.sws/manifest.yml` under `privacy.consent_tooling`. Do not evaluate or rank consent vendors — send that to the [University Privacy Office](https://privacy.stanford.edu) |
 | Business owner + technical admin | `src/pages/about.astro` footer or About page | MinWeb requires both be identifiable, with valid Stanford affiliation and email |
 | Page title + meta description | Every page | Unique per page |
 | `robots.txt` | `public/robots.txt` | Sitemap reference, plus explicit AI crawler sections. Allow retrieval bots (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`, `Googlebot`, `Bingbot`); treat training crawlers as a unit policy decision. See `standards/patterns/discoverability.md` |

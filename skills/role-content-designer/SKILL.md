@@ -102,10 +102,11 @@ Five rules they will remember beats twenty they will not.
 
 ## Privacy and required content
 
-- **Do not write or commission a cookie consent banner.** None is required at
-  Stanford, and a hand-rolled one implies a consent mechanism that does not
-  exist. The Global Footer's Privacy link satisfies the disclosure obligation,
-  and its upstream title is literally "Privacy and cookie policy."
+- **No cookie consent banner is required.** The Global Footer's Privacy link
+  satisfies the disclosure obligation. So never propose one as a default, but it
+  is **not forbidden**: if a unit decides they want one, write the copy and
+  record the choice rather than refusing. Telling someone they cannot have a
+  banner is interpreting policy, which is not yours to do.
 - **MinPriv requires a transparency notice before collection.** Any form needs to
   say what is collected, why, and what happens to it, in plain language, before
   the reader fills it in.

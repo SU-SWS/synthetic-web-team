@@ -1,209 +1,520 @@
 ---
 import Base from '../layouts/Base.astro';
+import CodeCard from '../components/CodeCard.astro';
+import Eyebrow from '../components/Eyebrow.astro';
 import { contractExtracted } from '../lib/footer';
 
 const REPO = 'https://github.com/SU-SWS/synthetic-web-team';
 
-const installPrompt = `Install the Stanford Web Services agent team into this project.
+const installCmd = `npx @su-sws/create-web-team --json --answers '{
+  "siteName": "Stanford Bioengineering",
+  "unit": "Bioengineering",
+  "businessOwnerEmail": "owner@stanford.edu",
+  "techAdminEmail": "admin@stanford.edu"
+}'`;
 
-Get the files from ${REPO} and copy in:
+const resultShape = `{
+  "ok": true,
+  "version": "0.1.0",
+  "counts": { "created": 81, "updated": 0, "unchanged": 0, "preserved": 0 },
+  "incomplete": ["site.url"],
+  "next": [
+    { "kind": "read-contract",  "path": "AGENTS.md" },
+    { "kind": "orient",         "skill": "sws-onboard" },
+    { "kind": "follow-recipe",  "path": "standards/recipes/astro-static/RECIPE.md" },
+    { "kind": "verify",         "command": "npx sws doctor --format json" }
+  ]
+}`;
 
-- AGENTS.md to the repository root
-- standards/ to the repository root
-- skills/ into BOTH .agents/skills/ and .claude/skills/
-- a CLAUDE.md containing exactly one line: @AGENTS.md
+const verifyCmd = `npm run build
+npx sws a11y     # axe-core, every route, real Chromium
+npx sws perf     # first-party byte budget
+npx sws check    # reads both, scores out of 100`;
 
-Then read AGENTS.md and tell me, in one line each, the non-negotiables you found.
-Do not change any of my existing code.`;
+const mcpConfig = `{
+  "mcpServers": {
+    "sws": { "command": "npx", "args": ["-y", "@su-sws/mcp"] }
+  }
+}`;
 
-const shellAlternative = `git clone --depth 1 ${REPO} /tmp/swt
-cp -r /tmp/swt/AGENTS.md /tmp/swt/standards .
-mkdir -p .agents .claude
-cp -r /tmp/swt/skills .agents/skills
-cp -r /tmp/swt/skills .claude/skills
-echo '@AGENTS.md' > CLAUDE.md`;
+const updateCmd = `npx @su-sws/create-web-team add .`;
 
-const benefits = [
-  {
-    h: 'Ship in hours, not weeks',
-    p: 'Go from empty repo to live Stanford site with full compliance in a single session. No manual compliance work. No technical debt.',
-  },
-  {
-    h: 'Works with your AI tool',
-    p: 'Claude Code, Cursor, VS Code, Copilot, Zed, or any agent you already use. No new tools to learn or install.',
-  },
-  {
-    h: 'Stanford-compliant by default',
-    p: 'Accessibility, security, brand, privacy all built in. Passes 90+ automated compliance checks. WCAG 2.1 AA ready.',
-  },
-  {
-    h: 'Maintainable in three years',
-    p: 'No bloat. No starter template rot. No framework lock-in. Just clean, understandable code.',
-  },
+const checkModules = [
+  ['footer', 'Global Footer link set, order, and nothing added'],
+  ['identity', 'Identity Bar present, nothing above but skip-nav'],
+  ['decanter', 'Decanter 8 not 7, no tailwind.config.js, no dead packages'],
+  ['a11y', 'axe-core at WCAG 2.1 AA, plus lang, headings, alt, skip link'],
+  ['perf', 'First-party byte budget per route'],
+  ['seo', 'Titles, descriptions, canonical, robots, sitemap, JSON-LD'],
+  ['secrets', 'Committed credentials. The only blocking check'],
+  ['manifest', 'Named owners, Siteimprove, recorded divergences'],
+];
+
+const mcpTools = [
+  ['sws_get_standard', 'Any policy, pattern, recipe or fragment. Understands synonyms'],
+  ['sws_footer_html', 'Global Footer markup, generated from the byte-exact contract'],
+  ['sws_check', 'The compliance report, structured'],
+  ['sws_decanter_token', 'Tokens read from the Decanter actually installed'],
+  ['sws_scaffold', 'Install into a project. Dry run by default'],
+];
+
+const updateVerdicts = [
+  ['preserved', '.sws/manifest.yml and acknowledged.yml. Your owners and accepted risks are never overwritten'],
+  ['conflict', 'A file you edited. Reported and left alone unless you pass --force'],
+  ['orphan', 'A file we no longer ship. Reported every run, never deleted'],
+];
+
+const inside = [
+  ['8 policy files', 'MinSec, MinWeb, accessibility, privacy, brand, identity, procurement, escalation. Each dated with a reviewed: field'],
+  ['7 pattern files', 'Decanter 8, components, content, IA, forms, motion, discoverability'],
+  ['25 skills', '8 built roles, 11 honest stubs, 6 shared. Two frontmatter keys, read natively by nine tools'],
+  ['2 recipes', 'astro-static and next-netlify, with 63 machine-checkable criteria between them'],
+  ['1 fragment', 'The Global Footer, byte-exact, extracted from the upstream component'],
 ];
 ---
 
 <Base
   title="Synthetic Web Team | Stanford Web Services"
-  description="Ship Stanford-compliant websites in hours, not weeks. AI-powered, built-in compliance, works with any AI tool you use."
+  description="Stanford compliance wired into your coding agent. 25 skills, 8 policy files, a 13-module compliance CLI, and an MCP server. No templates, no design system fork."
 >
-  <!-- Hero: Big, bold, benefits-focused -->
-  <div class="bg-gradient-to-b from-cardinal-red via-cardinal-red to-digital-red text-white relative overflow-hidden">
-    <div class="absolute inset-0 opacity-10" style="background: radial-gradient(circle at 30% 50%, white 0%, transparent 50%)"></div>
-    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30 md:py-120 relative">
-      <p class="mb-20 font-semibold uppercase tracking-widest text-18 text-white/80 opacity-0 animate-[fadeIn_0.6s_ease-out_0.1s_forwards]">
-        Stanford Web Services
-      </p>
-      <h1 class="type-6 mb-32 max-w-[28ch] font-serif leading-tight opacity-0 animate-[fadeInUp_0.8s_ease-out_0.2s_forwards]">
-        Ship Stanford sites in hours
-      </h1>
-      <p class="mb-32 max-w-[65ch] text-28 leading-relaxed md:text-32 opacity-0 animate-[fadeIn_0.6s_ease-out_0.3s_forwards]">
-        AI meets compliance. No manual work. No technical debt. Just launch.
-      </p>
-      <a href="#install" class="button inline-block px-32 py-16 text-20 font-semibold bg-gradient-to-r from-white to-orange-100 text-cardinal-red no-underline opacity-0 animate-[fadeIn_0.6s_ease-out_0.4s_forwards] hover:shadow-xl hover:scale-105 transition-all duration-300">
-        Get started
-      </a>
+  <!-- ===================================================== hero -->
+  <div class="relative overflow-hidden border-b border-black-90 bg-black">
+    <!-- Decorative only: a faint grid and a plum bloom, after the Decanter docs
+         hero. aria-hidden because it carries no meaning. -->
+    <div
+      aria-hidden="true"
+      class="pointer-events-none absolute inset-0 opacity-[0.18]"
+      style="background-image: linear-gradient(to right, #43423E 1px, transparent 1px), linear-gradient(to bottom, #43423E 1px, transparent 1px); background-size: 48px 48px;"
+    >
+    </div>
+    <div
+      aria-hidden="true"
+      class="pointer-events-none absolute -right-1/4 top-0 h-full w-3/4"
+      style="background: radial-gradient(ellipse at 60% 40%, #620059 0%, transparent 62%); opacity: 0.42;"
+    >
+    </div>
+
+    <div class="relative mx-auto max-w-[144rem] px-20 py-80 md:px-30 md:py-100">
+      <div class="grid items-center gap-60 lg:grid-cols-2 lg:gap-40">
+        <div>
+          <!-- Not animated: this is the first screenful and the h1 is the LCP
+               element. See standards/patterns/motion.md. -->
+          <p class="mb-24 flex flex-wrap items-center gap-12">
+            <!--
+              SOLID background, not an outlined pill, and the reason is measured.
+              The Decanter docs hero uses red-on-dark for this label. At 13px on
+              this background that computes to 3.61:1 against a required 4.5:1 —
+              a real WCAG failure, and one axe never reported because the
+              decorative gradient made the background indeterminate ("incomplete",
+              not "pass"). White on solid digital red is 7.26:1 and, being solid,
+              is something axe can actually verify.
+            -->
+            <span
+              class="rounded-full bg-digital-red px-14 py-4 text-13 font-semibold tracking-wide text-white"
+              >v0.1.0 EARLY</span
+            >
+            <span class="text-16 text-black-30">MCP server · CLI · 25 skills</span>
+          </p>
+          <h1 class="mb-28 max-w-[24ch] text-56 font-bold leading-[1.05] tracking-tight md:text-72">
+            Stanford compliance, wired into your agent.
+          </h1>
+          <p class="mb-36 max-w-[54ch] text-22 leading-relaxed text-black-20 md:text-24">
+            Markdown, YAML, and a small CLI that turns Stanford's web
+            requirements into something your coding agent already knows. No
+            starter templates. No design system fork. Nothing for us to keep
+            updated on your behalf.
+          </p>
+          <div class="flex flex-wrap gap-16">
+            <a
+              href="#install"
+              class="inline-block rounded-md bg-white px-28 py-14 text-18 font-semibold text-black no-underline transition-shadow duration-200 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >Install it →</a
+            >
+            <a
+              href="#inside"
+              class="inline-block rounded-md border border-black-40 px-28 py-14 text-18 font-semibold text-white no-underline transition-colors duration-200 hover:border-white hover:bg-black-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >Read what is inside</a
+            >
+          </div>
+        </div>
+
+        <div>
+          <CodeCard label="Terminal" tag="AGENT" lang="bash" code={installCmd} id="hero-install" />
+          <p class="mt-20 mb-0 flex items-start gap-10 text-17 text-black-20">
+            <span class="text-palo-verde-light" aria-hidden="true">✓</span>
+            <span
+              >Non-interactive by default off a TTY, so an agent cannot hang on a
+              prompt. One JSON document on stdout.</span
+            >
+          </p>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Benefits grid: HUGE and splashy -->
-  <section aria-labelledby="benefits" class="bg-white">
+  <!-- ===================================================== status strip -->
+  <div class="border-b border-black-20 bg-fog-light text-black">
+    <div
+      class="mx-auto flex max-w-[144rem] flex-wrap items-center gap-x-24 gap-y-8 px-20 py-20 md:px-30"
+    >
+      <p class="mb-0 text-17">
+        <strong>Dogfooded:</strong> this page is built by the recipe it documents
+        and scores <strong>100/100</strong> with zero automated failures.
+      </p>
+      <a
+        href="#verify"
+        class="ml-auto text-17 font-semibold text-digital-red underline hover:no-underline"
+        >See how it is measured →</a
+      >
+    </div>
+  </div>
+
+  <!-- ===================================================== install -->
+  <section aria-labelledby="install-h" class="border-b border-black-90 bg-black">
     <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
-      <h2 id="benefits" class="sr-only">Why you need this</h2>
-      <div class="grid grid-cols-1 gap-40 md:grid-cols-2">
+      <div class="grid gap-60 lg:grid-cols-2 lg:gap-40">
+        <div data-animate>
+          <Eyebrow tone="dark">One command</Eyebrow>
+          <h2 id="install-h" class="mb-24 max-w-[22ch] text-40 font-bold leading-tight md:text-48">
+            Built for an agent, not a human.
+          </h2>
+          <p class="mb-24 max-w-[54ch] text-19 leading-relaxed text-black-20">
+            The primary caller is a robot, so that is the first-class path.
+            Prompts appear only when stdin and stdout are both a TTY. Everything
+            else runs to completion and reports.
+          </p>
+          <p class="mb-0 max-w-[54ch] text-19 leading-relaxed text-black-20">
+            Three fields in the result are the ones to act on.
+          </p>
+          <dl class="mt-24 mb-0 grid gap-16">
+            <div class="border-l-2 border-poppy-light pl-20">
+              <dt class="mb-4 font-mono text-17 font-semibold text-white">next[]</dt>
+              <dd class="mb-0 ml-0 text-17 text-black-20">
+                What to do next, as data rather than prose. Each step has a path
+                or a command and a reason.
+              </dd>
+            </div>
+            <div class="border-l-2 border-poppy-light pl-20">
+              <dt class="mb-4 font-mono text-17 font-semibold text-white">incomplete[]</dt>
+              <dd class="mb-0 ml-0 text-17 text-black-20">
+                Manifest fields still holding placeholders. Ask the user for
+                these; MinWeb requires a named owner and technical administrator
+                with valid Stanford email.
+              </dd>
+            </div>
+            <div class="border-l-2 border-poppy-light pl-20">
+              <dt class="mb-4 font-mono text-17 font-semibold text-white">counts</dt>
+              <dd class="mb-0 ml-0 text-17 text-black-20">
+                created, updated, unchanged, preserved. A re-run reports
+                unchanged, so "already installed" is a truthful answer.
+              </dd>
+            </div>
+          </dl>
+        </div>
+        <div data-animate data-animate-delay="0.15">
+          <CodeCard label="stdout" lang="json" code={resultShape} id="result-shape" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== verify -->
+  <section aria-labelledby="verify-h" class="border-b border-black-20 bg-fog-light text-black">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <div class="mb-48 max-w-[62ch]" data-animate>
+        <Eyebrow>Verified, not asserted</Eyebrow>
+        <h2 id="verify-h" class="mb-24 text-40 font-bold leading-tight md:text-48">
+          Thirteen check modules. Sixty-three criteria.
+        </h2>
+        <p class="mb-0 text-19 leading-relaxed text-black-80">
+          Every criterion maps to an implemented check, is marked manual, or
+          declares why it is not built yet. A criterion with no check is a wish,
+          and four CI gates exist to stop wishes accumulating.
+        </p>
+      </div>
+
+      <div class="grid gap-48 lg:grid-cols-[1fr_1.1fr]">
+        <div data-animate>
+          <CodeCard label="Terminal" tag="CI" lang="bash" code={verifyCmd} id="verify-cmd" />
+          <p class="mt-24 mb-0 text-17 leading-relaxed text-black-80">
+            <strong>A check that cannot run reports <code>unknown</code>, never
+            <code>pass</code>.</strong> Its points are withheld rather than
+            awarded. That rule exists because a harness here once printed
+            <code>TOTAL VIOLATIONS: 0</code> while axe had silently failed to
+            load.
+          </p>
+        </div>
+
+        <div data-animate data-animate-delay="0.15">
+          <table class="w-full border-collapse text-left">
+            <caption class="sr-only">Check modules and what each verifies</caption>
+            <thead>
+              <tr class="border-b-2 border-black-30">
+                <th scope="col" class="py-12 pr-16 text-16 font-semibold">Module</th>
+                <th scope="col" class="py-12 text-16 font-semibold">Verifies</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                checkModules.map(([name, what]) => (
+                  <tr class="border-b border-black-20">
+                    <td class="py-12 pr-16 align-top font-mono text-16 whitespace-nowrap">{name}</td>
+                    <td class="py-12 align-top text-16 text-black-80">{what}</td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+          <p class="mt-16 mb-0 text-16 text-black-70">
+            Plus <code>build</code>, <code>hygiene</code>, <code>workflow</code>,
+            <code>security</code>, and <code>next</code>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== real browser -->
+  <section aria-labelledby="browser-h" class="border-b border-black-90 bg-black">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <div class="mb-48 max-w-[62ch]" data-animate>
+        <Eyebrow tone="dark">A real browser</Eyebrow>
+        <h2 id="browser-h" class="mb-24 text-40 font-bold leading-tight md:text-48">
+          axe and a byte budget, in Chromium.
+        </h2>
+        <p class="mb-0 text-19 leading-relaxed text-black-20">
+          Both runners serve the build over localhost, drive a real browser,
+          scroll the whole page, and wait for animations to settle before
+          measuring. Each of those steps exists because skipping it produced a
+          wrong answer on this very site.
+        </p>
+      </div>
+
+      <div class="grid gap-32 md:grid-cols-3">
         {
-          benefits.map((b, i) => (
-            <div class="border-l-8 border-cardinal-red pl-32 opacity-0 transition-all duration-500 hover:border-digital-red hover:pl-40 hover:-translate-y-1 group" style={`animation: fadeInUp 0.8s ease-out ${0.1 + i * 0.1}s forwards`}>
-              <h3 class="type-2 mb-16 font-serif text-cardinal-red">{b.h}</h3>
-              <p class="mb-0 text-22 text-black-80 leading-relaxed">{b.p}</p>
+          [
+            {
+              n: '145',
+              l: 'rule-nodes audited',
+              p: 'Unscrolled it was 116, and axe reported a clean pass. Entry motion holds content at opacity 0, and axe skips invisible elements — so a fifth of the page went unaudited.',
+            },
+            {
+              n: '4',
+              l: 'false contrast failures avoided',
+              p: 'axe reads computed colour. Captured mid-fade, text measured 1.05:1 against white. Waiting for animations to settle removed all four.',
+            },
+            {
+              n: '77%',
+              l: 'less JavaScript',
+              p: 'The same entry motion via vanilla motion rather than a React island: 60.4 KB instead of 266.7 KB. The byte budget caught the difference.',
+            },
+          ].map((s, i) => (
+            <div data-animate data-animate-delay={i * 0.15} class="rounded-md border border-black-90 bg-black-90/40 p-28">
+              <p class="mb-8 text-48 font-bold leading-none text-poppy-light">{s.n}</p>
+              <p class="mb-16 text-17 font-semibold tracking-wide text-white">{s.l}</p>
+              <p class="mb-0 text-17 leading-relaxed text-black-20">{s.p}</p>
             </div>
           ))
         }
       </div>
-    </div>
-  </section>
 
-  <!-- Install: Second priority -->
-  <section aria-labelledby="install" class="bg-fog-light">
-    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
-      <h2 id="install" class="type-3 mb-24 font-serif">Ready to build?</h2>
-      <p class="mb-40 max-w-[62ch] text-22 text-black-80">
-        Open your AI tool, paste the prompt below, and your Stanford site is minutes away.
+      <p class="mt-40 mb-0 max-w-[68ch] text-17 leading-relaxed text-black-30">
+        A green run means roughly 30 percent of accessibility issues are absent,
+        per the Office of Digital Accessibility's own figure. It is a floor, not
+        a conformance claim, and the report says so every time.
       </p>
+    </div>
+  </section>
 
-      <div class="relative rounded-none border-2 border-black-20 bg-white mb-24">
-        <div class="flex items-center justify-between gap-16 border-b border-black-20 px-24 py-14">
-          <span class="text-14 font-semibold uppercase tracking-wide text-black-70"
-            >Copy this prompt</span
-          >
-          <button
-            type="button"
-            id="copy-prompt"
-            data-target="install-prompt"
-            class="button cursor-pointer border-0 px-20 py-10 text-16 bg-cardinal-red text-white hover:bg-cardinal-red/90 hover:underline hover:underline-offset-4 hover:decoration-2 focus-visible:underline focus-visible:underline-offset-4 focus-visible:decoration-2"
-          >
-            Copy
-          </button>
+  <!-- ===================================================== entry points -->
+  <section aria-labelledby="entry-h" class="border-b border-black-20 bg-fog-light text-black">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <div class="grid gap-60 lg:grid-cols-2 lg:gap-40">
+        <div data-animate>
+          <Eyebrow>Two entry points</Eyebrow>
+          <h2 id="entry-h" class="mb-24 max-w-[20ch] text-40 font-bold leading-tight md:text-48">
+            A CLI, and an MCP server.
+          </h2>
+          <p class="mb-24 max-w-[54ch] text-19 leading-relaxed text-black-80">
+            The server is a second entry point, never a requirement. Everything
+            it exposes is also a plain file under <code>standards/</code> that an
+            agent can read directly, so if it will not start, nothing else stops
+            working.
+          </p>
+          <p class="mb-24 max-w-[54ch] text-19 leading-relaxed text-black-80">
+            Five tools and all 26 documents as resources. <code>sws_check</code>
+            and <code>sws_scaffold</code> shell out to the same binaries a human
+            runs, so the MCP answer and the terminal answer cannot disagree.
+          </p>
+          <CodeCard label=".mcp.json" lang="json" code={mcpConfig} id="mcp-config" />
         </div>
-        <pre
-          id="install-prompt"
-          class="m-0 overflow-x-auto p-24 text-16 leading-relaxed whitespace-pre-wrap font-mono bg-black-5">{installPrompt}</pre>
-      </div>
-      <p id="copy-status" role="status" aria-live="polite" class="mt-8 mb-0 text-18 text-cardinal-red font-semibold"></p>
 
-      <details class="mt-40 border-l-4 border-black-20 pl-24">
-        <summary class="cursor-pointer text-20 font-semibold hover:text-cardinal-red">
-          Prefer shell? Expand here
-        </summary>
-        <p class="mt-16 mb-16 max-w-[62ch] text-18 text-black-80">
-          Same result without an agent. Paste in your terminal:
+        <div data-animate data-animate-delay="0.15">
+          <table class="w-full border-collapse text-left">
+            <caption class="sr-only">MCP tools</caption>
+            <thead>
+              <tr class="border-b-2 border-black-30">
+                <th scope="col" class="py-12 pr-16 text-16 font-semibold">Tool</th>
+                <th scope="col" class="py-12 text-16 font-semibold">Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                mcpTools.map(([name, what]) => (
+                  <tr class="border-b border-black-20">
+                    <td class="py-12 pr-16 align-top font-mono text-15 whitespace-nowrap">{name}</td>
+                    <td class="py-12 align-top text-16 text-black-80">{what}</td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+          <p class="mt-24 mb-0 text-17 leading-relaxed text-black-80">
+            <code>sws_footer_html</code> justifies the server on its own. The
+            Global Footer is immutable, frequently gotten wrong, and mechanically
+            generable — two of its ten URLs were wrong in this project's first
+            draft because they were typed from memory. The contract was extracted
+            on {contractExtracted}.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== updates -->
+  <section aria-labelledby="update-h" class="border-b border-black-90 bg-black">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <div class="grid gap-60 lg:grid-cols-[1.1fr_1fr] lg:gap-40">
+        <div data-animate>
+          <Eyebrow tone="dark">Updates without surprises</Eyebrow>
+          <h2 id="update-h" class="mb-24 max-w-[24ch] text-40 font-bold leading-tight md:text-48">
+            Re-installing is the update.
+          </h2>
+          <p class="mb-24 max-w-[54ch] text-19 leading-relaxed text-black-20">
+            The standards are vendored into your project rather than resolved at
+            runtime, so an update is a re-copy. The only real question is what it
+            is allowed to touch.
+          </p>
+          <p class="mb-24 max-w-[54ch] text-19 leading-relaxed text-black-20">
+            <code>.sws/installed.json</code> records a hash of everything
+            written, which is what lets a re-install tell a local edit from an
+            old version. <code>sws doctor</code> tells you when you are behind:
+            content and tools ship in one package, so the CLI's version is the
+            standards version, and no network call is needed.
+          </p>
+          <CodeCard label="Terminal" tag="UPDATE" lang="bash" code={updateCmd} id="update-cmd" />
+        </div>
+
+        <div data-animate data-animate-delay="0.15" class="grid content-start gap-20">
+          {
+            updateVerdicts.map(([verdict, what]) => (
+              <div class="rounded-md border border-black-90 bg-black-90/40 p-24">
+                <p class="mb-8 font-mono text-19 font-semibold text-poppy-light">{verdict}</p>
+                <p class="mb-0 text-17 leading-relaxed text-black-20">{what}</p>
+              </div>
+            ))
+          }
+          <p class="mb-0 text-16 leading-relaxed text-black-30">
+            Deleting files in someone else's repository on the strength of a
+            version bump is not a risk worth taking for tidiness.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== what's inside -->
+  <section aria-labelledby="inside-h" class="border-b border-black-20 bg-fog-light text-black">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <div class="mb-48 max-w-[62ch]" data-animate>
+        <Eyebrow>What is inside</Eyebrow>
+        <h2 id="inside-h" class="mb-24 text-40 font-bold leading-tight md:text-48">
+          Markdown, YAML, and a small CLI.
+        </h2>
+        <p class="mb-0 text-19 leading-relaxed text-black-80">
+          No application code, no starter templates, no design system fork. A
+          template starts rotting the day it is committed and every consumer
+          inherits the rot; a recipe says what must be true and delegates the
+          boilerplate to the upstream scaffolder.
         </p>
-        <pre
-          class="overflow-x-auto border-2 border-black-20 bg-black-5 p-24 text-16 font-mono">{shellAlternative}</pre>
-      </details>
-    </div>
-  </section>
+      </div>
 
-  <!-- What's included: Highlights only -->
-  <section aria-labelledby="what-inside" class="bg-gradient-to-r from-fog-light to-fog-dark">
-    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
-      <h2 id="what-inside" class="type-2 mb-40 font-serif opacity-0 animate-[fadeInUp_0.8s_ease-out_0.2s_forwards]">Everything you need, nothing you don't</h2>
-      <ul class="grid list-none grid-cols-1 gap-40 p-0 md:grid-cols-2">
-        {[
-          { emoji: '•', title: 'Full SWS expertise', desc: 'Strategy, UX, accessibility, security, and delivery. All baked in.' },
-          { emoji: '•', title: 'Works everywhere', desc: 'Claude Code, Cursor, VS Code, Copilot, Zed, or your favorite AI tool.' },
-          { emoji: '•', title: 'Stanford compliance built-in', desc: 'WCAG 2.1 AA, MinWeb, MinSec, brand, privacy. Zero manual work.' },
-          { emoji: '•', title: 'No bloat or debt', desc: 'Clean, maintainable code. No starter template rot. No lock-in.' },
-        ].map((item, i) => (
-          <li class="flex gap-20 opacity-0 transition-all duration-300 hover:-translate-y-1 hover:pl-4" style={`animation: fadeInUp 0.8s ease-out ${0.3 + i * 0.1}s forwards`}>
-            <span class="text-40 font-serif text-cardinal-red flex-shrink-0">•</span>
-            <div>
-              <h3 class="type-1 mb-8 font-serif">{item.title}</h3>
-              <p class="mb-0 text-18 text-black-80">{item.desc}</p>
-            </div>
-          </li>
-        ))}
+      <ul class="grid list-none gap-32 p-0 md:grid-cols-2 lg:grid-cols-3">
+        {
+          inside.map(([title, desc], i) => (
+            <li data-animate data-animate-delay={(i % 3) * 0.15} class="border-t-2 border-digital-red pt-20">
+              <h3 class="mb-10 text-24 font-bold">{title}</h3>
+              <p class="mb-0 text-17 leading-relaxed text-black-80">{desc}</p>
+            </li>
+          ))
+        }
       </ul>
-    </div>
-  </section>
 
-  <!-- Who it's for -->
-  <section aria-labelledby="who" class="bg-cardinal-red text-white">
-    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
-      <h2 id="who" class="type-3 mb-40 font-serif">Who this is for</h2>
-      <div class="grid grid-cols-1 gap-40 md:grid-cols-3">
-        <div>
-          <h3 class="type-1 mb-12 font-serif">Web teams</h3>
-          <p class="mb-0 text-18">
-            Multiply your output. Build in parallel. Let AI handle the compliance while you focus on content and experience.
-          </p>
-        </div>
-        <div>
-          <h3 class="type-1 mb-12 font-serif">Individual developers</h3>
-          <p class="mb-0 text-18">
-            No web team at your school or unit? Ship a fully compliant site solo. Your AI does the heavy lifting.
-          </p>
-        </div>
-        <div>
-          <h3 class="type-1 mb-12 font-serif">Other universities</h3>
-          <p class="mb-0 text-18">
-            Only Stanford-specific bits need swapping. The rest is a portable playbook for any campus.
-          </p>
-        </div>
+      <div class="mt-48 rounded-md border border-black-20 bg-white p-28" data-animate>
+        <h3 class="mb-12 text-22 font-bold">One load-bearing version constraint</h3>
+        <p class="mb-0 max-w-[72ch] text-17 leading-relaxed text-black-80">
+          Recipes name no version numbers, with a single exception:
+          <strong>Decanter 8, never 7</strong>, because they are architecturally
+          different and getting it wrong fails silently. Everything else installs
+          at latest and records what resolved. Standards are expressed as things
+          to avoid, which age better than versions to require.
+        </p>
       </div>
     </div>
   </section>
 
-  <!-- Status/CTA -->
-  <section aria-labelledby="next" class="mx-auto max-w-[144rem] px-20 py-80 md:px-30 opacity-0 animate-[fadeIn_0.8s_ease-out_0.5s_forwards]">
-    <h2 id="next" class="type-3 mb-24 font-serif">Ready to launch?</h2>
-    <p class="mb-40 max-w-[64ch] text-20 text-black-80">
-      Scroll back to the top and paste the prompt into your AI tool. Your Stanford site builds itself.
-    </p>
-    <div class="flex gap-20 flex-wrap">
-      <a href={REPO} class="inline-block rounded-none bg-gradient-to-r from-cardinal-red to-digital-red px-32 py-16 text-18 font-semibold text-white no-underline transition-all duration-300 hover:shadow-lg hover:scale-105 hover:from-digital-red hover:to-cardinal-red focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cardinal-red">
-        View on GitHub
-      </a>
-      <a href="#install" class="inline-block rounded-none border-2 border-cardinal-red bg-white px-32 py-16 text-18 font-semibold text-cardinal-red no-underline transition-all duration-300 hover:shadow-lg hover:scale-105 hover:bg-cardinal-red hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cardinal-red">
-        Back to install
-      </a>
+  <!-- ===================================================== cta -->
+  <section aria-labelledby="cta-h" class="bg-black">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <div class="max-w-[62ch]" data-animate>
+        <h2 id="cta-h" class="mb-24 text-40 font-bold leading-tight md:text-48">
+          Point your agent at it.
+        </h2>
+        <p class="mb-36 text-19 leading-relaxed text-black-20">
+          Everything is advisory except committed credentials, because that is
+          the only irreversible harm. A tool that fails your build over a
+          contrast ratio gets uninstalled by Friday, and then nothing is
+          compliant.
+        </p>
+        <div class="flex flex-wrap gap-16">
+          <a
+            href={REPO}
+            class="inline-block rounded-md bg-white px-28 py-14 text-18 font-semibold text-black no-underline transition-shadow duration-200 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >View on GitHub</a
+          >
+          <a
+            href="#install"
+            class="inline-block rounded-md border border-black-40 px-28 py-14 text-18 font-semibold text-white no-underline transition-colors duration-200 hover:border-white hover:bg-black-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >Back to install</a
+          >
+        </div>
+      </div>
     </div>
   </section>
 
   <script>
-    // Progressive enhancement only. Without JS the prompt is still selectable
-    // text in a <pre>, which is the whole point of putting it there.
-    const btn = document.getElementById('copy-prompt');
-    const status = document.getElementById('copy-status');
-    btn?.addEventListener('click', async () => {
-      const target = document.getElementById(btn.dataset.target ?? '');
-      if (!target || !status) return;
-      try {
-        await navigator.clipboard.writeText(target.textContent ?? '');
-        status.textContent = 'Copied. Paste it into your AI coding tool.';
-      } catch {
-        status.textContent = 'Could not copy automatically. Select the text above and copy it.';
-      }
-    });
+    import '../scripts/animate-in-view.ts';
+  </script>
+
+  <script>
+    // Copy buttons. Progressive enhancement only: without JavaScript every
+    // block is still selectable text in a <pre>, which is why the code lives
+    // there rather than in a canvas or an image.
+    for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
+      btn.addEventListener('click', async () => {
+        const target = document.getElementById(btn.dataset.copy ?? '');
+        if (!target) return;
+        const original = btn.textContent;
+        try {
+          await navigator.clipboard.writeText(target.innerText.trim());
+          btn.textContent = 'Copied';
+        } catch {
+          btn.textContent = 'Press ⌘C';
+        }
+        window.setTimeout(() => {
+          btn.textContent = original;
+        }, 2000);
+      });
+    }
   </script>
 </Base>

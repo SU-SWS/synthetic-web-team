@@ -9,6 +9,7 @@
 //    cannot be relied on.
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, dirname } from 'node:path';
 
 const POINTER = (target) => `<!--
@@ -226,38 +227,132 @@ const ACKNOWLEDGED_TEMPLATE = `# Accepted risks.
 `;
 
 /**
- * Write, and report what actually changed per file.
+ * Write, and report what happened to each file.
  *
- * The per-file verdict exists because the primary caller is an AGENT, which may
- * re-run an install to be sure it happened. "83 files written" on the second run
- * is technically true and practically a lie: nothing changed, and an agent
- * reporting "I installed 83 files" to its user would be wrong. So each file
- * comes back as created | updated | unchanged, and the caller can say
- * "already installed, nothing to do" and mean it.
+ * THIS IS ALSO THE UPDATE MECHANISM. There is no separate `sws update`: a
+ * re-install IS the update, because the content is vendored into the project
+ * rather than resolved at runtime. That only works safely if three things are
+ * true, and each is a per-file verdict below.
  *
- * Comparison is by content, not mtime: a re-run of the same version must be
+ *   preserved  Project state is never overwritten. `.sws/manifest.yml` and
+ *              `.sws/acknowledged.yml` accumulate real owners, resolved
+ *              versions, recorded divergences and accepted risks. An earlier
+ *              version of this function replaced real business-owner emails
+ *              with nulls on a re-run, which is the one thing the wizard exists
+ *              to record.
+ *
+ *   conflict   A file the user EDITED is never silently overwritten. Detected by
+ *              comparing against `.sws/installed.json`, a record of the hashes
+ *              this tool last wrote. If the file on disk no longer matches that
+ *              record, the edit was somebody's deliberate work, and an update
+ *              that discards it is data loss with extra steps. Reported and
+ *              skipped; `force` overrides.
+ *
+ *   orphan     A file that this tool wrote before and no longer ships is
+ *              reported, NOT deleted. Deleting files in someone else's
+ *              repository on the strength of a version bump is not a risk worth
+ *              taking for tidiness.
+ *
+ * Comparison is by content, never mtime: re-running the same version must be
  * `unchanged` even though the source files have newer timestamps.
  */
-export function write(root, files) {
+export function write(root, files, { force = false, version = null } = {}) {
+  const prev = readInstalled(root);
+  const planned = new Set(files.map((f) => f.path));
   const results = [];
+  const nextHashes = {};
+
   for (const f of files) {
     const p = join(root, f.path);
-    let status = 'created';
-    if (existsSync(p)) {
+    const newHash = hash(f.contents);
+    let status;
+
+    if (!existsSync(p)) {
+      status = 'created';
+    } else {
+      const local = readFileSync(p, 'utf8');
       if (f.preserve) status = 'preserved';
-      else status = readFileSync(p, 'utf8') === f.contents ? 'unchanged' : 'updated';
+      else if (local === f.contents) status = 'unchanged';
+      else {
+        const recorded = prev?.files?.[f.path];
+        // No record means we cannot tell an edit from an old version, so the
+        // safe default is to update. Conflict detection needs evidence.
+        const edited = recorded !== undefined && hash(local) !== recorded;
+        status = edited && !force ? 'conflict' : 'updated';
+      }
     }
+
     if (status === 'created' || status === 'updated') {
       mkdirSync(dirname(p), { recursive: true });
       writeFileSync(p, f.contents);
+      nextHashes[f.path] = newHash;
+    } else if (status === 'conflict') {
+      // Record what is actually on disk, so the next run compares against
+      // reality and does not report the same conflict forever.
+      nextHashes[f.path] = hash(readFileSync(p, 'utf8'));
+    } else {
+      nextHashes[f.path] = existsSync(p) ? hash(readFileSync(p, 'utf8')) : newHash;
     }
     results.push({ path: f.path, status });
   }
+
+  const orphans = Object.keys(prev?.files ?? {}).filter((x) => !planned.has(x) && existsSync(join(root, x)));
+
+  // Keep orphans in the record while the file still exists, so they are reported
+  // on EVERY run rather than once. A one-shot warning is easy to miss -- an agent
+  // discards the output, a human scrolls past it -- and then a stale standard
+  // sits in the project looking authoritative. Same instinct as resurfacing an
+  // expired `review_by` date: the nag stops when the situation is resolved, not
+  // when it has been seen once.
+  for (const x of orphans) nextHashes[x] = prev.files[x];
+
+  writeInstalled(root, { version, files: nextHashes });
+
+  const count = (s) => results.filter((r) => r.status === s).length;
   return {
     results,
-    created: results.filter((r) => r.status === 'created').length,
-    updated: results.filter((r) => r.status === 'updated').length,
-    unchanged: results.filter((r) => r.status === 'unchanged').length,
-    preserved: results.filter((r) => r.status === 'preserved').length,
+    orphans,
+    previousVersion: prev?.version ?? null,
+    created: count('created'),
+    updated: count('updated'),
+    unchanged: count('unchanged'),
+    preserved: count('preserved'),
+    conflicts: results.filter((r) => r.status === 'conflict').map((r) => r.path),
   };
+}
+
+// --- the install record ----------------------------------------------------
+//
+// Committed, not gitignored: it is a record of what this tool put in the
+// repository, in the same spirit as a lockfile. Hashes are truncated because
+// their only job is to answer "has this changed since we wrote it".
+
+export const INSTALLED_PATH = join('.sws', 'installed.json');
+
+const hash = (s) => createHash('sha256').update(s).digest('hex').slice(0, 12);
+
+export function readInstalled(root) {
+  const p = join(root, INSTALLED_PATH);
+  if (!existsSync(p)) return null;
+  try {
+    const j = JSON.parse(readFileSync(p, 'utf8'));
+    return j && typeof j.files === 'object' ? j : null;
+  } catch {
+    // A corrupt record means we lose conflict detection for one run, which is
+    // survivable. Silently starting over beats refusing to install.
+    return null;
+  }
+}
+
+function writeInstalled(root, { version, files }) {
+  mkdirSync(join(root, '.sws'), { recursive: true });
+  writeFileSync(join(root, INSTALLED_PATH), `${JSON.stringify({
+    _comment: 'Written by @su-sws/create-web-team. Records what was installed so a '
+      + 're-install can tell an update from a local edit. Commit this. Safe to delete: '
+      + 'you lose conflict detection until the next install.',
+    tool: '@su-sws/create-web-team',
+    version,
+    at: new Date().toISOString(),
+    files,
+  }, null, 2)}\n`);
 }

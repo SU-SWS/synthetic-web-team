@@ -154,6 +154,37 @@ export async function settleAnimations(page, budget = ANIMATION_BUDGET_MS) {
   }, budget).catch(() => { /* measuring an unsettled page beats failing the route */ });
 }
 
+/**
+ * Scroll the whole page, then return to the top.
+ *
+ * REQUIRED BEFORE AUDITING, and the reason is a measured coverage gap rather
+ * than a theory. Entry animation (see standards/patterns/motion.md) holds
+ * below-fold content at `opacity: 0` until it scrolls into view. axe correctly
+ * treats an invisible element as not applicable -- so it SKIPS it. On this
+ * project's own docs site that meant 13 blocks were never audited, and axe
+ * reported a clean 0 violations while covering 116 rule-nodes instead of 145.
+ *
+ * A false negative in an accessibility check is worse than a false positive: a
+ * false positive gets investigated, a false negative gets trusted.
+ *
+ * Also triggers `client:visible` islands, which is the same reason the perf
+ * runner needs it -- lazily hydrated JavaScript is still JavaScript the reader
+ * downloads.
+ */
+export async function revealAll(page, { step = 600, settle = 120 } = {}) {
+  try {
+    const height = await page.evaluate(() => document.body.scrollHeight);
+    for (let y = 0; y < height; y += step) {
+      await page.evaluate((to) => window.scrollTo(0, to), y);
+      await page.waitForTimeout(settle);
+    }
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(settle);
+  } catch {
+    // Auditing an unscrolled page beats failing the route.
+  }
+}
+
 /** dist-relative file path -> the URL path a reader would visit. */
 export function routeFor(dist, file) {
   const rel = file.slice(dist.length + 1).split(sep).join('/');

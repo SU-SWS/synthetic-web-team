@@ -61,8 +61,10 @@ policy_links:
     title: Privacy and cookie policy
     note: >
       This is how a Stanford site satisfies its cookie disclosure obligation.
-      The upstream title says "Privacy and cookie policy" explicitly. No banner
-      is required and none should be hand-rolled.
+      The upstream title says "Privacy and cookie policy" explicitly, which is
+      why no consent banner is required. Not required is not forbidden: a unit
+      may add one, and if it does the choice belongs in .sws/manifest.yml rather
+      than in an argument.
   - label: Copyright
     href: https://uit.stanford.edu/security/copyright-infringement
     title: Report alleged copyright infringement

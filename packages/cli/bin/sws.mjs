@@ -21,17 +21,19 @@ import {
 } from '../src/report.mjs';
 import * as history from '../src/history.mjs';
 import * as gh from '../src/github.mjs';
+// Sibling directory inside the same published package (@su-sws/sws), so this
+// relative path resolves in the repository and in a tarball alike. One reader
+// of the install record means the CLI and the wizard cannot disagree about what
+// "installed" means.
+import { readInstalled } from '../../create-web-team/src/emit.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-// Resolved once, at load. Null when the package is absent, which is normal: a
-// vendored `standards/` in the project is the common case and takes precedence.
-const standardsFromPackage = await (async () => {
-  try {
-    const { standardsDir } = await import('@su-sws/standards');
-    return standardsDir ?? null;
-  } catch { return null; }
-})();
+// `standards/` ships in the same package as this file (@su-sws/sws), so the
+// relative walk below finds it in both the published layout and this
+// repository. There used to be an `import('@su-sws/standards')` fallback here;
+// consolidating content and tools into one package removed the need for it,
+// along with the cross-package version skew it could produce.
 
 const { values: flags, positionals } = parseArgs({
   allowPositionals: true,
@@ -100,12 +102,26 @@ const USAGE = `
 
 if (flags.help) { console.log(USAGE); process.exit(0); }
 
+// Does this project look like it was installed by the wizard?
+//
+// A `.sws/manifest.yml` alone is NOT enough evidence, and assuming it was cost a
+// false nag on this project's own docs site: `site/` is hand-built inside this
+// repository and carries a manifest, but nothing was ever vendored into it. The
+// advice "re-run the installer" would have written 81 files of skills and
+// standards into a directory that wants none of them.
+//
+// The real signature of a wizard install is vendored content, so look for that.
+function wizardInstalled(dir) {
+  return existsSync(join(dir, 'AGENTS.md'))
+    && (existsSync(join(dir, '.agents', 'skills')) || existsSync(join(dir, '.claude', 'skills')));
+}
+
 // --- locate things ----------------------------------------------------------
 
 // A project normally vendors `standards/` (the wizard copies it in), so the
-// local lookups come first and win. The package fallback exists for two real
-// cases: `npx @su-sws/sws-cli` in a project that did not vendor them, and a
-// consumer who deliberately depends on the package instead of copying.
+// local lookups come first and win. The last entry is the copy that ships
+// alongside this CLI, which covers `npx @su-sws/sws sws doctor` in a project
+// that never vendored them.
 function findStandards() {
   if (flags.standards) return resolve(flags.standards);
   for (const c of [
@@ -113,7 +129,7 @@ function findStandards() {
     join(root, '.sws', 'standards'),
     resolve(HERE, '..', '..', '..', 'standards'),
   ]) if (existsSync(c)) return c;
-  return standardsFromPackage;
+  return null;
 }
 
 function findDist() {
@@ -377,7 +393,33 @@ async function run() {
     console.error('  note: in CI without GITHUB_TOKEN, so no PR comment or issue was written.');
   }
 
-  if (cmd === 'doctor') return 0;                       // never gates
+  // --- is this project on stale standards? ---------------------------------
+  //
+  // A doctor NOTE, deliberately not a finding. Being behind is a maintenance
+  // fact about the toolchain, not a compliance fact about the site, and scoring
+  // it would mean a project loses points for something that has nothing to do
+  // with whether it meets Stanford's requirements.
+  //
+  // The comparison is free because content and tools ship in ONE package
+  // (@su-sws/sws), so the version of this CLI *is* the version of the standards
+  // it carries. No network call, no registry lookup.
+  if (cmd === 'doctor') {
+    const installed = readInstalled(root);
+    const mine = (() => {
+      try { return JSON.parse(readFileSync(resolve(HERE, '..', '..', '..', 'package.json'), 'utf8')).version; }
+      catch { return null; }
+    })();
+    if (installed?.version && mine && installed.version !== mine) {
+      note(`  Standards in this project are v${installed.version}; this tool carries v${mine}.`);
+      note(`  To update:  npx @su-sws/create-web-team add .`);
+      note(`  ${'Content is rewritten, your .sws state is preserved, and files you edited'}`);
+      note(`  are reported rather than overwritten.\n`);
+    } else if (!installed && wizardInstalled(root)) {
+      note(`  No .sws/installed.json, so an update cannot tell your edits from an old`);
+      note(`  version. Re-run the installer once to create it.\n`);
+    }
+    return 0;                                           // never gates
+  }
   if (blocking.length) return 1;
   if (flags.strict && findings.some((f) => f.state === 'fail')) return 1;
   return 0;

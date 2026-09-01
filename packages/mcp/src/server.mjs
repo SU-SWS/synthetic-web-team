@@ -31,13 +31,27 @@
 import { readFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { standardsDir, contentRoot } from '@su-sws/standards';
+import { createRequire } from 'node:module';
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { indexStandards, getStandard, footerHtml, check, decanterToken } from './tools.mjs';
 import { scaffold } from './scaffold.mjs';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
-export function build({ root = process.cwd(), standards = standardsDir } = {}) {
+// Standards ship inside @su-sws/sws. Resolve that package, then fall back to the
+// repository layout so this works from a checkout with no install.
+const bundledStandards = (() => {
+  try {
+    const p = createRequire(import.meta.url).resolve('@su-sws/sws/package.json');
+    const c = join(dirname(p), 'standards');
+    if (existsSync(c)) return c;
+  } catch { /* not installed */ }
+  const dev = new URL('../../../standards', import.meta.url).pathname;
+  return existsSync(dev) ? dev : null;
+})();
+
+export function build({ root = process.cwd(), standards = bundledStandards } = {}) {
   const server = new McpServer(
     { name: 'sws', version: pkg.version },
     {
@@ -155,5 +169,5 @@ export function build({ root = process.cwd(), standards = standardsDir } = {}) {
     },
   }, async (args) => scaffold(root, args));
 
-  return { server, index, contentRoot };
+  return { server, index, contentRoot: standards };
 }

@@ -14,7 +14,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import YAML from 'yaml';
 import {
-  serve, launchChromium, settleAnimations, routeFor, newestMtime, writeResults,
+  serve, launchChromium, settleAnimations, revealAll, routeFor, newestMtime, writeResults,
 } from './browser.mjs';
 
 export const RESULTS_PATH = join('.sws', 'perf-results.json');
@@ -139,6 +139,21 @@ export async function runPerf({ root, dist, html, standards, manifest }) {
       try {
         const resp = await page.goto(`${srv.origin}${route}`, { waitUntil: 'load', timeout: 30_000 });
         if (!resp || !resp.ok()) throw new Error(`HTTP ${resp ? resp.status() : 'no response'}`);
+
+        // SCROLL THE PAGE BEFORE MEASURING, or the budget lies by omission.
+        //
+        // Lazily hydrated islands (`client:visible`) do not request their
+        // JavaScript until they approach the viewport. Measuring only the
+        // initial load therefore reports the page as if that code did not
+        // exist. On this project's own site the difference was 52.9 KB and 2
+        // requests versus the truth once the islands hydrate -- and the whole
+        // point of a js budget here is to catch a client-side framework being
+        // shipped for static content, which is precisely what it was missing.
+        //
+        // What is budgeted is therefore "what a reader who reads the page
+        // downloads", not "what the first paint costs". Deferred bytes are
+        // still bytes.
+        await revealAll(page);
         await settleAnimations(page);
 
         // Unscored context only. See the header: lab timings on a build server

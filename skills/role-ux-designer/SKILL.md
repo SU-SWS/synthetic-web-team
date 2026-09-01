@@ -76,9 +76,14 @@ criterion axe can actually check.
 **Reflow to 320 pixels** without horizontal scrolling. Test at 400 percent zoom,
 which is where fixed-height containers break.
 
-**Motion needs an off switch.** Respect `prefers-reduced-motion`. SWS projects
-use `motion` and `framer-motion`, both of which support it, so there is no excuse
-for not wiring it up.
+**Motion.** The full pattern is `standards/patterns/motion.md`; Decanter ships
+no motion guidance, so this project supplies it. The design decisions are:
+animate on **viewport entry, once**, 500ms, staggered 150ms between siblings, and
+**never on the first screenful** — the hero is already visible and the `h1` is
+usually the LCP element. Reduced motion is an **exit**, not a shorter animation:
+render the static thing. Hover motion is affordance only, and nothing that moves
+layout. The reference implementation is `AnimateInView` in
+[sws-astro](https://github.com/SU-SWS/sws-astro).
 
 **Design the states**, not just the happy path: loading, empty, error, too much
 content, too little content, longest plausible name, and a page where the unit

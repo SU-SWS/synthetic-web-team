@@ -9,27 +9,37 @@ reviewed: 2026-09-01
 Stanford's policy name is **MinPriv**. This file also covers the cookie question
 and the Data Risk Assessment, because in practice people meet all three at once.
 
-## Do not build a cookie consent banner
+## No cookie consent banner is required
 
-**No consent banner is required at Stanford.** This is settled, and the guidance
-actively says not to add one.
+**And that is the whole claim. Not required is not the same as forbidden.**
 
 The disclosure obligation is satisfied by the **Privacy link in the Stanford
 Global Footer**, whose upstream title is literally "Privacy and cookie policy."
 The Cookie Policy lives centrally on `www.stanford.edu`; individual sites do not
 restate it.
 
-Two consequences worth stating explicitly:
+So a banner is never the default, and a site without one is fully compliant.
 
-- **A hand-rolled banner is worse than none**, because it implies a consent
-  mechanism that does not exist behind it.
-- **No consent vendor is centrally licensed**, so there is nothing to recommend.
-  If a unit has a genuine need for consent tooling, that is a conversation with
-  the University Privacy Office, and the choice gets recorded in
-  `.sws/manifest.yml` under `privacy.consent_tooling` with the reason.
+**A developer may still add one.** Units have reasons this project cannot see: an
+analytics posture, a European audience, a decision taken above them. Nothing here
+prohibits it, and an agent that tells someone they cannot have a cookie banner is
+interpreting policy on the university's behalf, which the escalation rules
+explicitly forbid.
 
-The `privacy.consent-tooling-declared` check exists for exactly that case: it
-does not ban consent tooling, it flags tooling nobody declared.
+What to say instead, if someone adds one:
+
+- **It is a deliberate addition, so write it down.** Record it in
+  `.sws/manifest.yml` under `privacy.consent_tooling` with the reason. Both
+  consent checks pass once it is declared, and neither blocks anything.
+- **It is now yours to keep accessible.** A banner is a focus trap, a contrast
+  surface and a keyboard target that nobody upstream maintains for you.
+- **The vendor question is not ours.** No consent vendor is centrally licensed,
+  so do not evaluate or rank them. Send it to the University Privacy Office.
+
+Two checks cover this and both are advisory: `privacy.consent-ui-declared` for
+markup written in the repo, and `privacy.consent-tooling-declared` for a
+third-party package. Each flags an **undeclared** choice, never the choice
+itself.
 
 ## MinPriv: transparency before collection
 

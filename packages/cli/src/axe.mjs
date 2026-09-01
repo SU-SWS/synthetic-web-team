@@ -13,7 +13,7 @@
 import { existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import {
-  serve, launchChromium, settleAnimations, routeFor, newestMtime, writeResults, fromProject,
+  serve, launchChromium, settleAnimations, revealAll, routeFor, newestMtime, writeResults, fromProject,
 } from './browser.mjs';
 
 export const RESULTS_PATH = join('.sws', 'axe-results.json');
@@ -74,14 +74,23 @@ export async function runAxe({ root, dist, html }) {
         const resp = await page.goto(`${srv.origin}${route}`, { waitUntil: 'load', timeout: 30_000 });
         if (!resp || !resp.ok()) throw new Error(`HTTP ${resp ? resp.status() : 'no response'}`);
 
-        // Animations must settle first. axe's color-contrast rule reads
-        // *computed* colour, so an element captured mid-fade reports the blend
-        // against its backdrop and looks like a serious design defect. This
-        // project's own site produced four such failures at ratios of 1.05 to
-        // 1.55 (#f9f9f9 on #ffffff) from `opacity-0` plus a delayed
-        // `fadeInUp ... forwards`. Every one was a false positive, and entry
-        // animations are common enough on Stanford unit sites that shipping
-        // without this would have discredited the check on first contact.
+        // TWO STEPS, IN THIS ORDER, EACH FOR A DIFFERENT MEASURED BUG.
+        //
+        // 1. revealAll: entry motion holds below-fold content at opacity 0
+        //    until it scrolls into view, and axe SKIPS invisible elements. So
+        //    without scrolling, whole sections go unaudited and the clean
+        //    result is a false negative -- which is worse than a false
+        //    positive, because a false positive gets investigated. Measured on
+        //    this project's own site: 116 rule-nodes unscrolled, 145 scrolled.
+        //
+        // 2. settleAnimations: axe's color-contrast rule reads *computed*
+        //    colour, so an element captured mid-fade reports the blend against
+        //    its backdrop. This site once produced four such failures at ratios
+        //    of 1.05 to 1.55 (#f9f9f9 on #ffffff), all false.
+        //
+        // Reveal first, then settle: scrolling is what starts the animations
+        // that then need to finish.
+        await revealAll(page);
         await settleAnimations(page);
 
         const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
@@ -104,6 +113,11 @@ export async function runAxe({ root, dist, html }) {
             violations: results.violations.length,
             passes: results.passes.length,
             incomplete: results.incomplete.length,
+            // Node counts, not just rule counts. Rules stay flat while coverage
+            // changes, so this is the number that shows whether entry motion is
+            // hiding content from the audit.
+            passNodes: results.passes.reduce((a, r) => a + r.nodes.length, 0),
+            violationNodes: results.violations.reduce((a, r) => a + r.nodes.length, 0),
           },
           pageErrors,
           violations: results.violations.map((v) => ({

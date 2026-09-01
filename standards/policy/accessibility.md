@@ -85,7 +85,12 @@ provably misses:
 - **Alt text quality.** `alt="image"` passes the presence check and fails the
   human.
 - **Reflow at 320 pixels and 400 percent zoom.**
-- **`prefers-reduced-motion` honoured.**
+- **`prefers-reduced-motion` honoured**, meaning the static thing renders rather
+  than a faster animation. And **content still visible with JavaScript
+  disabled**: entry motion that ships its hidden state in the HTML makes content
+  permanently invisible if the script never runs, which happened on this
+  project's own site to 13 blocks. See
+  [`../patterns/motion.md`](../patterns/motion.md).
 - **Captions and audio description on all new video**, which Stanford policy
   requires. Not optional, not a nice-to-have.
 - **Plain language and reading level**, which is cognitive accessibility. See

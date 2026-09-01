@@ -196,6 +196,17 @@ Decanter ships no font assets. Import `fonts.css` for the full set or
 [`../policy/brand.md`](../policy/brand.md), which owns the brand side, including
 the Heroicons-not-FontAwesome-Pro rule.
 
+## Decanter has no motion guidance
+
+It ships a `transition-duration` scale and nothing else: no entry animation, no
+easing set, no reduced-motion stance, no component-level motion. So every
+Stanford site invents its own and most invent badly.
+
+[`motion.md`](motion.md) is this project's answer, built on the `motion` library
+and the `AnimateInView` pattern from
+[sws-astro](https://github.com/SU-SWS/sws-astro). If Decanter later ships motion
+tokens, they win on values and that file keeps the judgment.
+
 ## Class composition
 
 `cnbuilder` in Astro and Storyblok projects, pinned at `^3.1.0` across seven SWS

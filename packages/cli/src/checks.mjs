@@ -599,7 +599,7 @@ export function secrets({ root }) {
 // hygiene, build, workflow, manifest, ownership
 // --------------------------------------------------------------------------
 
-export function hygiene({ root, html }) {
+export function hygiene({ root, html, manifest }) {
   const out = [];
   if (!html.length) {
     out.push(dunno('minweb.https-only', 'no built HTML found'));
@@ -625,12 +625,64 @@ export function hygiene({ root, html }) {
         'Licence-gated with a preinstall token check. A unit site inheriting this gets an install failure and a licence nobody mentioned. Use Heroicons.')
     : ok('security.no-fontawesome-pro', 'no FontAwesome Pro packages'));
 
-  const banner = html.some((f) => /cookie/i.test(read(f)) && /(accept|consent)/i.test(read(f)));
-  out.push(banner
-    ? { id: 'privacy.no-handrolled-consent', state: 'fail',
-        detail: 'consent-like UI detected in the built output',
-        fix: 'No cookie banner is required at Stanford. The Global Footer Privacy link satisfies disclosure. If consent management is genuinely needed, that is a University Privacy Office conversation, not a component.' }
-    : ok('privacy.no-handrolled-consent', 'no hand-rolled consent UI'));
+  // Consent UI, and the framing matters more than the detection.
+  //
+  // A cookie banner is NOT forbidden at Stanford. It is simply not required:
+  // the Global Footer's Privacy link satisfies the disclosure obligation, so a
+  // banner is a deliberate addition rather than a default. Any unit is free to
+  // add one.
+  //
+  // So this reports an UNDECLARED one, exactly like the third-party tooling
+  // check below it, and passes once the project records the choice in
+  // .sws/manifest.yml under `privacy.consent_tooling`. An earlier version
+  // reported the mere presence of consent UI as a failure, which asserted a
+  // prohibition Stanford does not have -- and this project has no business
+  // inventing policy.
+  //
+  // This was two substrings anywhere in the document -- /cookie/ AND
+  // /(accept|consent)/ -- and it produced a false failure on this project's own
+  // site, which is the worst possible place for it to fire. "cookie" came from
+  // the MANDATED Global Footer link (`title="Privacy and cookie policy"`, part
+  // of the byte-exact contract every compliant Stanford site must carry), and
+  // "accept" came from prose about accepted risks. So the check fired on the one
+  // element the project requires, on a page with no banner anywhere.
+  //
+  // A check that fails a correct site gets the whole tool switched off. Now it
+  // looks for the two things a real banner actually has: a container named like
+  // one, or a control whose OWN text asks you to accept cookies.
+  //
+  // An earlier version of this fix ALSO skipped the whole <footer>, on the
+  // theory that its content is mandated. That was unnecessary -- the mandated
+  // link's text is "Privacy", which matches neither pattern -- and it opened a
+  // real evasion gap: a banner placed inside the footer went undetected. Scan
+  // everything.
+  const CONSENT_CONTAINER = /(?:id|class)="[^"]*(?:cookie[-_ ]?(?:consent|banner|notice|bar|law)|consent[-_ ]?(?:banner|bar|manager|modal)|gdpr[-_ ]?(?:banner|notice))[^"]*"/i;
+  const CONSENT_CONTROL = /\b(?:accept|allow|agree\s+to|opt\s+in\s+to)\b[^<>]{0,30}\bcookies?\b|\bcookies?\b[^<>]{0,30}\b(?:accept(?:ed)?|allow(?:ed)?)\b/i;
+
+  const bannerHits = [];
+  for (const f of html) {
+    const doc = parse(read(f));
+    const markup = read(f);
+    if (CONSENT_CONTAINER.test(markup)) { bannerHits.push(`${relative(root, f)}: element named like a consent banner`); continue; }
+    for (const el of doc.querySelectorAll('button, a, [role="button"]')) {
+      const label = (el.text || '').replace(/\s+/g, ' ').trim();
+      if (label && CONSENT_CONTROL.test(label)) {
+        bannerHits.push(`${relative(root, f)}: control labelled "${label.slice(0, 40)}"`);
+        break;
+      }
+    }
+  }
+  const declared = String(manifest?.privacy?.consent_tooling ?? '').trim();
+  if (!bannerHits.length) {
+    out.push(ok('privacy.consent-ui-declared', 'no consent UI in the built output'));
+  } else if (declared) {
+    out.push(ok('privacy.consent-ui-declared',
+      `consent UI present and declared in .sws/manifest.yml: ${declared.split('\n')[0].slice(0, 80)}`));
+  } else {
+    out.push(bad('privacy.consent-ui-declared',
+      `consent UI present but not declared: ${bannerHits.slice(0, 3).join('; ')}`,
+      'This is allowed — no cookie banner is required at Stanford, but none is forbidden either. Record it in .sws/manifest.yml under privacy.consent_tooling with the reason, consult the University Privacy Office, and remember the banner is now yours to keep accessible.'));
+  }
 
   return out;
 }
