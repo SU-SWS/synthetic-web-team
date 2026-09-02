@@ -9,7 +9,7 @@
   },
   "scripts": {
     "sync-skills": "node scripts/sync-skills.mjs",
-    "validate": "node scripts/validate-skills.mjs && node scripts/validate-criteria.mjs",
+    "validate": "node scripts/validate-skills.mjs && node scripts/validate-emit.mjs && node scripts/validate-criteria.mjs",
     "check": "npm run validate && npm run sync-skills -- --check",
     "pack:all": "mkdir -p .pack && npm pack --pack-destination ./.pack && npm pack -w @su-sws/mcp --pack-destination ./.pack"
   },

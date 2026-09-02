@@ -60,6 +60,21 @@ which files differ and asks.
 Editing one and forgetting the other is the expected mistake. That is the whole
 reason the check exists.
 
+## Three checks, three different subjects
+
+Easy to conflate, so worth naming. They do not overlap:
+
+| Check | Runs | Subject |
+|---|---|---|
+| `sync-skills.mjs --check` | locally, via `npm run check` | the two **local** copies in this repo agree with `skills/`. Both are gitignored, so an absent copy is reported and skipped, not failed |
+| `validate-emit.mjs` | CI, and `npm run validate` | the **wizard** puts every skill in `skills/` into both consumer paths, byte-identical, with the paths agreeing |
+| `sws doctor` | in a consumer project | the two **committed** directories there have not diverged |
+
+CI runs `validate-emit.mjs` rather than the stale check, because the stale check
+has no subject in a fresh checkout: the copies it compares are gitignored and
+therefore never present. An emitter gap, by contrast, ships to every consumer
+project and cannot be regenerated away there.
+
 ## If you only use one editor
 
 Delete the other directory. Nothing depends on both existing, and a project with

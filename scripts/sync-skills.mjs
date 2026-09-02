@@ -34,13 +34,23 @@ const names = Object.keys(src).sort();
 
 if (checkOnly) {
   let stale = false;
+  let materialized = 0;
   for (const t of TARGETS) {
     const got = manifest(t);
+    // ABSENT IS NOT STALE, and this distinction is the whole point of the
+    // check. In THIS repo both targets are gitignored (see .gitignore and
+    // docs/skill-paths.md), so a fresh clone -- and every CI checkout -- simply
+    // does not have them. Calling that drift made the CI gate red on every run
+    // from the moment it was added, which is a broken gate, not a finding.
+    //
+    // Drift is when a copy EXISTS and disagrees with skills/. That is the
+    // developer-machine failure this check is for: you edit skills/, forget to
+    // re-sync, and your own agent then reads the old instructions.
     if (!got) {
-      console.log(`STALE  ${t} does not exist`);
-      stale = true;
+      console.log(`ABSENT ${t} not materialized (run \`npm run sync-skills\` to load skills locally)`);
       continue;
     }
+    materialized++;
     const missing = names.filter((n) => !(n in got));
     const extra = Object.keys(got).filter((n) => !(n in src));
     const differ = names.filter((n) => n in got && got[n] !== src[n]);
@@ -56,6 +66,11 @@ if (checkOnly) {
   if (stale) {
     console.log('\nRun `npm run sync-skills` to refresh.');
     process.exit(1);
+  }
+  if (!materialized) {
+    console.log(`\nNeither copy is materialized, so there was nothing to compare.`);
+    console.log(`That is expected in a fresh checkout. The gate that CI runs on`);
+    console.log(`the emitted paths is scripts/validate-emit.mjs.`);
   }
   process.exit(0);
 }

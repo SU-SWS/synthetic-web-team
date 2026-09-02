@@ -67,9 +67,22 @@ jobs:
       # Fails, deliberately. This was a warning, and the six shared sws-* skills
       # then sat missing from both emitted paths for three weeks without anyone
       # noticing. A drift check that cannot go red does not detect drift.
-      # These are generated files: the fix is always `npm run sync-skills`.
-      - name: Confirm emitted skill copies are not stale
-        run: node scripts/sync-skills.mjs --check
+      #
+      # It used to run `sync-skills.mjs --check`, which could not work HERE.
+      # That compares the two local copies, and both are gitignored in this repo
+      # (skills/ is the source of truth), so a CI checkout never has them: the
+      # gate was red on every single run, which is a broken gate rather than a
+      # finding. It is still the right check on a developer machine, where a
+      # stale copy means your own agent reads old instructions, and `npm run
+      # check` still runs it there.
+      #
+      # What CI can check is the EMITTER, which is also where the sws-* bug
+      # actually lived: `plan()` must put every skill in skills/ into both
+      # consumer paths, byte-identical, with the two paths agreeing. In a
+      # consumer project those directories are committed and there is no
+      # skills/ to regenerate from, so an emitter gap ships and stays shipped.
+      - name: Every skill reaches both emitted paths
+        run: node scripts/validate-emit.mjs
 
       - name: Validate every YAML in standards/
         run: |
