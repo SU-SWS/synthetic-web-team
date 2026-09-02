@@ -46,6 +46,41 @@ because they were typed from memory.
 4. Optional **local footer**. Unit links go here.
 5. **Stanford Global Footer.** Immutable, exact.
 
+## The Identity Bar has a fixed height
+
+It is brand furniture, not a design opportunity. It appears on every Stanford
+site, so an inconsistent one is obvious the moment two sites sit side by side.
+
+The exact markup is `standards/fragments/identity-bar.yml`. Use it verbatim:
+
+```html
+<div class="bg-cardinal-red px-20 pt-5 pb-1 sm:px-30 md:px-50 lg:px-30">
+  <a class="logo inline-block text-20 leading-none text-white no-underline hocus:text-white hocus:underline"
+     href="https://www.stanford.edu">Stanford University<span class="sr-only"> (link is external)</span></a>
+</div>
+```
+
+Three things people get wrong, all of which this project got wrong first:
+
+- **`pt-5 pb-1`, not `py-*`.** Five pixels above and one below on Decanter's
+  scale, giving a bar about 29px tall. A `py-12` container measures roughly 44px.
+- **`logo`, not `font-serif`.** `.logo` is a Decanter *component* class carrying
+  `--font-stanford` and its discretionary ligatures. `font-serif` renders in
+  Source Serif 4 and loses them. `.logo` also forces cardinal red on hover and
+  focus, which is why `hocus:text-white` is needed inside the red bar.
+- **No centred wrapper.** The padding sits directly on the red container.
+  Wrapping the link in `mx-auto max-w-*` moves the logo relative to every other
+  Stanford site.
+
+`brand.identity-bar.exact` verifies this by **classes, not measured pixels** —
+the bar drifts from 28.8px to 30.1px across viewports depending on which font
+resolves, and a brand check that wobbles by a pixel gets switched off.
+
+Decanter ships no font assets, and the Decanter documentation site itself loads
+only Google Fonts, so `Stanford` is normally absent and the logo renders in
+Source Serif 4. That is the same result upstream gets. Do not add a font file to
+"fix" it.
+
 ## The Global Footer is immutable
 
 Per the Identity Guide, its links **may not be altered, reordered, or added to,

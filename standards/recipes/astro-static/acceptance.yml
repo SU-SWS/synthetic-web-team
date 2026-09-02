@@ -71,6 +71,34 @@ criteria:
     weight: 4
     policy: brand
 
+  - id: brand.identity-bar.exact
+    requires: >
+      The Identity Bar markup matches standards/fragments/identity-bar.yml: the
+      container's classes, the logo link's classes, and the link target. This is
+      what fixes its height and the logo size.
+    check: identity
+    severity: warn
+    weight: 3
+    policy: brand
+    mechanism: >
+      Compare CLASSES against the fragment, not a measured height. A pixel
+      assertion would be flaky: the bar measures 28.8px at a 1280px viewport and
+      30.1px at 1600px, because the line box depends on the metrics of whichever
+      font resolves for --font-stanford. A brand check that drifts by a pixel
+      gets switched off. The classes are exact and can only produce the Stanford
+      height on Decanter's scale.
+
+      Also reject class patterns that re-size the bar even when the required
+      classes are present: py-*, any pt-/pb- other than pt-5/pb-1, h-*, min-h-*,
+      max-h-*, and on the link any text-* other than text-20, font-serif, or a
+      leading-* other than leading-none.
+    note: >
+      Written after this project shipped a bar at roughly 44px -- `py-12` in a
+      centred max-width wrapper with `font-serif text-24 md:text-27` -- which was
+      visibly taller than every other Stanford site when placed beside one. The
+      `logo` class is the correct mechanism, not font-serif: it carries
+      --font-stanford and its discretionary ligatures.
+
   - id: brand.identity-bar.nothing-above
     requires: >
       Nothing precedes the Identity Bar in the document except a skip

@@ -34,7 +34,11 @@ order, what happens on error, what an empty state says.
 Every page, in this order:
 
 1. Skip navigation link. The only thing permitted above the Identity Bar.
-2. **Stanford Identity Bar.** Nothing above it but the skip link.
+2. **Stanford Identity Bar.** Nothing above it but the skip link, and it has a
+   **fixed height** — roughly 29px, from `pt-5 pb-1` and a `text-20` logo. Use
+   `standards/fragments/identity-bar.yml` verbatim rather than styling your own;
+   `logo` is the correct font mechanism, not `font-serif`. Getting this wrong is
+   immediately visible next to any other Stanford site.
 3. Local header, navigation, page content. Design freely here.
 4. Optional local footer. Unit links go here.
 5. **Stanford Global Footer.** Immutable, exact, from

@@ -207,6 +207,22 @@ and the `AnimateInView` pattern from
 [sws-astro](https://github.com/SU-SWS/sws-astro). If Decanter later ships motion
 tokens, they win on values and that file keeps the judgment.
 
+## `logo` is a component class, not a utility
+
+`.logo` applies `--font-stanford` with discretionary ligatures, and it forces
+cardinal red on `:hover` and `:focus`. Two consequences:
+
+- Inside the red Identity Bar you need `text-white hocus:text-white` to override
+  it. `hocus:` is a Decanter variant covering hover and focus together.
+- **Never substitute `font-serif`.** That resolves to Source Serif 4 and drops
+  the ligature settings. `--font-stanford` is
+  `Stanford, "Source Serif 4", Georgia, Times, "Times New Roman", serif`, so it
+  degrades to the same visual result when the Stanford family is absent — which
+  it usually is, since Decanter 8 ships no font assets — but only `.logo`
+  carries the ligatures for the case where it is present.
+
+See [`../fragments/identity-bar.yml`](../fragments/identity-bar.yml).
+
 ## Class composition
 
 `cnbuilder` in Astro and Storyblok projects, pinned at `^3.1.0` across seven SWS

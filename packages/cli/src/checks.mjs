@@ -153,7 +153,7 @@ export function footer({ root, html, standards }) {
 // identity bar: DOM POSITION, not string order
 // --------------------------------------------------------------------------
 
-export function identity({ root, html }) {
+export function identity({ root, html, standards }) {
   if (!html.length) return [dunno('brand.identity-bar.present', 'no built HTML found')];
 
   const SELECTORS = ['#su-identity', '.su-identity', '[data-su-identity]', '#stanford-identity'];
@@ -195,6 +195,74 @@ export function identity({ root, html }) {
           'Only a skip navigation link may precede the Identity Bar.')
       : ok('brand.identity-bar.nothing-above', 'nothing precedes it except the skip link')
   );
+
+  // ---- exact markup, which is what fixes the height ----------------------
+  //
+  // CLASSES, NOT PIXELS. A measured height would be the obvious check and it
+  // would be flaky: the bar measures 28.8px at 1280px and 30.1px at 1600px,
+  // because the line box depends on the metrics of whichever font actually
+  // resolves for --font-stanford. A brand check that drifts by a pixel gets
+  // switched off. The classes are exact, deterministic, and on Decanter's scale
+  // they can only produce the Stanford height.
+  //
+  // This exists because this project shipped a bar at roughly 44px -- `py-12` in
+  // a centred wrapper with `font-serif text-24 md:text-27` -- which was visibly
+  // taller than every other Stanford site.
+  const fragPath = standards && join(standards, 'fragments', 'identity-bar.yml');
+  if (!fragPath || !existsSync(fragPath)) {
+    out.push(dunno('brand.identity-bar.exact', `contract not found at ${fragPath ?? 'standards/fragments/identity-bar.yml'}`));
+    return out;
+  }
+
+  let frag;
+  try { frag = readYaml(fragPath); }
+  catch (err) { out.push(dunno('brand.identity-bar.exact', `contract is not valid YAML: ${err.message}`)); return out; }
+
+  const problems = [];
+  const classesOf = (el) => (el?.getAttribute('class') || '').split(/\s+/).filter(Boolean);
+  const offend = (list, patterns) => (patterns ?? [])
+    .flatMap((rx) => list.filter((c) => new RegExp(rx).test(c)).map((c) => ({ c, rx })));
+
+  // The bar is in a shared layout, so the first page is representative; a
+  // per-page divergence is a different and rarer problem.
+  const doc = parse(read(html[0]));
+  const bar = SELECTORS.map((sel) => { try { return doc.querySelector(sel); } catch { return null; } }).find(Boolean);
+
+  if (!bar) {
+    out.push(dunno('brand.identity-bar.exact', 'no Identity Bar element to inspect'));
+    return out;
+  }
+
+  const barClasses = classesOf(bar);
+  for (const want of frag.container?.classes ?? []) {
+    if (!barClasses.includes(want)) problems.push(`bar is missing \`${want}\``);
+  }
+  for (const { c, rx } of offend(barClasses, frag.container?.disallowed_class_patterns)) {
+    problems.push(`bar has \`${c}\`, which changes its height (matches ${rx})`);
+  }
+
+  const link = bar.querySelector('a');
+  if (!link) {
+    problems.push('bar contains no link');
+  } else {
+    const linkClasses = classesOf(link);
+    for (const want of frag.link?.classes ?? []) {
+      if (!linkClasses.includes(want)) problems.push(`logo link is missing \`${want}\``);
+    }
+    for (const { c, rx } of offend(linkClasses, frag.link?.disallowed_class_patterns)) {
+      problems.push(`logo link has \`${c}\`, which changes its size (matches ${rx})`);
+    }
+    const href = (link.getAttribute('href') || '').trim();
+    if (frag.link?.href && href !== frag.link.href) {
+      problems.push(`logo link points at ${href || '(nothing)'}, contract says ${frag.link.href}`);
+    }
+  }
+
+  out.push(problems.length
+    ? bad('brand.identity-bar.exact', problems.slice(0, 4).join('; '),
+        `The Identity Bar is brand furniture with a fixed height. Use the markup in standards/fragments/identity-bar.yml verbatim: ${(frag.container?.classes ?? []).join(' ')} on the container, and \`logo inline-block text-20 leading-none\` on the link. Not font-serif -- \`logo\` is a Decanter component class carrying the Stanford font and its ligatures.`)
+    : ok('brand.identity-bar.exact', `matches the contract (extracted ${frag.extracted ?? 'unknown'}), ~${frag.measured?.bar_height_px ?? '?'}px tall`));
+
   return out;
 }
 

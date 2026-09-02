@@ -67,15 +67,24 @@ const jsonLd = {
       >Skip to main content</a
     >
 
-    <!-- Stanford Identity Bar. Nothing above it but the skip link. -->
-    <div id="su-identity" class="bg-cardinal-red">
-      <div class="mx-auto max-w-[144rem] px-20 py-12 md:px-30">
-        <a
-          href="https://www.stanford.edu"
-          class="font-serif text-24 text-white no-underline hover:underline focus:underline md:text-27"
-          >Stanford University</a
-        >
-      </div>
+    <!--
+      Stanford Identity Bar. Nothing above it but the skip link.
+
+      EXACT, from standards/fragments/identity-bar.yml. Do not restyle it.
+      `pt-5 pb-1` gives the 26px Stanford height; the previous version used
+      `py-12` in a centred max-width wrapper with `font-serif text-24 md:text-27`
+      and measured about 44px — visibly taller than every other Stanford site,
+      which is how the error was spotted.
+
+      `logo` is a Decanter component class carrying --font-stanford and its
+      ligature settings, and it forces cardinal red on hover and focus, which is
+      why `hocus:text-white` is needed to override it inside the red bar.
+    -->
+    <div id="su-identity" class="bg-cardinal-red px-20 pt-5 pb-1 sm:px-30 md:px-50 lg:px-30">
+      <a
+        class="logo inline-block text-20 leading-none text-white no-underline hocus:text-white hocus:underline"
+        href="https://www.stanford.edu">Stanford University<span class="sr-only"> (link is external)</span></a
+      >
     </div>
 
     <!--

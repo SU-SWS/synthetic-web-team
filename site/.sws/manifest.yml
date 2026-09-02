@@ -68,6 +68,24 @@ accessibility_testing:
     Automation covers roughly 30 percent of issues per ODA guidance. The manual
     WCAG 2.1 AA checklist has not been done for this site.
 
+identity_bar:
+  contract: standards/fragments/identity-bar.yml
+  corrected: 2026-09-02
+  was: >
+    bg-cardinal-red with an inner `mx-auto max-w-[144rem] px-20 py-12 md:px-30`
+    wrapper and `font-serif text-24 md:text-27` on the link. Measured about 44px
+    tall and used the wrong font mechanism.
+  now: >
+    The upstream markup verbatim: `px-20 pt-5 pb-1 sm:px-30 md:px-50 lg:px-30` on
+    the red container, and `logo inline-block text-20 leading-none text-white
+    no-underline hocus:text-white hocus:underline` on the link. Measures 28.8px
+    at a 1280px viewport.
+  how_found: >
+    Spotted by eye, side by side with the Decanter 8 docs site. Nothing in the
+    toolchain caught it, because there was no contract to check against -- the
+    Identity Bar was verified for PRESENCE and DOM POSITION only. The fragment
+    and brand.identity-bar.exact now close that gap.
+
 design:
   aesthetic: >
     After the Decanter 8 beta documentation site
