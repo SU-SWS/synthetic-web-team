@@ -191,10 +191,15 @@ The Pro-fallback removal is **inert for most projects**, because `fonts.css` and
 the Pro families yourself — in which case ensure Source Sans 3 and Source Serif 4
 are also available, or text falls through to Helvetica Neue and Georgia.
 
-Decanter ships no font assets. Import `fonts.css` for the full set or
-`fonts-basic.css` for sans, serif, and the Stanford ligature logo font. See
-[`../policy/brand.md`](../policy/brand.md), which owns the brand side, including
-the Heroicons-not-FontAwesome-Pro rule.
+**Decanter 8 ships no font assets at all**, and unlike v7 it publishes no
+`fonts.css` or `fonts-basic.css` either — check the package if in doubt, those
+files are absent from `8.0.0-beta.0`. So a project declares its own faces:
+Source Sans 3 and Source Serif 4 from Google Fonts, and **the Stanford ligature
+font from the University Communications media CDN, which is required wherever the
+Identity Bar appears**. See
+[`../fragments/identity-bar.yml`](../fragments/identity-bar.yml) for the exact
+`@font-face`, and [`../policy/brand.md`](../policy/brand.md) for the brand side
+including the Heroicons-not-FontAwesome-Pro rule.
 
 ## Decanter has no motion guidance
 
@@ -215,11 +220,15 @@ cardinal red on `:hover` and `:focus`. Two consequences:
 - Inside the red Identity Bar you need `text-white hocus:text-white` to override
   it. `hocus:` is a Decanter variant covering hover and focus together.
 - **Never substitute `font-serif`.** That resolves to Source Serif 4 and drops
-  the ligature settings. `--font-stanford` is
-  `Stanford, "Source Serif 4", Georgia, Times, "Times New Roman", serif`, so it
-  degrades to the same visual result when the Stanford family is absent — which
-  it usually is, since Decanter 8 ships no font assets — but only `.logo`
-  carries the ligatures for the case where it is present.
+  the ligature settings.
+- **And load the font.** `--font-stanford` is
+  `Stanford, "Source Serif 4", Georgia, Times, "Times New Roman", serif`, and
+  **Decanter 8 publishes no font assets** — the woff2 is in its repository but
+  not in the npm package. Without an `@font-face` the wordmark silently renders
+  in Source Serif 4. Declare it from the University Communications media CDN;
+  the CSS is in
+  [`../fragments/identity-bar.yml`](../fragments/identity-bar.yml) and
+  `brand.identity-bar.font-loaded` checks it.
 
 See [`../fragments/identity-bar.yml`](../fragments/identity-bar.yml).
 

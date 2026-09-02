@@ -99,6 +99,32 @@ criteria:
       `logo` class is the correct mechanism, not font-serif: it carries
       --font-stanford and its discretionary ligatures.
 
+  - id: brand.identity-bar.font-loaded
+    requires: >
+      Wherever the Identity Bar appears, the Stanford ligature font is loaded:
+      an @font-face for family "Stanford" is present in the built output.
+    check: identity
+    severity: warn
+    weight: 3
+    policy: brand
+    mechanism: >
+      Scan the built CSS and HTML for an @font-face declaring font-family
+      Stanford, or for a reference to the font file named in
+      standards/fragments/identity-bar.yml. Only runs when the Identity Bar is
+      actually present.
+    note: >
+      Decanter's --font-stanford is
+      `Stanford, "Source Serif 4", Georgia, Times, ...` and Decanter 8 publishes
+      NO font assets -- static/fonts/stanford.woff2 is in its repository but not
+      in the npm package. So a project that installs Decanter and does nothing
+      else gets the Source Serif 4 fallback: the wordmark renders in the wrong
+      typeface and the bar measures 28.8px rather than 30.8px. Nothing errors,
+      which is why it needs checking.
+
+      Serve it from the University Communications media CDN, the same origin
+      Decanter v7's fonts.css used. Verified 2026-09-02: the woff2 is 3,816
+      bytes and the woff 7,552, both HTTP 200.
+
   - id: brand.identity-bar.nothing-above
     requires: >
       Nothing precedes the Identity Bar in the document except a skip

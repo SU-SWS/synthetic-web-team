@@ -37,8 +37,11 @@ Every page, in this order:
 2. **Stanford Identity Bar.** Nothing above it but the skip link, and it has a
    **fixed height** — roughly 29px, from `pt-5 pb-1` and a `text-20` logo. Use
    `standards/fragments/identity-bar.yml` verbatim rather than styling your own;
-   `logo` is the correct font mechanism, not `font-serif`. Getting this wrong is
-   immediately visible next to any other Stanford site.
+   `logo` is the correct font mechanism, not `font-serif`. **The Stanford
+   ligature font must be loaded** — Decanter 8 ships no font assets, so without
+   an `@font-face` the wordmark falls back to Source Serif 4 and the bar comes
+   out 2px short. Getting any of this wrong is immediately visible next to
+   another Stanford site.
 3. Local header, navigation, page content. Design freely here.
 4. Optional local footer. Unit links go here.
 5. **Stanford Global Footer.** Immutable, exact, from

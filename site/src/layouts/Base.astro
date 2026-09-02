@@ -34,6 +34,10 @@ const jsonLd = {
     <meta property="og:type" content="website" />
     <link rel="sitemap" href="/synthetic-web-team/sitemap-index.xml" />
     <!-- Google Fonts, per Decanter 8: it ships no font assets. -->
+    <!-- The Stanford wordmark font, declared in global.css. Preconnect because
+         it is on a different origin and the Identity Bar is the first thing
+         painted. -->
+    <link rel="preconnect" href="https://www-media.stanford.edu" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

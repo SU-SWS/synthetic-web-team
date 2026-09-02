@@ -1,6 +1,32 @@
 @import 'decanter';
 
 /* ---------------------------------------------------------------------------
+   The Stanford ligature font. REQUIRED wherever the Identity Bar appears.
+
+   Decanter's `--font-stanford` is
+   `Stanford, "Source Serif 4", Georgia, Times, ...`, and Decanter 8 ships no
+   font assets — the woff2 exists in its repository but is not published to npm.
+   So without this block the `logo` class silently falls back to Source Serif 4
+   and the wordmark renders in the wrong typeface, which is a brand defect that
+   looks like a rendering quirk.
+
+   Source: the University Communications media CDN, the same origin Decanter v7's
+   own fonts.css uses. Verified 2026-09-02: woff2 3,816 bytes, woff 7,552 bytes,
+   both HTTP 200 with valid `wOF2`/`wOFF` magic.
+
+   woff2 first because it is half the size and universally supported; woff kept
+   as the fallback. `font-display: swap` so the wordmark never blocks paint.
+   --------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Stanford';
+  src:
+    url('https://www-media.stanford.edu/assets/fonts/stanford.woff2') format('woff2'),
+    url('https://www-media.stanford.edu/assets/fonts/stanford.woff') format('woff');
+  font-weight: 300;
+  font-display: swap;
+}
+
+/* ---------------------------------------------------------------------------
    Motion lives in two places, deliberately.
 
    ENTRY motion (something arriving as you scroll) is JavaScript, via

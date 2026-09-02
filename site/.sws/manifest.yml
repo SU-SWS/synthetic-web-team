@@ -80,6 +80,19 @@ identity_bar:
     the red container, and `logo inline-block text-20 leading-none text-white
     no-underline hocus:text-white hocus:underline` on the link. Measures 28.8px
     at a 1280px viewport.
+  font: >
+    The Stanford ligature font is declared in src/styles/global.css from the
+    University Communications media CDN (woff2 3,816 bytes, then woff), with a
+    preconnect in the head. Verified in Chromium: the woff2 is requested (200),
+    document.fonts.check('300 20px Stanford') is true, and the computed
+    font-family on the wordmark is Stanford. Loading it changes the bar from
+    28.8px to 30.8px, so it is a sizing requirement as well as a typeface one.
+  font_correction: >
+    An earlier note in this repository said not to add the font, reasoning that
+    the Decanter docs site loads only Google Fonts and renders the fallback too.
+    That read current practice on one site as intent. Decanter v7 shipped a
+    fonts.css loading this exact font from this exact CDN. Retracted, and
+    brand.identity-bar.font-loaded now checks it.
   how_found: >
     Spotted by eye, side by side with the Decanter 8 docs site. Nothing in the
     toolchain caught it, because there was no contract to check against -- the

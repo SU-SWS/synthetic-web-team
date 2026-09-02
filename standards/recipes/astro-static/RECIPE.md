@@ -187,10 +187,39 @@ That is the entire integration. Specifically:
 Every page uses one layout containing, in this order:
 
 1. Skip navigation link. The only thing permitted above the Identity Bar.
-2. **Stanford Identity Bar.** Use `fragments/identity-bar.html`. Nothing may go above it except the skip link.
+2. **Stanford Identity Bar.** Use `standards/fragments/identity-bar.yml` verbatim. Nothing may go above it except the skip link.
 3. Local header, navigation, and page content. Unit-specific, design freely within Decanter.
 4. Optional local footer.
-5. **Stanford Global Footer.** Use `fragments/global-footer.html` verbatim.
+5. **Stanford Global Footer.** Generate it from `standards/fragments/global-footer.yml`.
+
+**The Identity Bar has a fixed height, and two things decide it.**
+
+```html
+<div class="bg-cardinal-red px-20 pt-5 pb-1 sm:px-30 md:px-50 lg:px-30">
+  <a class="logo inline-block text-20 leading-none text-white no-underline hocus:text-white hocus:underline"
+     href="https://www.stanford.edu">Stanford University<span class="sr-only"> (link is external)</span></a>
+</div>
+```
+
+- `pt-5 pb-1`, never `py-*`, and no centred `max-w-*` wrapper — the padding sits on the red container. A `py-12` version measures about 44px against the correct 30.8px.
+- `logo`, never `font-serif`. It is a Decanter *component* class carrying `--font-stanford` and its ligatures, and it forces cardinal red on hover and focus, which is why `hocus:text-white` is needed inside the red bar.
+
+**Load the Stanford ligature font.** Decanter 8 publishes no font assets, so without this the wordmark silently falls back to Source Serif 4 and the bar loses 2px. Add to your entry CSS:
+
+```css
+@font-face {
+  font-family: 'Stanford';
+  src:
+    url('https://www-media.stanford.edu/assets/fonts/stanford.woff2') format('woff2'),
+    url('https://www-media.stanford.edu/assets/fonts/stanford.woff') format('woff');
+  font-weight: 300;
+  font-display: swap;
+}
+```
+
+and `<link rel="preconnect" href="https://www-media.stanford.edu" crossorigin>` in the head. Source Sans 3 and Source Serif 4 come from Google Fonts; Decanter ships neither, and v8 has no `fonts.css` to import.
+
+`brand.identity-bar.exact` and `brand.identity-bar.font-loaded` check all of the above.
 
 **The Global Footer is immutable.** Per the Stanford Identity Guide its links may not be altered, reordered, or added to, and nothing else may go inside it. Unit links belong in the local footer above it. This is the single highest-value automated check in the system, so expect `sws check` to be strict about it.
 
@@ -430,4 +459,4 @@ The Decanter 8 integration in step 3 was separately verified with a controlled t
 
 Defects found by executing rather than reviewing, all now fixed above: the wrong Decanter dist-tag (`@next` does not exist), the nested-Tailwind trap, the scaffolder's network precheck, and two acceptance criteria whose prose was too loose to check correctly.
 
-**Not yet verified:** the Global Footer link set in `fragments/global-footer.html` against the current Identity Guide, and the GitHub Pages action versions. Both are marked in place.
+**Not yet verified:** the Global Footer link set in `standards/fragments/global-footer.yml` against the current Identity Guide, and the GitHub Pages action versions. Both are marked in place.

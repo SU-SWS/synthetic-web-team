@@ -91,24 +91,72 @@ link:
 measured:
   browser: Chromium 151
   date: 2026-09-02
-  bar_height_px: 28.8        # at 1280x720
-  bar_height_range_px: [28.7, 30.1]   # 640px, 1280px and 1600px viewports
+  with_stanford_font_loaded: true
+  bar_height_px: 30.8        # at 1280x720
+  bar_height_range_px: [30.1, 30.8]   # 375, 640, 1024, 1280, 1600
   padding_top_px: 5
   padding_bottom_px: 1
   logo_font_size_px: 20
   logo_line_height_px: 20
   note: >
-    An earlier draft of this file asserted 26px before anyone measured it. The
-    real figure is 28.8px at 1280px, and it drifts to 30.1px at 1600px because
-    the line box depends on the metrics of whichever font actually resolves for
-    --font-stanford. A `py-12` container in a centred wrapper measures about
-    44px, which is the error this fragment exists to stop repeating.
+    Two corrections are recorded here rather than quietly overwritten. An early
+    draft asserted 26px before anyone measured. The first real measurement gave
+    28.8px -- but that was with the Stanford family ABSENT, so the line box came
+    from the Source Serif 4 fallback. With the ligature font actually loaded the
+    bar is 30.8px, and the spread across viewports tightens from 1.4px to 0.7px.
+    30.8px is the Stanford height. A `py-12` container measures about 44px, which
+    is the error this fragment exists to stop repeating.
   why_the_check_is_class_based: >
-    That 1.4px drift is exactly why the check verifies CLASSES rather than a
-    measured height. A pixel assertion would be flaky across viewports and font
-    availability, and a flaky brand check gets switched off. The classes are
-    exact and deterministic, and on Decanter's scale they can only produce the
-    Stanford height.
+    Even correct, the height still drifts 0.7px across viewports. A pixel
+    assertion would be flaky and a flaky brand check gets switched off. The
+    classes are exact and deterministic, and on Decanter's scale they can only
+    produce the Stanford height -- provided the font is loaded, which is checked
+    separately.
+
+# ------------------------------------------------------------------- font
+# REQUIRED wherever this bar appears. Not optional, and not something to skip
+# because upstream's own docs site happens to omit it.
+#
+# Decanter's --font-stanford is
+# `Stanford, "Source Serif 4", Georgia, Times, "Times New Roman", serif`, and
+# Decanter 8 publishes no font assets: static/fonts/stanford.woff2 exists in its
+# repository but is not in the npm package. So a project that does nothing gets
+# the Source Serif 4 fallback, and the wordmark renders in the wrong typeface --
+# a brand defect that looks like a rendering quirk rather than a mistake.
+font:
+  family: Stanford
+  required: true
+  weight: 300
+  # Verified 2026-09-02: both HTTP 200 with valid magic bytes. woff2 is 3,816
+  # bytes and woff is 7,552, so woff2 goes first. Decanter v7's own fonts.css
+  # lists only woff and ttf; the woff2 exists and is half the size.
+  sources:
+    - url: https://www-media.stanford.edu/assets/fonts/stanford.woff2
+      format: woff2
+      bytes: 3816
+    - url: https://www-media.stanford.edu/assets/fonts/stanford.woff
+      format: woff
+      bytes: 7552
+  origin: University Communications media CDN, the same origin Decanter v7 uses
+  css: |
+    @font-face {
+      font-family: 'Stanford';
+      src:
+        url('https://www-media.stanford.edu/assets/fonts/stanford.woff2') format('woff2'),
+        url('https://www-media.stanford.edu/assets/fonts/stanford.woff') format('woff');
+      font-weight: 300;
+      font-display: swap;
+    }
+  also: >
+    Add `<link rel="preconnect" href="https://www-media.stanford.edu" crossorigin>`.
+    It is a separate origin and the Identity Bar is the first thing painted.
+  privacy_note: >
+    This is a third-party origin and `sws perf` will list it. It is a Stanford
+    origin serving one 3.8 KB font, so it is not a MinPriv concern, but it is
+    worth knowing it appears in that list rather than being surprised by it.
+  measured_effect: >
+    With the font loaded the bar is 30.8px; without it, 28.8px. So the font is
+    not only a typeface question -- omitting it changes the bar's height.
 
 # --------------------------------------------------------------------- notes
 placement:
@@ -121,11 +169,12 @@ placement:
     centred max-width container: upstream does not, and doing so changes where
     the logo sits relative to every other Stanford site.
 
-fonts: >
-  --font-stanford resolves to `Stanford, "Source Serif 4", Georgia, Times, "Times
-  New Roman", serif`. Decanter 8 ships no font assets, and the Decanter
-  documentation site itself loads only Google Fonts -- so the `Stanford` family
-  is normally absent and the logo renders in Source Serif 4. That is the same
-  result upstream gets, so do not add a font file to "fix" it. Use the `logo`
-  class regardless: it carries the ligature settings for the case where the
-  family IS available.
+fonts_correction: >
+  An earlier version of this file said "do not add a font file to fix it",
+  reasoning that the Decanter documentation site itself loads only Google Fonts
+  and therefore renders the fallback too. That was wrong, and wrong in a
+  characteristic way: it took current practice on one site as intent. The
+  wordmark is the Stanford wordmark, the ligature font is what makes it that,
+  and Decanter v7 shipped a fonts.css that loaded it from exactly the CDN named
+  above. See standards/patterns/sws-conventions.md on inferring intent from
+  presence.

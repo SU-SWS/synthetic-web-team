@@ -153,7 +153,7 @@ export function footer({ root, html, standards }) {
 // identity bar: DOM POSITION, not string order
 // --------------------------------------------------------------------------
 
-export function identity({ root, html, standards }) {
+export function identity({ root, html, standards, dist }) {
   if (!html.length) return [dunno('brand.identity-bar.present', 'no built HTML found')];
 
   const SELECTORS = ['#su-identity', '.su-identity', '[data-su-identity]', '#stanford-identity'];
@@ -256,6 +256,43 @@ export function identity({ root, html, standards }) {
     if (frag.link?.href && href !== frag.link.href) {
       problems.push(`logo link points at ${href || '(nothing)'}, contract says ${frag.link.href}`);
     }
+  }
+
+  // ---- the Stanford ligature font -----------------------------------------
+  //
+  // If the bar is on the page, this font is required. Decanter's
+  // --font-stanford falls back to Source Serif 4, so omitting it does not error
+  // -- the wordmark just renders in the wrong typeface, and the bar comes out
+  // 28.8px instead of 30.8px. It looks like a rendering quirk rather than a
+  // brand defect, which is exactly why it needs a check.
+  //
+  // Decanter 8 publishes no font assets, so "we installed Decanter" is not
+  // enough: the @font-face has to be declared by the project.
+  if (frag.font?.required) {
+    const css = [];
+    (function walk(d) {
+      if (!existsSync(d)) return;
+      for (const name of readdirSync(d)) {
+        const fp = join(d, name);
+        if (statSync(fp).isDirectory()) walk(fp);
+        else if (fp.endsWith('.css')) css.push(read(fp));
+      }
+    })(dist ?? '');
+    // Inline <style> counts too, and so does a linked stylesheet we cannot see
+    // (a CDN URL in the markup), so search the HTML as well.
+    const haystack = [...css, ...html.map(read)].join('\n');
+
+    const family = frag.font.family ?? 'Stanford';
+    const declared = new RegExp(`@font-face[^}]*font-family\\s*:\\s*['"]?${family}['"]?`, 'i').test(haystack)
+      || new RegExp(`font-family\\s*:\\s*['"]?${family}['"]?[^}]*src\\s*:`, 'i').test(haystack);
+    const referenced = (frag.font.sources ?? [])
+      .some((src) => src.url && haystack.includes(src.url.split('/').pop()));
+
+    out.push(declared || referenced
+      ? ok('brand.identity-bar.font-loaded', `${family} font face declared`)
+      : bad('brand.identity-bar.font-loaded',
+          `the Identity Bar is present but no @font-face for "${family}" was found in the build`,
+          `Without it, --font-stanford falls back to Source Serif 4: the wordmark renders in the wrong typeface and the bar measures ${frag.measured?.bar_height_px ? '28.8px instead of ' + frag.measured.bar_height_px + 'px' : 'the wrong height'}. Decanter 8 ships no font assets, so declare it yourself — the CSS is in standards/fragments/identity-bar.yml under font.css, served from the University Communications media CDN.`));
   }
 
   out.push(problems.length

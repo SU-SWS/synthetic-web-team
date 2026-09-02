@@ -73,13 +73,41 @@ Three things people get wrong, all of which this project got wrong first:
   Stanford site.
 
 `brand.identity-bar.exact` verifies this by **classes, not measured pixels** —
-the bar drifts from 28.8px to 30.1px across viewports depending on which font
-resolves, and a brand check that wobbles by a pixel gets switched off.
+the bar still drifts about 0.7px across viewports, and a brand check that wobbles
+gets switched off.
 
-Decanter ships no font assets, and the Decanter documentation site itself loads
-only Google Fonts, so `Stanford` is normally absent and the logo renders in
-Source Serif 4. That is the same result upstream gets. Do not add a font file to
-"fix" it.
+### The ligature font is required, not optional
+
+**Load the Stanford font wherever the Identity Bar appears.** Decanter's
+`--font-stanford` is `Stanford, "Source Serif 4", Georgia, Times, …`, and
+**Decanter 8 publishes no font assets** — `static/fonts/stanford.woff2` is in its
+repository but not in the npm package. So a project that installs Decanter and
+does nothing else gets the Source Serif 4 fallback: the wordmark renders in the
+wrong typeface and the bar measures 28.8px instead of 30.8px. Nothing errors,
+which is why `brand.identity-bar.font-loaded` exists.
+
+```css
+@font-face {
+  font-family: 'Stanford';
+  src:
+    url('https://www-media.stanford.edu/assets/fonts/stanford.woff2') format('woff2'),
+    url('https://www-media.stanford.edu/assets/fonts/stanford.woff') format('woff');
+  font-weight: 300;
+  font-display: swap;
+}
+```
+
+Plus `<link rel="preconnect" href="https://www-media.stanford.edu" crossorigin>`,
+since it is a separate origin and the bar is the first thing painted. That origin
+will appear in `sws perf`'s third-party list: one 3.8 KB Stanford-hosted font, so
+not a MinPriv concern, but expect to see it.
+
+**A correction worth recording.** An earlier version of this file said not to add
+the font, reasoning that the Decanter documentation site loads only Google Fonts
+and renders the fallback too. That took current practice on one site as intent —
+the error pattern in
+[`../patterns/sws-conventions.md`](../patterns/sws-conventions.md). Decanter v7
+shipped a `fonts.css` that loaded this exact font from this exact CDN.
 
 ## The Global Footer is immutable
 
