@@ -181,6 +181,19 @@ const contentVersion = (() => {
   return null;
 })();
 
+// A null version is not fatal, but it must not be silent. It gets recorded in
+// .sws/installed.json, and `sws doctor` compares that against its own version to
+// tell a project it is behind -- so a null disables the staleness nag FOREVER,
+// with nothing on screen to say so. Found by running this project's own install
+// prompt against a partial checkout.
+const versionWarning = contentVersion
+  ? null
+  : 'Could not determine the standards version, so .sws/installed.json will record null '
+    + 'and `sws doctor` will never report this project as behind. This usually means an '
+    + 'incomplete checkout: the package.json beside AGENTS.md is missing.';
+
+if (versionWarning) console.error(`  warning: ${versionWarning}`);
+
 const source = findSource();
 if (source?.badSource) {
   die(2, `--source is not a standards source: ${source.badSource}`,
@@ -341,6 +354,7 @@ function emitJson({ written, write: wr }) {
     schema: 1,
     tool: '@su-sws/create-web-team',
     version: contentVersion,
+    warnings: versionWarning ? [versionWarning] : [],
     previousVersion: wr?.previousVersion ?? null,
     mode,
     written,

@@ -6,6 +6,63 @@ import { contractExtracted } from '../lib/footer';
 
 const REPO = 'https://github.com/SU-SWS/synthetic-web-team';
 
+// ---------------------------------------------------------------------------
+// The paste-into-your-agent prompts. These are the easiest install path and the
+// one most people will use, so they are the first thing in the hero.
+//
+// Each one names BOTH routes on purpose. Nothing is published to npm yet, so a
+// prompt that only said `npx @su-sws/create-web-team` would send every agent
+// into a 404 — verified, not assumed. The clone route works today and the npx
+// route works the day it ships, so the prompt stays correct across that change
+// without anyone editing it.
+//
+// They also encode the two safety properties that matter: never invent an owner
+// email (MinWeb requires real ones), and stop on a conflict rather than
+// overwriting someone's edit.
+// ---------------------------------------------------------------------------
+
+const promptInstall = `Set up the Stanford Web Services agent team in this project.
+
+Install it:
+
+  npx @su-sws/create-web-team --json --answers '{"siteName":"...","unit":"..."}'
+
+If that 404s it is not published yet, so use the repository instead:
+
+  git clone --depth 1 https://github.com/SU-SWS/synthetic-web-team /tmp/swt
+  node /tmp/swt/packages/create-web-team/bin/create-web-team.mjs --json \\
+    --answers '{"siteName":"...","unit":"..."}'
+
+Fill in siteName and unit from this repository. Ask me if it is not obvious.
+The installer is non-interactive and prints one JSON document. Then:
+
+1. Read AGENTS.md. That is the behavioural contract for this repository.
+   Follow it from now on, not only during setup.
+2. Work through the result's "next" array in order.
+3. Ask me about every field in "incomplete". Do not invent owner names or
+   email addresses: Stanford's MinWeb standard requires a named business
+   owner and technical administrator with real Stanford addresses.
+4. Tell me which compliance tier it derived, and the one-sentence reason.
+
+Do not change any of my existing code.`;
+
+const promptReview = `Review this project against Stanford Web Services standards. Change nothing.
+
+  git clone --depth 1 https://github.com/SU-SWS/synthetic-web-team /tmp/swt
+  node /tmp/swt/packages/create-web-team/bin/create-web-team.mjs add . --json
+  node /tmp/swt/packages/cli/bin/sws.mjs doctor --format json
+
+Give me the score out of 100, then the three findings most worth fixing: one
+sentence each, naming the Stanford policy behind it. Fix nothing yet.`;
+
+const promptUpdate = `Update the Stanford Web Services standards in this project.
+
+  npx @su-sws/create-web-team add . --json
+
+Report "previousVersion" against "version", and the "counts" object. If anything
+comes back as a conflict, list those files and stop: they are ones I edited and
+I will decide. If anything is an orphan, list it and do not delete it.`;
+
 const installCmd = `npx @su-sws/create-web-team --json --answers '{
   "siteName": "Stanford Bioengineering",
   "unit": "Bioengineering",
@@ -128,7 +185,7 @@ const inside = [
             <a
               href="#install"
               class="inline-block rounded-md bg-white px-28 py-14 text-18 font-semibold text-black no-underline transition-shadow duration-200 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-              >Install it →</a
+              >Other ways to install →</a
             >
             <a
               href="#inside"
@@ -139,12 +196,15 @@ const inside = [
         </div>
 
         <div>
-          <CodeCard label="Terminal" tag="AGENT" lang="bash" code={installCmd} id="hero-install" />
+          <p class="mb-12 flex items-center gap-10 text-16 font-semibold text-poppy-light">
+            <span aria-hidden="true">↓</span> Paste this into your agent
+          </p>
+          <CodeCard label="Install prompt" tag="PROMPT" lang="text" code={promptInstall} id="hero-prompt" />
           <p class="mt-20 mb-0 flex items-start gap-10 text-17 text-black-20">
             <span class="text-palo-verde-light" aria-hidden="true">✓</span>
             <span
-              >Non-interactive by default off a TTY, so an agent cannot hang on a
-              prompt. One JSON document on stdout.</span
+              >Works in Claude Code, Cursor, VS Code Copilot, Codex, Zed — any
+              agent that can run a command. No flags to learn.</span
             >
           </p>
         </div>
@@ -174,10 +234,33 @@ const inside = [
     <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
       <div class="grid gap-60 lg:grid-cols-2 lg:gap-40">
         <div data-animate>
-          <Eyebrow tone="dark">One command</Eyebrow>
+          <Eyebrow tone="dark">Three ways in</Eyebrow>
           <h2 id="install-h" class="mb-24 max-w-[22ch] text-40 font-bold leading-tight md:text-48">
             Built for an agent, not a human.
           </h2>
+          <ol class="mb-32 grid list-none gap-16 p-0">
+            <li class="flex gap-14">
+              <span class="font-mono text-15 font-semibold text-poppy-light" aria-hidden="true">01</span>
+              <span class="text-18 text-black-20"
+                ><strong class="text-white">Paste the prompt.</strong> Easiest.
+                It is in the hero, and again below for an existing project.</span
+              >
+            </li>
+            <li class="flex gap-14">
+              <span class="font-mono text-15 font-semibold text-poppy-light" aria-hidden="true">02</span>
+              <span class="text-18 text-black-20"
+                ><strong class="text-white">Run the command.</strong> Same
+                installer, if you would rather drive it yourself.</span
+              >
+            </li>
+            <li class="flex gap-14">
+              <span class="font-mono text-15 font-semibold text-poppy-light" aria-hidden="true">03</span>
+              <span class="text-18 text-black-20"
+                ><strong class="text-white">Call the MCP tool.</strong>
+                <code>sws_scaffold</code>, if your agent already has the server.</span
+              >
+            </li>
+          </ol>
           <p class="mb-24 max-w-[54ch] text-19 leading-relaxed text-black-20">
             The primary caller is a robot, so that is the first-class path.
             Prompts appear only when stdin and stdout are both a TTY. Everything
@@ -212,7 +295,34 @@ const inside = [
           </dl>
         </div>
         <div data-animate data-animate-delay="0.15">
-          <CodeCard label="stdout" lang="json" code={resultShape} id="result-shape" />
+          <CodeCard label="Terminal" tag="CLI" lang="bash" code={installCmd} id="install-cmd" />
+          <div class="mt-24">
+            <CodeCard label="stdout" lang="json" code={resultShape} id="result-shape" />
+          </div>
+
+          <details class="mt-32 rounded-md border border-black-90 bg-black-90/30 p-24">
+            <summary
+              class="cursor-pointer text-18 font-semibold text-white hover:text-poppy-light focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >Two more prompts: review an existing site, and update</summary
+            >
+            <div class="mt-24 grid gap-24">
+              <div>
+                <p class="mb-12 text-17 text-black-20">
+                  <strong class="text-white">Already have a site?</strong> This
+                  one reports and changes nothing.
+                </p>
+                <CodeCard label="Review prompt" tag="PROMPT" lang="text" code={promptReview} id="prompt-review" />
+              </div>
+              <div>
+                <p class="mb-12 text-17 text-black-20">
+                  <strong class="text-white">Already installed?</strong>
+                  Re-installing is the update, and it stops on anything you
+                  edited.
+                </p>
+                <CodeCard label="Update prompt" tag="PROMPT" lang="text" code={promptUpdate} id="prompt-update" />
+              </div>
+            </div>
+          </details>
         </div>
       </div>
     </div>

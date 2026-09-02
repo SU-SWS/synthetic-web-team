@@ -91,6 +91,25 @@ design:
     became white on solid digital red (7.26:1), which is also something axe can
     measure. This is the roughly 70 percent automation cannot see, made concrete.
 
+install_pathways:
+  - kind: prompt
+    what: >
+      Three copy-a-prompt boxes on the page: install, review an existing project,
+      and update. The easiest path, and the one most people will use.
+    honesty_note: >
+      Each prompt names BOTH the npx route and a git clone fallback, because
+      nothing is published to npm yet. Verified: `npx @su-sws/create-web-team`
+      returns E404 today, and the clone route installs 87 files. A prompt naming
+      only npx would send every agent into a 404.
+    encodes: >
+      Never invent an owner name or email (MinWeb requires real ones), stop on a
+      conflict rather than overwriting an edit, and read AGENTS.md as an ongoing
+      contract rather than a setup step.
+  - kind: cli
+    what: "npx @su-sws/create-web-team --json --answers '{...}'"
+  - kind: mcp
+    what: sws_scaffold, for an agent that already has the server configured
+
 motion:
   pattern: standards/patterns/motion.md
   library: "motion 13.1.1, vanilla API (animate + inView), not motion/react"

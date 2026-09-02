@@ -26,6 +26,7 @@ Early. The plan is complete and reviewed; the implementation is partway through.
 | `sws` CLI | **Working.** `doctor` and `check` run 13 check modules against 63 criteria. `sws a11y` runs axe and `sws perf` measures a byte budget, both in real Chromium |
 | Report delivery | **Working.** PR comment and a persistent "Site health" issue, both updated in place. Score trend, sparkline, HTML artifact, README badge |
 | Install wizard | **Working, agent-first.** Non-interactive by default off a TTY, `--json` result with machine-readable next steps, `--answers` input, idempotent re-runs that preserve project state |
+| Copy-a-prompt install | **Working.** Three prompts on the site — install, review, update — each carrying an `npx` route and a `git clone` fallback |
 | Publishable packages | **Working, not yet published.** Two packages — `@su-sws/sws` and `@su-sws/mcp` — verified by installing the tarballs into a clean project with no repository present |
 | Updates | **Working.** Re-install is the update: project state preserved, local edits reported as conflicts rather than overwritten, stale files reported not deleted, staleness nag in `sws doctor` |
 | Recipe canary | **Deliberately deferred**, 2026-09-01. Not in production, so nobody is exposed to upstream drift yet. Revisit before the first pilot |
@@ -37,6 +38,20 @@ End to end, verified: `create-web-team` installs, an agent follows the recipe, t
 **A green axe run is a floor, not a conformance claim.** It covers roughly 30 percent of accessibility issues per ODA guidance, and this project says so in the report itself.
 
 ## Install
+
+### Easiest: paste a prompt into your agent
+
+Copy the install prompt from [the site](https://su-sws.github.io/synthetic-web-team/)
+and paste it into Claude Code, Cursor, VS Code Copilot, Codex, Zed — anything that
+can run a command. It tells the agent how to install, what to read first, and
+**to ask you for the owner names and emails rather than inventing them**, because
+MinWeb requires real ones.
+
+There are three prompts: install, review an existing site without changing it,
+and update. Each names both the `npx` route and a `git clone` fallback, so it
+stays correct whether or not the package is published yet.
+
+### Or drive the installer yourself
 
 **The primary caller is an agent, so that is the first-class path.** One command,
 no prompts, one JSON document on stdout, stable exit codes:
