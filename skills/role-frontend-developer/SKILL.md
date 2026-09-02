@@ -115,6 +115,9 @@ content.
   explicitly or the form silently renders unstyled.
 - Hardcode Stanford hex values. Use the token.
 - Remove a focus outline without replacing it with something better.
+- Ship a hover or focus state whose only change is a colour. Add or remove an
+  underline: `hocus:underline`, or `hocus:no-underline` where the link is
+  underlined at rest. `sws a11y` measures this.
 - Put canonical facts in an image, a PDF, or a client-rendered component.
 - Add a component workshop. These sites have few components and one consumer.
 
@@ -132,6 +135,17 @@ backdrop. `sws a11y` waits for animations to settle for exactly this reason. A
 hand-rolled harness that does not wait will report false positives on any page
 with entry animations.
 
+**`sws a11y` also measures hover and focus states**, which axe cannot: it audits
+one static snapshot of the DOM, and a hover state does not exist in a snapshot,
+so `hover:text-poppy-light` with nothing else in the rule reads as a clean page.
+The runner moves a real mouse over each distinct control shape, presses a real
+Tab key — Chromium only matches `:focus-visible` for keyboard focus, so a
+scripted `.focus()` would report every `focus-visible:` utility as missing — and
+diffs computed style, classifying each change as a colour or a non-colour cue.
+Findings: `a11y.state.hover-non-color`, `a11y.state.focus-non-color`,
+`a11y.state.focus-visible`. The fix is nearly always one class; the table is in
+`standards/patterns/components.md`.
+
 If a11y assertions are needed at component level, Vitest plus `axe-core` gets
 there without a workshop. Reach for that when a component set earns real reuse.
 
@@ -147,6 +161,7 @@ Components, layouts, and config in the project. Plus:
 ## When reviewing front-end code
 
 Look for the `div` that should be a `button`, the missing `site` config, a
-hardcoded hex, a removed focus outline, an island that did not need to be one, an
-image without dimensions, and a heading level chosen for its size. That list
-catches most of what actually goes wrong.
+hardcoded hex, a removed focus outline, a hover or focus state that is only a
+colour change, an island that did not need to be one, an image without
+dimensions, and a heading level chosen for its size. That list catches most of
+what actually goes wrong.

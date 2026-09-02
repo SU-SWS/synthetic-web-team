@@ -23,7 +23,7 @@ Early. The plan is complete and reviewed; the implementation is partway through.
 | Shared skills | 6 of 6 done |
 | Role skills | **8 of 8 built, 11 of 11 stubs.** 25 skills total, all validated |
 | Documentation site | **Working.** [`site/`](site/), built by our own recipe, scores 91/100 with zero failures |
-| `sws` CLI | **Working.** `doctor` and `check` run 13 check modules against 63 criteria. `sws a11y` runs axe and `sws perf` measures a byte budget, both in real Chromium |
+| `sws` CLI | **Working.** `doctor` and `check` run 13 check modules against 68 criteria. `sws a11y` runs axe and an interactive-state audit — hover and focus measured with a real mouse and a real Tab key — and `sws perf` measures a byte budget, all in real Chromium |
 | Report delivery | **Working.** PR comment and a persistent "Site health" issue, both updated in place. Score trend, sparkline, HTML artifact, README badge |
 | Install wizard | **Working, agent-first.** Non-interactive by default off a TTY, `--json` result with machine-readable next steps, `--answers` input, idempotent re-runs that preserve project state |
 | Copy-a-prompt install | **Working.** Three prompts on the site — install, review, update — each carrying an `npx` route and a `git clone` fallback |
@@ -169,7 +169,7 @@ node packages/cli/bin/sws.mjs doctor --standards standards
 | [`standards/recipes/`](standards/recipes/) | Build contracts with machine-checkable acceptance criteria |
 | [`standards/fragments/`](standards/fragments/) | Byte-exact compliance content, like the Global Footer link set |
 | [`standards/prior-art/`](standards/prior-art/) | Existing SWS work, with era, lineage, and judgment attached |
-| [`packages/cli/`](packages/cli/) | The `sws` CLI. 13 check modules, axe and performance runners in real Chromium |
+| [`packages/cli/`](packages/cli/) | The `sws` CLI. 13 check modules, plus axe, interactive-state, and performance runners in real Chromium |
 | [`packages/create-web-team/`](packages/create-web-team/) | The install wizard |
 | [`packages/mcp/`](packages/mcp/) | `@su-sws/mcp`. The same standards as MCP tools and resources, for agents that prefer calling a tool to shelling out |
 

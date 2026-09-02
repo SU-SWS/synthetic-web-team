@@ -100,6 +100,13 @@ jobs:
       - name: Criteria and checks map in both directions
         run: node scripts/validate-criteria.mjs
 
+      # The judgment half of the interactive-state check, which needs no
+      # browser. It shipped with a key-parsing bug that scored every
+      # pseudo-element colour change as a non-colour cue -- a false pass in the
+      # one check whose whole purpose is catching what axe cannot see.
+      - name: Colour-vs-cue classification
+        run: node scripts/validate-state-classifier.mjs
+
       # Packing is the only way to learn that a `files` list is wrong or that
       # @su-sws/standards' prepack stopped staging content -- and both fail
       # silently right up until someone publishes. So pack for real, then assert

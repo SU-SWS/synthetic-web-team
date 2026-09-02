@@ -7,16 +7,35 @@ description: Run and interpret the Stanford compliance report. Use when the user
 
 ```bash
 sws doctor        # friendly local report, always exits 0
-sws a11y          # run axe over the built routes, always exits 0
+sws a11y          # axe over the built routes, then hover and focus states
 sws perf          # measure the performance budget, always exits 0
 sws check         # the full run, used in CI
 ```
 
 `sws a11y` needs `@playwright/test`, `@axe-core/playwright`, and a browser in the
-project. It writes `.sws/axe-results.json`; `doctor` and `check` read that file
-rather than launching a browser themselves. **Order matters: build, `a11y`, then
-`check`.** If the a11y criterion reads `unknown`, the reason is in the finding —
-usually axe was never run, or the results predate the current build.
+project. It runs **two** measurements in one browser launch and writes
+`.sws/axe-results.json` and `.sws/state-results.json`; `doctor` and `check` read
+those files rather than launching a browser themselves. **Order matters: build,
+`a11y`, then `check`.** If an a11y criterion reads `unknown`, the reason is in
+the finding — usually it was never run, or the results predate the current build.
+
+The second measurement is the one people have not seen before. **axe cannot see
+a hover or focus state at all**, because it audits one static snapshot of the DOM
+and a hover state only exists while a pointer is over the element. So a control
+whose entire hover state is a colour swap passes axe and fails WCAG 1.4.1. The
+state runner moves a real mouse and presses a real Tab key, then diffs computed
+style and classifies each change as a colour or as a non-colour cue:
+
+| Finding | Means |
+|---|---|
+| `a11y.state.hover-non-color` | A hover state changes colour and nothing else. Fix: `hover:underline`, or `hover:no-underline` where the link is underlined at rest |
+| `a11y.state.focus-non-color` | Same for keyboard focus. `hocus:underline` covers both states at once |
+| `a11y.state.focus-visible` | A control reached by Tab changes nothing at all on focus. Usually a removed outline |
+
+Controls are grouped by tag and class list and measured once per distinct shape,
+with the instance count reported, so "x8" means one fix in one component. Icon
+and image controls are flagged too, and there the fix is an outline or a border
+rather than an underline — an underline has nothing to draw on.
 
 Findings come from the recipe's `acceptance.yml`, which is the definition of
 correct for that project. Read it rather than inventing criteria.
@@ -60,7 +79,8 @@ Group by what the person can do, not by policy chapter.
 
 1. **Blocking launch** — the footer link set is wrong, ownership is missing,
    axe violations exist
-2. **Should fix** — heading order, missing meta descriptions, contrast
+2. **Should fix** — heading order, missing meta descriptions, contrast,
+   colour-only hover and focus states
 3. **Consider** — structured data, performance budget
 4. **Could not check** — the `unknown` bucket, with the reason for each
 5. **Accepted** — acknowledged findings, with review dates

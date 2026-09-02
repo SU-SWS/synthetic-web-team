@@ -75,10 +75,20 @@ not tell you which.
 outline without replacing it with something better. This is the single most
 common regression in a redesign.
 
+**Hover and focus must change more than colour.** Design the cue, do not leave it
+to the build: an underline appearing (or, where the link is underlined at rest,
+disappearing) is the standard answer for text, and an outline or border for icon
+controls. Colour-only states are measured and reported by `sws a11y`
+(`a11y.state.hover-non-color`, `a11y.state.focus-non-color`), so a comp that
+specifies only a colour swap will come back. The WCAG basis is 1.4.1 technique
+G183, which requires the cue on hover **and** on focus; see
+`standards/patterns/components.md` for the class-by-class table.
+
 **Target size.** Minimum 24 by 24 CSS pixels, and this is the one WCAG 2.2
 criterion axe can actually check.
 
-**Do not rely on colour alone** to convey status, required fields, or meaning.
+**Do not rely on colour alone** to convey status, required fields, or meaning —
+in a resting state or in a hover or focus state.
 
 **Reflow to 320 pixels** without horizontal scrolling. Test at 400 percent zoom,
 which is where fixed-height containers break.

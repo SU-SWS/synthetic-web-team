@@ -13,6 +13,9 @@ person.
 ## What already runs
 
 - Playwright with axe on every route, asserting WCAG 2.1 AA tags
+- `sws a11y`'s state audit on top of axe: hover and focus states measured with a
+  real mouse and a real Tab key, because axe reads a static snapshot and a
+  colour-only hover state is invisible to it
 - Build verification
 - 47 acceptance criteria per recipe
 - Link checking and a post-deploy sweep

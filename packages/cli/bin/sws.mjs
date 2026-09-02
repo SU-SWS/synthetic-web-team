@@ -15,6 +15,7 @@ import YAML from 'yaml';
 import { ALL, findHtml } from '../src/checks.mjs';
 import { runAxe, RESULTS_PATH as AXE_RESULTS_PATH } from '../src/axe.mjs';
 import { runPerf, RESULTS_PATH as PERF_RESULTS_PATH } from '../src/perf.mjs';
+import { runStates, RESULTS_PATH as STATE_RESULTS_PATH } from '../src/states.mjs';
 import {
   score, renderTerminal, renderMarkdown, renderJson, group,
   renderPrComment, renderIssueBody, renderHtml, renderBadge,
@@ -69,8 +70,10 @@ const USAGE = `
 
   doctor            Friendly local report. Always exits 0.
   check             Full run for CI. Exits non-zero only on a blocking finding.
-  a11y              Run axe over every built route. Writes .sws/axe-results.json,
-                    which check and doctor then read. Always exits 0.
+  a11y              Run axe over every built route, then measure hover and
+                    focus states with a real mouse and a real Tab key. Writes
+                    .sws/axe-results.json and .sws/state-results.json, which
+                    check and doctor then read. Always exits 0.
                     Needs @playwright/test and @axe-core/playwright in THIS
                     project, plus: npx playwright install chromium
   perf              Measure the performance budget in a real browser. Writes
@@ -430,7 +433,14 @@ async function run() {
 // fast and runnable without a browser, and CI wants axe as its own step so a
 // browser download failure is legible instead of buried in a compliance report.
 //
-// Always exits 0. It is a measurement, not a gate: the resulting finding is
+// Two measurements, one command and one browser launch: axe over every route,
+// then the interactive-state audit. They belong together -- both need Chromium,
+// both are accessibility, and a second command would be a second thing for CI
+// and for people to forget. The state audit is what catches a hover or focus
+// state that is only a colour change, which axe cannot see because it audits a
+// static snapshot.
+//
+// Always exits 0. These are measurements, not gates: the resulting findings are
 // scored by `check` like everything else.
 
 async function a11y() {
@@ -445,6 +455,12 @@ async function a11y() {
     console.log(`  ${r.detail}`);
     console.log(`\n  Recorded in ${AXE_RESULTS_PATH}. This reports as \`unknown\`, never as a pass,`);
     console.log('  so the criterion withholds its points rather than flattering the score.');
+    // Still attempt the state audit. It needs Playwright but NOT
+    // @axe-core/playwright, so the commonest reason axe bails -- that one
+    // package missing -- says nothing about whether states can be measured.
+    // Returning here would have turned one missing dependency into four
+    // unknowns instead of one.
+    await states();
     return 0;
   }
 
@@ -471,6 +487,64 @@ async function a11y() {
     console.log('  these are not failures and are not scored. See the results file.');
   }
   console.log(`  Full detail: ${AXE_RESULTS_PATH}`);
+
+  await states();
+  return 0;
+}
+
+// --- interactive states -----------------------------------------------------
+// Hover and focus, measured rather than inferred: real mouse, real Tab key,
+// computed style diffed property by property. A change that is only a colour
+// is a finding (SC 1.4.1 via G183); no change at all on focus is a finding
+// (SC 2.4.7). Never gates, and reports `unknown` rather than `pass` when it
+// could not measure.
+
+async function states() {
+  const dist = findDist();
+  const html = dist ? findHtml(dist) : [];
+
+  console.log('');
+  console.log(`  states: hover and focus on ${html.length} route(s)`);
+
+  const r = await runStates({ root, dist, html });
+
+  if (r.status !== 'ok') {
+    console.log(`\n  Did not complete: ${r.status}`);
+    console.log(`  ${r.detail}`);
+    console.log(`\n  Recorded in ${STATE_RESULTS_PATH}. Reports as \`unknown\`, never as a pass.`);
+    return 0;
+  }
+
+  const t = r.totals;
+  console.log(`  ${t.controls} distinct control shape(s), ${t.instances} instance(s)`);
+
+  const flagged = r.routes.flatMap((x) => (x.findings ?? []).map((f) => ({ ...f, route: x.route })));
+  if (!flagged.length) {
+    console.log('\n  Every hover and focus state carries a cue that does not depend on colour.');
+  } else {
+    console.log(`\n  ${flagged.length} control shape(s) to fix:\n`);
+    for (const f of flagged) {
+      const what = f.verdict === 'no-change' ? 'no visible focus state' : `${f.state}: colour only`;
+      console.log(`    ${what}  ${f.label ? `"${f.label}"` : f.target}${f.occurrences > 1 ? ` (${f.occurrences} instances)` : ''}`);
+      console.log(`      ${f.route}  ${f.target}`);
+      if (f.classes?.length) console.log(`      classes: ${f.classes.join(' ')}`);
+      if (f.changed?.length) console.log(`      changed: ${f.changed.join(', ')}`);
+      console.log(`      fix: ${f.graphic
+        ? 'no text on this control, so an underline is not the fix -- add an outline, a border, or a shape change'
+        : 'add or remove an underline (`hover:underline`, `focus-visible:underline`, or `hocus:underline`)'}`);
+    }
+    console.log('');
+    console.log('  WCAG 2.1 SC 1.4.1 via technique G183: where colour identifies a control,');
+    console.log('  hover AND focus each need a cue that does not depend on colour vision.');
+  }
+
+  if (t.inconclusive) {
+    console.log(`\n  ${t.inconclusive} control(s) could not be hovered by a real mouse: covered by another`);
+    console.log('  element, moving under the pointer, or not pointer-reachable at all, which is');
+    console.log('  normal for a visually hidden skip link. Not counted either way -- the');
+    console.log(`  inventory in ${STATE_RESULTS_PATH} says which, and why.`);
+  }
+  console.log(`\n  Full detail: ${STATE_RESULTS_PATH}`);
   return 0;
 }
 

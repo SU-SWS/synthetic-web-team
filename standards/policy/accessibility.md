@@ -1,7 +1,7 @@
 ---
 policy: accessibility
 title: Accessibility, WCAG 2.1 AA, Siteimprove, and ODA
-reviewed: 2026-09-01
+reviewed: 2026-09-02
 ---
 
 # Accessibility
@@ -34,13 +34,14 @@ Say it out loud, every time. A green axe run is a **floor, not a conformance
 claim**. Never describe a site as accessible on the strength of a passing test,
 and never let a report imply it.
 
-## Four signals, none sufficient alone
+## Five signals, none sufficient alone
 
 | Signal | When | Catches |
 |---|---|---|
 | **`sa11y`** in the CMS Visual Editor overlay | While authors edit | Content problems, before publish |
 | **axe** via Playwright in CI | Every build | ~30 percent of issues in the built site |
-| **Manual checklist** | Pre-launch, and on significant change | The other ~70 percent |
+| **State audit**, in the same `sws a11y` run | Every build | Hover and focus states that change colour and nothing else, which axe cannot see |
+| **Manual checklist** | Pre-launch, and on significant change | The rest |
 | **Siteimprove** | After launch, continuously | Its own criteria, site-wide |
 
 `sa11y` is a **content-author** tool, not a developer tool. It belongs in the
@@ -81,7 +82,10 @@ provably misses:
   lists, announced form errors.
 - **Contrast in context**, including text on images and gradients, and in every
   state: hover, focus, disabled, visited.
-- **Meaning not carried by colour alone.**
+- **Meaning not carried by colour alone.** The hover and focus half of this is
+  now measured — see [State feedback](#state-feedback-must-not-be-colour-alone)
+  below — but colour used to carry meaning in charts, status badges, required
+  fields, and map keys still needs a person.
 - **Alt text quality.** `alt="image"` passes the presence check and fails the
   human.
 - **Reflow at 320 pixels and 400 percent zoom.**
@@ -99,6 +103,41 @@ provably misses:
   over.
 
 Record results in `docs/a11y/manual-checklist.md`, dated, with who did it.
+
+## State feedback must not be colour alone
+
+**Hover and focus states have to change something other than colour.** Adding an
+underline, or removing one that is there at rest, is the fix in almost every
+case: it is one class, it costs no layout, and it reads in monochrome, in Windows
+High Contrast, and to anyone with a colour vision deficiency.
+
+The basis in WCAG 2.1:
+
+| Criterion | What it gives you |
+|---|---|
+| **1.4.1 Use of Color** (A), technique **G183** | Where colour identifies a control, a non-colour cue is required on **both** hover **and** focus. G183 is the technique that makes an unstyled-looking link conformant, and it is a package: 3:1 contrast against surrounding text *plus* the cue on hover *plus* the cue on focus. Two out of three is not the technique |
+| **2.4.7 Focus Visible** (AA) | Focus must be visible at all. A control whose focus state changes nothing fails here, and the usual cause is a removed outline that was never replaced |
+| **1.4.11 Non-text Contrast** (AA) | A focus indicator needs 3:1 against what is behind it, so a colour swap between two similar tones fails even where a cue exists |
+
+**SWS applies the cue rule to every interactive control, not only to links that
+depend on colour at rest.** That is deliberately stricter than G183 read
+narrowly, for two reasons: a reader cannot tell which of your links happens to
+carry an underline, and "is this link distinguishable from surrounding text"
+is a judgment that changes every time the design does, so it is not a rule an
+author can apply reliably or a check can measure honestly.
+
+**This is measured, by `sws a11y`.** axe cannot see it — it audits one static
+snapshot of the DOM, and a hover state does not exist in a snapshot — so a
+control whose whole hover state is `hover:text-poppy-light` reads as a clean
+page. The runner moves a real mouse, presses a real Tab key, and diffs computed
+style, classifying each change as a colour or as a non-colour cue. Findings:
+`a11y.state.hover-non-color`, `a11y.state.focus-non-color`,
+`a11y.state.focus-visible`.
+
+Found on this project's own site by a person, not a tool, which is the whole
+argument for the manual checklist. Four control shapes were colour-only on
+hover: the header wordmark, a bordered secondary button, the code-card copy
+button, and a `<summary>`. All four were one class each.
 
 ## Two ways an automated a11y result lies to you
 

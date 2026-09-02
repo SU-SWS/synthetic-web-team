@@ -126,7 +126,7 @@ If `main` is `tailwind.config.js` you have v7. If `node_modules/decanter/node_mo
 
 ```bash
 npm run build
-sws a11y     # axe-core over every route, WCAG 2.1 AA tags
+sws a11y     # axe-core over every route, then hover and focus states
 sws perf     # first-party byte budget per route
 sws check    # reads both
 ```
@@ -139,7 +139,9 @@ generated reports outside `dist`. (`sws check --badge dist/badge.json` is the on
 exception: the CLI knows it wrote that file and excludes it. This bit this
 project's own Pages workflow before the exception existed.)
 
-Each serves the build over localhost, drives Chromium, and waits for animations to settle. **Add `**/.sws/axe-results.json` and `**/.sws/perf-results.json` to `.gitignore`** — both are derived from a build, and `sws check` treats results older than the build as `unknown` so a stale pass cannot travel with the repo. Use the `**/` prefix: a leading-slash pattern only matches at the repo root, which bit this project when its own site moved into a subdirectory.
+`sws a11y` is two measurements in one browser launch: axe, then an interactive-state audit that moves a real mouse and presses a real Tab key to catch a hover or focus state whose only change is a colour. axe cannot see that at all — it audits one static snapshot of the DOM, and a hover state does not exist in a snapshot. The fix is nearly always one class, `hover:underline` or `hover:no-underline`; see `standards/patterns/components.md`.
+
+Each serves the build over localhost, drives Chromium, and waits for animations to settle. **Add `**/.sws/axe-results.json`, `**/.sws/state-results.json`, and `**/.sws/perf-results.json` to `.gitignore`** — both are derived from a build, and `sws check` treats results older than the build as `unknown` so a stale pass cannot travel with the repo. Use the `**/` prefix: a leading-slash pattern only matches at the repo root, which bit this project when its own site moved into a subdirectory.
 
 The budget lives in `standards/stack/performance-budget.yml` and is bytes rather than Lighthouse scores, for reasons given in that file. Override any limit in `.sws/manifest.yml` under `performance_budget:` with a reason if this site genuinely needs different numbers.
 

@@ -200,6 +200,82 @@ criteria:
       ratios of 1.05 to 1.55, from `opacity-0` plus a delayed `fadeInUp`.
       Entry animations are common, so do not remove the wait.
 
+  - id: a11y.state.hover-non-color
+    requires: >
+      Where a control has a hover state, that state changes something other
+      than colour. An underline appearing (or, on a link underlined at rest,
+      disappearing) is the standard fix.
+    check: a11y
+    severity: warn
+    weight: 3
+    policy: accessibility
+    wcag: 1.4.1 (technique G183)
+    mechanism: >
+      Requires a REAL BROWSER, and a real mouse: axe cannot see this at all.
+      axe audits one static snapshot of the DOM and a hover state does not
+      exist in a snapshot, so `hover:text-poppy-light` with nothing else in the
+      hover rule reads as a clean page. `sws a11y` runs the audit in
+      packages/cli/src/states.mjs after axe: it moves the pointer over each
+      distinct control shape with `page.hover()`, waits for the transition to
+      finish, and diffs computed style against the resting state, classifying
+      every changed property as a colour (color, background-color, border
+      colour, outline colour, text-decoration-color, filter, partial opacity)
+      or as a non-colour cue (text-decoration, outline or border width and
+      style, box-shadow geometry, font-weight, transform, padding, radius,
+      something appearing). Colour changes with no cue anywhere in the
+      control's own subtree, including its ::before and ::after, are the
+      finding. Results go to .sws/state-results.json; `sws check` reads that
+      file and does not run a browser itself.
+    reports_unknown_when: >
+      Same list as a11y.axe.routes, for the same reason: no results file,
+      Playwright missing, Chromium unable to launch, a partial run, results
+      that predate the build, or fewer routes covered than the build produced.
+    note: >
+      Controls are grouped by tag and class list and measured once per distinct
+      shape, with the instance count reported. In a utility-CSS project the
+      class list IS the style, so this covers every instance of a component
+      without hovering 200 links; the tradeoff is that a state which depends on
+      position rather than class (a bare `nth-child` rule) is measured only on
+      its first instance. A control the mouse cannot reach, because something
+      overlaps it, is recorded as inconclusive and scored neither way.
+
+  - id: a11y.state.focus-non-color
+    requires: >
+      Keyboard focus is signalled by something other than colour on every
+      focusable control.
+    check: a11y
+    severity: warn
+    weight: 3
+    policy: accessibility
+    wcag: 1.4.1 (technique G183), 1.4.11
+    mechanism: >
+      Measured by the same runner as a11y.state.hover-non-color, but focus is
+      moved by actually PRESSING TAB, not by calling `el.focus()`. This is not
+      a stylistic preference: Chromium only matches `:focus-visible` when focus
+      arrived from the keyboard, so a scripted `.focus()` reads the `:focus`
+      styles and reports every `focus-visible:` utility on the page as missing.
+      Tab traversal also measures exactly the set of controls a keyboard user
+      can reach, which is the set this criterion is about.
+    reports_unknown_when: Same list as a11y.axe.routes.
+
+  - id: a11y.state.focus-visible
+    requires: >
+      Every control reached by Tab changes visibly when it is focused.
+    check: a11y
+    severity: warn
+    weight: 3
+    policy: accessibility
+    wcag: 2.4.7
+    mechanism: >
+      Falls out of the same Tab traversal: a focused control whose computed
+      style, pseudo-elements, and descendants are all byte-identical to the
+      resting state has no focus indicator at all. Reported separately from
+      a11y.state.focus-non-color because it is a different obligation with a
+      different fix -- usually an outline that was removed and not replaced --
+      and because a control with no focus state would otherwise be invisible
+      to a check that only looks at whether a change was colour.
+    reports_unknown_when: Same list as a11y.axe.routes.
+
   - id: a11y.skiplink
     requires: A skip navigation link is the first focusable element on every page.
     check: a11y

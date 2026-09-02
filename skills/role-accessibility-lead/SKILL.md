@@ -12,12 +12,13 @@ as the working standard. Where policy text lags, say so and date the note.
 Admin Guide 6.8.1 covers existing content, new content, and purchases or major
 revisions. Not just new work.
 
-## Four signals, none sufficient alone
+## Five signals, none sufficient alone
 
 | Signal | When | Catches |
 |---|---|---|
 | **`sa11y`** in the CMS Visual Editor overlay | While authors edit | Content problems, before publish |
 | **axe** via Playwright in CI | Every build | Roughly 30 percent of issues in the built site. Run it with `sws a11y` |
+| **State audit**, same command | Every build | Hover and focus states that change colour and nothing else — which axe cannot see at all |
 | **Manual checklist** | Pre-launch, and on significant change | The other ~70 percent |
 | **Siteimprove** | After launch, continuously | Its own criteria, site-wide |
 
@@ -56,7 +57,9 @@ provably misses:
   headings form an outline, are link lists usable, are form errors announced.
 - **Contrast in context**, including text on images and gradients, and every
   state: hover, focus, disabled, visited.
-- **Meaning not carried by colour alone.**
+- **Meaning not carried by colour alone.** The hover and focus half of this is
+  now measured rather than reviewed (see below); charts, status badges, required
+  fields, and map keys still need a person.
 - **Alt text quality**, which is a judgment call automation cannot make. An
   `alt="image"` passes the presence check and fails the human.
 - **Reflow at 320 pixels and 400 percent zoom.**
@@ -71,6 +74,45 @@ Record results in `docs/a11y/manual-checklist.md`, dated, with who did it.
 
 For reference: WCAG 2.2 adds six criteria and axe covers exactly one of them
 (`target-size`). Not a v1 concern, but it tells you how far automation reaches.
+
+## One thing that moved from the checklist into the tooling
+
+**Colour-only hover and focus states are now measured**, by the state audit that
+`sws a11y` runs after axe. It is worth knowing why, because it is the model for
+anything else you want to move out of the manual list.
+
+axe audits one static snapshot of the DOM. A hover state does not exist in a
+snapshot — it exists only while a pointer is over the element — so a control
+whose entire hover rule is a colour swap reads as a clean page. The runner in
+`packages/cli/src/states.mjs` moves a real mouse over each distinct control
+shape, presses a real Tab key (Chromium only matches `:focus-visible` for
+keyboard focus, so a scripted `.focus()` reports every `focus-visible:` style as
+missing), and diffs computed style property by property, classifying each change
+as a colour or as a non-colour cue.
+
+| Finding | WCAG basis |
+|---|---|
+| `a11y.state.hover-non-color` | 1.4.1 Use of Color, technique G183 |
+| `a11y.state.focus-non-color` | 1.4.1 (G183), 1.4.11 Non-text Contrast |
+| `a11y.state.focus-visible` | 2.4.7 Focus Visible |
+
+G183 is a package deal and this is the part people miss: it makes a link
+distinguished only by colour conformant **provided** the colour has 3:1 contrast
+against surrounding text *and* there is a non-colour cue on hover *and* one on
+focus. Two of the three is not the technique.
+
+SWS applies the cue rule to every control, not only to links that lean on colour
+at rest. That is stricter than a narrow reading of G183, and the reason is
+practical: "is this link distinguishable from the text around it" is a judgment
+that changes with every design revision, so it is not something an author can
+apply consistently or a check can measure honestly. Say that plainly if someone
+pushes back — the extra strictness is a house choice, not a WCAG requirement, and
+the remedy is one class either way.
+
+What automation still cannot judge: whether the cue has enough contrast against
+what is behind it (1.4.11 is a ratio, not a diff), whether the focus indicator is
+big enough to notice, and whether a colour-only cue elsewhere on the page carries
+meaning. Keep those on the checklist.
 
 ## ODA: three doors, pick one
 

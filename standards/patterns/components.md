@@ -79,6 +79,37 @@ reviewer see it in one place.
 State motion — hover, focus, active, open — belongs in the component's CSS, is
 capped at 200ms, and must not move layout. See [`motion.md`](motion.md).
 
+## Hover and focus must change more than colour
+
+**A state whose only change is a colour is not a state for a lot of readers.**
+Every hover and focus state needs one cue that survives monochrome: an
+underline, an outline, a border width, a weight, a shape.
+
+For text links and buttons the answer is nearly always an underline, in whichever
+direction the rest state leaves free:
+
+| Rest state | Hover and focus |
+|---|---|
+| `no-underline` | `hocus:underline` |
+| `underline` | `hocus:no-underline` |
+| Colour change you want to keep | Keep it, and add the underline as well |
+| Icon or image control, no text | `hocus:outline`, a border width, or a shape change — an underline has nothing to draw on |
+
+`hocus:` is the Decanter variant covering hover and focus together; plain
+Tailwind is `hover: focus-visible:`. Where the underline belongs on an inner
+element rather than the whole control — a wordmark next to a badge, say — put
+`group` on the control and `group-hover:underline group-focus:underline` on the
+text.
+
+Two things that look like cues and are not: a `filter: brightness()` shift, and
+an opacity change that dims rather than reveals. Both are colour.
+
+`sws a11y` measures this with a real mouse and a real Tab key, so it is checked
+rather than reviewed: `a11y.state.hover-non-color`,
+`a11y.state.focus-non-color`, `a11y.state.focus-visible`. The reasoning and the
+WCAG basis are in
+[`../policy/accessibility.md`](../policy/accessibility.md#state-feedback-must-not-be-colour-alone).
+
 ## Design the states, not the happy path
 
 A component is not done when it renders the expected content. Cover:
@@ -124,7 +155,7 @@ The list that catches most of what actually goes wrong:
 
 1. The `div` that should be a `button`.
 2. A hardcoded Stanford hex.
-3. A removed focus outline.
+3. A removed focus outline, or a hover state that is only a colour change.
 4. An island that did not need to be one.
 5. An image without dimensions.
 6. A heading level chosen for its size.

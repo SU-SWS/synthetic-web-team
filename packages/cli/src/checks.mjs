@@ -17,6 +17,7 @@ import { parse } from 'node-html-parser';
 import YAML from 'yaml';
 import { RESULTS_PATH as AXE_RESULTS_PATH, SCHEMA as AXE_SCHEMA } from './axe.mjs';
 import { RESULTS_PATH as PERF_RESULTS_PATH, SCHEMA as PERF_SCHEMA } from './perf.mjs';
+import { RESULTS_PATH as STATE_RESULTS_PATH, SCHEMA as STATE_SCHEMA } from './states.mjs';
 import { newestMtime } from './browser.mjs';
 
 const read = (p) => readFileSync(p, 'utf8');
@@ -546,11 +547,108 @@ export function axeFinding({ root, dist, html }) {
 }
 
 // --------------------------------------------------------------------------
+// interactive states: hover and focus feedback that colour vision is not
+// required to perceive. Reads what `sws a11y` recorded, same contract as axe.
+// --------------------------------------------------------------------------
+// axe cannot see this at all -- it audits a static snapshot, and a hover state
+// only exists while a pointer is over the element -- so a control whose entire
+// hover state is `hover:text-poppy-light` reads as a clean page. The runner in
+// states.mjs drives a real mouse and a real Tab key and diffs computed style,
+// classifying each changed property as a colour or as a non-colour cue.
+//
+// Three findings, because they are three different obligations and one number
+// would not tell anyone what to do:
+//   focus-visible     something must change on keyboard focus at all (SC 2.4.7)
+//   focus-non-color   that change must not be colour alone (SC 1.4.1, G183)
+//   hover-non-color   the same for hover, where a hover state exists
+// --------------------------------------------------------------------------
+
+export function statesFinding({ root, dist, html }) {
+  const p = join(root, STATE_RESULTS_PATH);
+  const spread = (why) => [
+    dunno('a11y.state.focus-visible', why),
+    dunno('a11y.state.focus-non-color', why),
+    dunno('a11y.state.hover-non-color', why),
+  ];
+
+  if (!existsSync(p)) {
+    return spread(!html.length
+      ? 'no built HTML found; run the build, then `sws a11y`'
+      : 'hover and focus states have not been measured. Run `sws a11y` (needs @playwright/test in this project)');
+  }
+
+  let r;
+  try { r = JSON.parse(read(p)); }
+  catch (err) { return spread(`${STATE_RESULTS_PATH} is not valid JSON (${err.message}); re-run \`sws a11y\``); }
+
+  if (r.schema !== STATE_SCHEMA) {
+    return spread(`${STATE_RESULTS_PATH} is schema ${r.schema ?? '?'}, this CLI expects ${STATE_SCHEMA}; re-run \`sws a11y\``);
+  }
+  if (r.status !== 'ok') {
+    return spread(`the state audit did not complete (${r.status}): ${r.detail ?? 'no detail recorded'}`);
+  }
+
+  // Same staleness rule as axe: results describing a build that no longer
+  // exists are not evidence about this one.
+  if (dist && existsSync(dist)) {
+    const now = newestMtime(dist);
+    if (typeof r.distMtime === 'number' && now > r.distMtime + 1000) {
+      return spread(`state results predate the current build (build is ${Math.round((now - r.distMtime) / 1000)}s newer); re-run \`sws a11y\``);
+    }
+  }
+
+  const routes = Array.isArray(r.routes) ? r.routes : [];
+  if (!routes.length) return spread('state results record no routes; re-run `sws a11y`');
+  if (html.length && routes.length < html.length) {
+    return spread(`the state audit covered ${routes.length} of ${html.length} built page(s); re-run \`sws a11y\``);
+  }
+
+  const all = routes.flatMap((x) => (x.findings ?? []).map((f) => ({ ...f, route: x.route })));
+  const pick = (state, verdict) => all.filter((f) => f.state === state && f.verdict === verdict);
+
+  // Per item, and named the way a person can find it in a template: the
+  // element path, its label, and the state classes it already carries.
+  const detail = (list) => list.slice(0, 4).map((f) => {
+    const where = f.label ? `"${f.label.slice(0, 32)}"` : f.target;
+    const inst = f.occurrences > 1 ? ` x${f.occurrences}` : '';
+    const cls = f.classes?.length ? ` [${f.classes.slice(0, 2).join(' ')}]` : '';
+    return `${f.route} ${where}${inst}${cls}`;
+  }).join(' | ') + (list.length > 4 ? ` | +${list.length - 4} more, see ${STATE_RESULTS_PATH}` : '');
+
+  const scale = `${r.totals.controls} distinct control shape(s) across ${routes.length} route(s)`;
+  const out = [];
+
+  const noChange = pick('focus', 'no-change');
+  out.push(noChange.length
+    ? bad('a11y.state.focus-visible',
+        `${noChange.length} control shape(s) change nothing on keyboard focus. ${detail(noChange)}`,
+        'Every focusable control needs a visible focus state. Decanter and the browser both give you one for free; the usual cause is a removed outline. Restore it, or add `focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2`.')
+    : ok('a11y.state.focus-visible', `every control reached by Tab changes visibly on focus (${scale})`));
+
+  const focusColour = pick('focus', 'colour-only');
+  out.push(focusColour.length
+    ? bad('a11y.state.focus-non-color',
+        `${focusColour.length} control shape(s) signal focus with colour alone. ${detail(focusColour)}`,
+        'Add a non-colour cue to the focus state. For text links and buttons the best fix is an underline: `focus-visible:underline`, or `focus-visible:no-underline` where the link is underlined at rest. For icon and image controls use an outline or a border instead.')
+    : ok('a11y.state.focus-non-color', `focus states carry a non-colour cue (${scale})`));
+
+  const hoverColour = pick('hover', 'colour-only');
+  out.push(hoverColour.length
+    ? bad('a11y.state.hover-non-color',
+        `${hoverColour.length} control shape(s) change colour and nothing else on hover. ${detail(hoverColour)}`,
+        'Add a non-colour cue: `hover:underline`, or `hover:no-underline` where the link is underlined at rest. `hocus:underline` covers hover and focus together. For icon and image controls use an outline, a border, or a shape change.')
+    : ok('a11y.state.hover-non-color', `hover states carry a non-colour cue (${scale})`));
+
+  return out;
+}
+
+// --------------------------------------------------------------------------
 
 export function a11y({ root, dist, html }) {
   const out = [];
 
   out.push(axeFinding({ root, dist, html }));
+  out.push(...statesFinding({ root, dist, html }));
 
   // Static structural checks that genuinely can run here.
   if (html.length) {

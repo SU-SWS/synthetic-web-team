@@ -20,6 +20,7 @@ dist
 # treats results older than the build as `unknown` precisely to stop that.
 **/.sws/axe-results.json
 **/.sws/perf-results.json
+**/.sws/state-results.json
 
 # Local score history, for `sws doctor`'s "since your last run". Per-developer,
 # not shared state: the project trend lives in the Site health issue body. See
