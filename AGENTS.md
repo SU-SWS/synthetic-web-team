@@ -114,7 +114,7 @@ email**), and `counts` to tell a fresh install from a no-op re-run. Verify with
 | `standards/scope.md` | **What this package covers.** Static sites, content in the repo, no CMS. Read it before proposing a content backend |
 | `standards/policy/` | Stanford requirements: MinSec, MinWeb, accessibility, privacy, brand, identity, procurement, escalation. Each file dated with `reviewed:` |
 | `standards/patterns/` | How SWS builds: Decanter, components, content, IA, forms, discoverability, conventions |
-| `standards/stack/` | `reference-versions.yml`, a dated snapshot for the canary to diff. Advisory. **Nothing installs from it** |
+| `standards/stack/` | `requirements.yml`, what must be installed on the machine and how to detect it — run `sws preflight`. Plus `reference-versions.yml`, a dated snapshot for the canary to diff. Advisory. **Nothing installs from either** |
 | `standards/recipes/` | Build contracts, with acceptance criteria per recipe |
 | `standards/hosting/` | `capabilities.yml`, what a site needs from a host, plus one profile per host. **SWS runs both Netlify and Vercel**, one per family, so neither is a divergence |
 | `standards/fragments/` | Byte-exact compliance content. The Global Footer lives here |

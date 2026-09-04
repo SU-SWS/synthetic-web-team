@@ -22,6 +22,7 @@ import {
 } from '../src/report.mjs';
 import * as history from '../src/history.mjs';
 import * as gh from '../src/github.mjs';
+import { preflight, summarise } from '../src/preflight.mjs';
 // Sibling directory inside the same published package (@su-sws/sws), so this
 // relative path resolves in the repository and in a tarball alike. One reader
 // of the install record means the CLI and the wizard cannot disagree about what
@@ -68,6 +69,11 @@ const note = (...a) => (flags.format === 'json' ? console.error(...a) : console.
 const USAGE = `
   sws <command>
 
+  preflight         Is this machine equipped to build and deploy? Checks the
+                    tools in standards/stack/requirements.yml and reports what
+                    is missing. It does NOT install anything and does not say
+                    how to: install what it names, your own way, then run it
+                    again to confirm. Exits 0 unless --strict.
   doctor            Friendly local report. Always exits 0.
   check             Full run for CI. Exits non-zero only on a blocking finding.
   a11y              Run axe over every built route, then measure hover and
@@ -610,9 +616,76 @@ async function perf() {
   return 0;
 }
 
+// --- preflight --------------------------------------------------------------
+
+function runPreflight() {
+  const standards = findStandards();
+  if (!standards) {
+    console.error('Could not find a standards/ directory. Pass --standards <dir>.');
+    return 2;
+  }
+
+  const { results, error, packageManager, provider, notRequired } =
+    preflight({ standardsDir: standards, root, manifest: loadManifest() });
+
+  if (error) { console.error(error); return 2; }
+
+  const { blocking, unknown, optional, ready } = summarise(results);
+
+  if (flags.format === 'json') {
+    console.log(JSON.stringify({
+      ready, packageManager, provider,
+      results, blocking: blocking.map((b) => b.id), notRequired,
+    }, null, 2));
+    return ready || !flags.strict ? 0 : 1;
+  }
+
+  const MARK = {
+    pass: 'ok', missing: 'MISSING', too_old: 'TOO OLD',
+    unknown: 'unknown', not_applicable: '-', skip: '-',
+  };
+
+  console.log('\nSystem preflight\n');
+  for (const r of results) {
+    const tag = MARK[r.state] ?? r.state;
+    console.log(`  ${tag.padEnd(9)} ${String(r.name || r.id).padEnd(34)} ${r.detail || ''}`);
+  }
+
+  // The actionable part. Say WHAT to install and WHY it matters, never how.
+  if (blocking.length) {
+    console.log('\nInstall these, however you normally would on this machine:\n');
+    for (const b of blocking) {
+      console.log(`  - ${b.name || b.id}`);
+      if (b.why) console.log(`      why:    ${b.why.trim().split('\n').join(' ')}`);
+      if (b.blocks) console.log(`      blocks: ${b.blocks.trim().split('\n').join(' ')}`);
+    }
+    console.log('\n  Then run `sws preflight` again. Verifying the install is the point:');
+    console.log('  an install that reported success and did not put the binary on PATH is');
+    console.log('  the common failure, and it is invisible until something else breaks.');
+  }
+
+  if (unknown.length) {
+    console.log('\nCould not determine (present but the probe failed). Not a pass:');
+    for (const u of unknown) console.log(`  - ${u.name || u.id}: ${u.detail}`);
+  }
+
+  if (optional.length) {
+    console.log('\nOptional, missing, nothing is blocked:');
+    for (const o of optional) console.log(`  - ${o.name || o.id}`);
+  }
+
+  if (ready) console.log('\nReady. Everything required for this project is present.\n');
+  else console.log('');
+
+  return ready || !flags.strict ? 0 : 1;
+}
+
 // --- dispatch ---------------------------------------------------------------
 
 switch (cmd) {
+  case 'preflight':
+    process.exit(runPreflight());
+    break;
   case 'doctor':
   case 'check':
     process.exit(await run());

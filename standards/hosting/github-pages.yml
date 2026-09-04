@@ -121,21 +121,32 @@ provisioning:
   # point of this block is that the agent installs what it needs rather than
   # sending a new user on a scavenger hunt.
   # ---------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
+  # ASSUME A BARE MACHINE. No gh, possibly no git, no package manager.
+  #
+  # WHAT to install is standards/stack/requirements.yml, and `sws preflight`
+  # checks it. HOW to install is the agent's business -- see the header of that
+  # file for why we do not keep a package-manager matrix here.
+  # ---------------------------------------------------------------------------
   prerequisite:
-    the_decision: >
-      INSTALL git AND THE gh CLI. Not the MCP server, except as a supplement.
-      The reasoning is below, because "use gh" is worth nothing without it and
-      the obvious counter-argument -- that an MCP server needs no install -- is
-      a good one that happens to be wrong for this task.
+    run: |
+      npx sws preflight        # then install what it names, then run it again
+    needs: >
+      git and the gh CLI. Both appear in requirements.yml with their detection
+      commands; gh is conditional on hosting.provider == github-pages.
 
+    the_decision: >
+      INSTALL git AND gh. Not the MCP server, except as a supplement for an
+      agent with no shell. The obvious counter-argument -- that an MCP server
+      needs no install -- is a good one that is wrong for this task, so the
+      reasoning is recorded rather than asserted.
     why_not_mcp: >
       GIT IS MANDATORY EITHER WAY, and that settles it. This task pushes a
       working tree: git init, a commit, a remote, a push. The GitHub REST API
       can create a repo, write individual files, and switch Pages on, but it
       cannot init a repo, make a local commit, add a remote, or push a tree. So
       an MCP server cannot finish the job, and "no install" was never really on
-      offer -- you are installing git regardless. Once git is going in, adding
-      gh is one more binary and it buys a lot.
+      offer. Once git is going in, gh is one more binary and it buys a lot.
     what_gh_buys:
       - >
         OAuth device flow, so there is NO RAW TOKEN for the agent to mishandle.
@@ -155,67 +166,17 @@ provisioning:
       so it can do the GitHub half and not the local half -- someone has to
       supply the commits. Do not install gh AND the MCP server for the same job;
       that is two auth systems for one task. NOT VERIFIED here.
-
-    step_0_git:
-      what: >
-        Check for git FIRST. It is the one dependency with no substitute.
-      run: |
-        git --version
-      install: >
-        macOS: `xcode-select --install` (a GUI prompt, so the person has to
-        click it) or install Xcode Command Line Tools. Windows:
-        `winget install --id Git.Git -e`. Debian/Ubuntu: `sudo apt-get install
-        -y git`. Fedora/RHEL: `sudo dnf install -y git`. Arch: `sudo pacman -S
-        --noconfirm git`.
-      note: >
-        On macOS `git --version` can itself trigger the Command Line Tools
-        prompt. That is a dialog a human clicks, not something an agent can
-        accept, so say what is about to happen rather than letting a box appear
-        from nowhere.
-
-    step_0_gh:
-      what: Then check for gh, and install it if missing.
-      run: |
-        gh --version
-      install_via_package_manager: >
-        Try in this order, whichever exists. macOS: `brew install gh`. Windows:
-        `winget install --id GitHub.cli -e`, else `scoop install gh`, else
-        `choco install gh -y`. Debian/Ubuntu: gh is in recent apt repos as
-        `gh`; older releases need GitHub's apt source added first, which is
-        several steps and a keyring, so prefer the tarball below if apt does not
-        already know it. Fedora/RHEL: `sudo dnf install -y gh`. Arch:
-        `sudo pacman -S --noconfirm github-cli`.
-      install_without_a_package_manager: >
-        DO NOT INSTALL HOMEBREW JUST TO GET gh. On a machine with no package
-        manager, Homebrew is a very large dependency (and on macOS pulls the
-        Command Line Tools) to acquire one binary. Take the official release
-        asset instead: github.com/cli/cli/releases/latest publishes
-        gh_<version>_macOS_arm64.zip and _amd64.zip plus a universal .pkg,
-        gh_<version>_windows_amd64.msi and .zip, and
-        gh_<version>_linux_amd64.tar.gz plus .deb and .rpm. Unpack and put the
-        binary on PATH; no admin rights needed for the zip and tarball forms.
-      verified: >
-        Asset names read from the live releases API on 2026-09-04, latest
-        v2.100.0, and the download URLs were then requested: macOS_arm64.zip,
-        linux_amd64.tar.gz and windows_amd64.msi all return 200 at
-        github.com/cli/cli/releases/download/v<version>/gh_<version>_<asset>.
-        So the no-package-manager path is real rather than aspirational. The
-        package-manager commands themselves are NOT verified across platforms
-        from this repo, and the install itself was not executed here because gh
-        was already present.
-      version_floor: >
-        Anything current is fine. Every command in `steps` below was confirmed
-        working on 2.21, which is from early 2023, so an old gh is not a reason
-        to stop and upgrade.
+    version_floor: >
+      Anything current. Every command in `steps` below was confirmed working on
+      gh 2.21, which is from early 2023, so an old gh is not a reason to stop
+      and upgrade. Latest at the time of writing was 2.100.0.
 
     fallback_no_install_possible: >
       A locked-down machine where nothing can be installed but git already
-      exists. **This project already requires Node** (engines: >=22.12.0), and
-      Node 18+ has a global `fetch`, so the REST calls in `steps` can be made
-      from a few lines of Node with NO new dependency at all. curl works too and
-      is present on macOS, modern Windows, and most Linux.
-      Auth then needs a Personal Access Token, which is the part to be careful
-      with -- see token_handling.
+      exists. This project already requires Node (>=22.12.0), and Node 18+ has
+      a global `fetch`, so the REST calls in `steps` can be made from a few
+      lines of Node with NO new dependency. Auth then needs a Personal Access
+      Token -- see token_handling.
 
     token_handling: >
       ONLY when the OAuth device flow is not possible. A PAT is a credential and

@@ -23,10 +23,10 @@ Early. The plan is complete and reviewed; the implementation is partway through.
 | `astro-ssr` recipe | Written, extends `astro-static`. **Not executed**, and no SWS Astro project runs SSR, so its hosting half is reasoned rather than copied |
 | `next-ssr` recipe | Written, extends `astro-static`. Renamed from `next-netlify` on 2026-09-03. Not yet executed end to end |
 | Hosting profiles | **New.** `standards/hosting/`: a capability contract plus GitHub Pages, Netlify, and Vercel |
-| Shared skills | **7 of 7 done**, including `sws-github`, which provisions a repo and Pages deploy through `gh` |
-| Role skills | **8 of 8 built, 11 of 11 stubs.** 26 skills total, all validated |
+| Shared skills | **8 of 8 done**, including `sws-github` (provisions a repo and Pages deploy through `gh`) and `sws-preflight` (is this machine equipped?) |
+| Role skills | **8 of 8 built, 11 of 11 stubs.** 27 skills total, all validated |
 | Documentation site | **Working.** [`site/`](site/), built by our own recipe, scores 91/100 with zero failures |
-| `sws` CLI | **Working.** `doctor` and `check` run 13 check modules against 68 criteria. `sws a11y` runs axe and an interactive-state audit — hover and focus measured with a real mouse and a real Tab key — and `sws perf` measures a byte budget, all in real Chromium |
+| `sws` CLI | **Working.** `preflight` reports whether the machine has the tools to build at all. `doctor` and `check` run 13 check modules against 68 criteria. `sws a11y` runs axe and an interactive-state audit — hover and focus measured with a real mouse and a real Tab key — and `sws perf` measures a byte budget, all in real Chromium |
 | Report delivery | **Working.** PR comment and a persistent "Site health" issue, both updated in place. Score trend, sparkline, HTML artifact, README badge |
 | Install wizard | **Working, agent-first.** Non-interactive by default off a TTY, `--json` result with machine-readable next steps, `--answers` input, idempotent re-runs that preserve project state |
 | Copy-a-prompt install | **Working.** Three prompts on the site — install, review, update — each carrying an `npx` route and a `git clone` fallback |
@@ -165,7 +165,7 @@ node packages/cli/bin/sws.mjs doctor --standards standards
 | Path | What it does |
 |---|---|
 | [`AGENTS.md`](AGENTS.md) | The behavioral contract. 100 lines, read by every tool |
-| [`skills/`](skills/) | The team: 26 skills, each one `SKILL.md` with two frontmatter keys. 8 built roles, 11 honest stubs, 7 shared |
+| [`skills/`](skills/) | The team: 27 skills, each one `SKILL.md` with two frontmatter keys. 8 built roles, 11 honest stubs, 8 shared |
 | [`standards/policy/`](standards/policy/) | Stanford requirements: MinSec, MinWeb, accessibility, privacy, brand, identity, procurement, escalation. Each file carries a `reviewed:` date |
 | [`standards/patterns/`](standards/patterns/) | How SWS actually builds: Decanter, components, content, IA, forms, discoverability, plus conventions derived from reading 11 production repos |
 | [`standards/stack/`](standards/stack/) | `reference-versions.yml`, a dated baseline. Advisory — nothing installs from it. Plus `performance-budget.yml`, the byte budget `sws perf` enforces |

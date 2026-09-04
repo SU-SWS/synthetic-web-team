@@ -1,0 +1,154 @@
+# What has to be on the machine, and how to tell whether it is
+#
+# reviewed: 2026-09-04
+#
+# Read by `sws preflight` and by the sws-preflight skill.
+#
+# ==============================================================================
+# THIS FILE DELIBERATELY DOES NOT SAY HOW TO INSTALL ANYTHING.
+#
+# It says what is needed, why, what breaks without it, and the command that
+# proves it is there. The install itself is the agent's job, its own way.
+#
+# That is a deliberate choice, not laziness:
+#   - An agent knows what platform it is on and what package manager exists.
+#     A hardcoded matrix of brew/winget/apt/dnf/pacman/tarball lines is a guess
+#     about someone else's machine, and it is wrong on a good fraction of them.
+#   - An install matrix goes stale. Package names move, repos change keyrings,
+#     new managers appear. A detection command does not go stale.
+#   - It matches the house style: express a standard as a thing to verify rather
+#     than a procedure to follow, because the verification ages better.
+#
+# So the loop is: CHECK -> the agent installs what is missing however it likes
+# -> CHECK AGAIN to confirm it actually worked. That last step is the one people
+# skip, and it is the whole point of having this file.
+# ==============================================================================
+
+version: 1
+
+tools:
+  - id: node
+    name: Node.js
+    why: >
+      Runs the build, the sws CLI, and the test harness. Everything else here is
+      downstream of it.
+    detect: node --version
+    version_min: "22.12.0"
+    required: always
+    blocks: Everything. Nothing in this toolchain runs without it.
+    note: >
+      Bootstrap paradox worth naming: `sws preflight` is itself a Node program,
+      so if it ran at all, Node is present. The check still reports the VERSION,
+      which is the part that actually goes wrong -- an old Node fails deep inside
+      a build with an error that does not mention Node.
+      .nvmrc in this repo pins 24 for CI; 22.12 is the floor.
+
+  - id: npm
+    name: npm
+    why: Installs dependencies and runs scripts.
+    detect: npm --version
+    required: always
+    blocks: Dependency install, so the build.
+    note: >
+      yarn is equally fine and is in production use at SWS. NEVER CONVERT A
+      PROJECT from one to the other. If the project has a yarn.lock, yarn is the
+      requirement and npm is not -- preflight reports whichever the project
+      actually uses.
+
+  - id: git
+    name: git
+    why: >
+      Version control, and the only way to get a working tree onto a remote.
+    detect: git --version
+    required: always
+    blocks: >
+      Any deployment at all. THIS IS THE ONE WITH NO SUBSTITUTE: the GitHub API
+      can create a repo and write single files, but it cannot init a repo, make
+      a local commit, add a remote, or push a tree. No API and no MCP server
+      replaces it.
+    note: >
+      On macOS, running `git --version` when the Command Line Tools are absent
+      pops a GUI installer dialog. A person has to click that; an agent cannot.
+      Warn before running it rather than letting a box appear from nowhere.
+
+  - id: gh
+    name: GitHub CLI
+    why: >
+      Authentication, repo creation, and the Pages API, all without handing a
+      raw token around. See standards/hosting/github-pages.yml.
+    detect: gh --version
+    required_when: hosting.provider == github-pages
+    blocks: >
+      The scripted GitHub provisioning path. Not the build, and not the site.
+    note: >
+      Every command in the github-pages provisioning runbook was confirmed on
+      gh 2.21 (early 2023), so an old gh is not a reason to stop and upgrade.
+      Latest at the time of writing was 2.100.0.
+    also_check:
+      what: Authentication state, which is separate from being installed.
+      detect: gh auth status
+      note: >
+        Installed and authenticated are different failures with different fixes,
+        so report them separately. `gh auth login --web` handles the second.
+
+  - id: playwright-browser
+    name: Playwright Chromium
+    why: >
+      axe needs a REAL browser. So does the interactive-state audit, which
+      measures hover and focus with a real mouse and a real Tab key.
+    detect: npx playwright --version
+    required: always
+    blocks: >
+      `sws a11y` and `sws perf`. Both then report `unknown` rather than `pass`,
+      and withhold their weight from the score.
+    note: >
+      TWO SEPARATE THINGS, and this is the most-missed item in the file. The
+      npm packages (@playwright/test, @axe-core/playwright) are project
+      dependencies; the BROWSER BINARY is a separate download via
+      `npx playwright install chromium`. The packages can be present and the
+      browser absent, and the failure then looks like a broken test rather than
+      a missing download.
+      A missing browser must never read as a clean a11y result. An accessibility
+      check that did not run is `unknown`, not a pass -- see
+      standards/policy/accessibility.md.
+
+  - id: netlify-cli
+    name: Netlify CLI
+    why: Local dev against Netlify features, and manual deploys.
+    detect: netlify --version
+    required_when: hosting.provider == netlify
+    optional: true
+    blocks: >
+      Nothing essential. Netlify deploys from its git integration, so the CLI is
+      a convenience rather than a dependency.
+
+  - id: vercel-cli
+    name: Vercel CLI
+    why: Local dev against Vercel features, and manual deploys.
+    detect: vercel --version
+    required_when: hosting.provider == vercel
+    optional: true
+    blocks: >
+      Nothing essential. Vercel deploys from its git integration too.
+
+# ------------------------------------------------------------------ not listed
+not_required:
+  # Named so their absence is not read as an oversight.
+  - what: Docker
+    why: >
+      Only the LOCAL GitHub MCP server needs it, and we do not recommend that
+      path: git is mandatory anyway, so the MCP server cannot complete a
+      deployment on its own. See standards/hosting/github-pages.yml.
+  - what: Homebrew, or any specific package manager
+    why: >
+      Never a requirement. Do not install Homebrew to obtain one binary -- it is
+      a very large dependency for that, and every tool here has a
+      package-manager-free download.
+  - what: A GitHub MCP server
+    why: >
+      Supplement, not a requirement, and only for an agent with no shell. Such
+      an agent cannot run git either. Do not install it alongside gh.
+  - what: Decanter, Astro, Next, Tailwind
+    why: >
+      PROJECT dependencies, not system tools. They arrive via npm install and
+      are checked by `sws check`, not here.

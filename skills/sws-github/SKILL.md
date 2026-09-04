@@ -35,17 +35,16 @@ a confirmed door.
 ## Preflight: assume the machine is bare
 
 **Assume nothing is installed.** No `gh`, possibly no `git`, possibly no package
-manager. Check, then install what is missing — do not send a new user on a
-scavenger hunt.
+manager. Use the `sws-preflight` skill, or just:
 
 ```bash
-git --version    # mandatory, no substitute
-gh --version     # install if missing
-gh auth status   # skip the login if already authed
+npx sws preflight        # then install what it names, then run it again
 ```
 
-Full cross-platform install ladder, including the no-package-manager path:
-`standards/hosting/github-pages.yml`, under `provisioning.prerequisite`.
+It reports what is missing and why it matters, and deliberately does not say how
+to install it — that is yours, because you know the platform. **Re-run it after
+installing.** An installer that exited 0 without putting the binary on `PATH` is
+the common failure, and it hides until something else breaks.
 
 **Install `git` and `gh`. Not the MCP server** — and the reason matters, because
 "an MCP server needs no install" is a fair argument that happens to be wrong
@@ -66,11 +65,6 @@ the local half. Never install both for one job — that is two auth systems.
 **On macOS, `git --version` can itself trigger the Xcode Command Line Tools
 dialog.** A person has to click that; an agent cannot. Say it is about to happen
 rather than letting a box appear from nowhere.
-
-**Do not install Homebrew just to get `gh`.** It is a very large dependency for
-one binary. Every platform has a package-manager-free download from
-`github.com/cli/cli/releases/latest`, and the zip and tarball forms need no
-admin rights.
 
 ### If they have no account
 
