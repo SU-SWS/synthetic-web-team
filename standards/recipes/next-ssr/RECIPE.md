@@ -218,7 +218,7 @@ Two notes on the values:
 
 #### Content-Security-Policy is optional, and off by default
 
-**Confirmed by SWS 2026-09-03: nonce-based CSP is a nice-to-have.** MinWeb
+**Confirmed by SWS 2026-09-03: CSP is a nice-to-have.** MinWeb
 requires no response headers at all, so a site without a CSP is fully compliant.
 
 The reason it is off by default is not effort, it is **who absorbs the
@@ -232,9 +232,6 @@ So:
 
 - **Never build a CSP from a domain allowlist.** It drifts, it ends up allowing
   everything, and every future embed is a support ticket.
-- **If you do add one**, use `'strict-dynamic'` with per-request nonces. On
-  Netlify, `@netlify/plugin-csp-nonce` injects them at the edge. On Vercel there
-  is no equivalent and you write it in `proxy.ts` yourself.
 - **Start with `Content-Security-Policy-Report-Only`.** It cannot break a page by
   construction, and it tells you what a real policy would have blocked.
 - **Record it in `.sws/manifest.yml`.** It is a divergence from this default, and
@@ -375,8 +372,8 @@ npx sws check
 |---|---|
 | `astro-static` instead | **Usually the better choice for a content site.** Less weight, simpler hosting, works on GitHub Pages |
 | Static export (`output: 'export'`) | Forfeits CSP and security headers, `redirects`, `rewrites`, Proxy, ISR, Server Actions, Draft Mode, and default-loader image optimization. Route Handlers become `GET`-only. If you want this, you want `astro-static` |
-| Vercel instead of Netlify, or the reverse | **Not a divergence.** SWS runs both, one per family. Pick per `standards/hosting/`, and prefer whichever the unit already administers. The only real asymmetry: `@netlify/plugin-csp-nonce` has no Vercel equivalent, which costs you nothing unless you opt into CSP |
-| A CSP, nonce-based | Supported and welcome. You are taking on the support cost of a policy that breaks at content-edit time. Name who owns that |
+| Vercel instead of Netlify, or the reverse | **Not a divergence.** SWS runs both, one per family. Pick per `standards/hosting/`, and prefer whichever the unit already administers |
+| A CSP | Supported and welcome. You are taking on the support cost of a policy that breaks at content-edit time. Name who owns that |
 | A CMS, either Storyblok or decoupled Drupal | **Out of scope for now, and not a swap you can take here.** See `standards/scope.md`. Eleven SWS repos do this in production, so the capability exists — just not as anything this recipe can hand you. Raise it in discovery rather than building half of it |
 | Cypress instead of Playwright | Reasonable if the project already has it. Both baselines do |
 | `clsx` + `tailwind-merge` instead of `cnbuilder` | Both are in SWS use, split by project family. One per project |

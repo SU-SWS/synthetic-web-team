@@ -17,6 +17,12 @@ site:
   purpose: "Explain the project and give people the prompt that installs it"
   url: "https://su-sws.github.io/synthetic-web-team"
 
+hosting:
+  provider: github-pages
+  production_url: "https://su-sws.github.io/synthetic-web-team"
+  deployed_via: .github/workflows/static.yml, first live 2026-09-03
+  mfa_confirmed: 2026-09-03
+
 owners:
   business:
     name: "Shea McKinney"

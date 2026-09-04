@@ -890,7 +890,7 @@ export function hygiene({ root, html, manifest }) {
   return out;
 }
 
-export function build({ root, dist }) {
+export function build({ root, dist, manifest }) {
   const out = [];
   out.push(existsSync(dist)
     ? ok('build.succeeds', `build output present at ${relative(root, dist) || dist}`)
@@ -901,6 +901,8 @@ export function build({ root, dist }) {
   if (!cfg) {
     out.push(na('build.static-output', 'no Astro config; not an Astro project'));
     out.push(na('build.base-path', 'no Astro config'));
+    out.push(na('astro.no-hybrid-output', 'no Astro config'));
+    out.push(na('astro.adapter-configured', 'no Astro config'));
     return out;
   }
   const c = read(cfg);
@@ -916,6 +918,36 @@ export function build({ root, dist }) {
   out.push(/\bbase:\s*['"]/.test(c)
     ? ok('build.base-path', '`base` is set for a subpath deploy')
     : na('build.base-path', 'no `base` set; correct unless deploying to a subpath'));
+
+  // 'hybrid' was removed from Astro. Its presence signals a config copied from
+  // an older project, and it fails at build time rather than silently -- but
+  // catching it here is cheap and gives an earlier, clearer message.
+  out.push(/output:\s*['"]hybrid['"]/.test(c)
+    ? bad('astro.no-hybrid-output', "output: 'hybrid' is set",
+        "'hybrid' was removed from Astro. Use 'server' plus per-page `export const prerender = true`, or 'static'.")
+    : ok('astro.no-hybrid-output', "no 'hybrid' output"));
+
+  // A mismatch here is a real and quiet failure: @astrojs/vercel configured on
+  // a project deploying to Netlify builds successfully and serves wrongly.
+  const isServer = /output:\s*['"]server['"]/.test(c);
+  const adapterMatch = c.match(/@astrojs\/(netlify|vercel)/);
+  if (!isServer) {
+    out.push(na('astro.adapter-configured', "output is not 'server'; no host adapter required"));
+  } else if (!adapterMatch) {
+    out.push(bad('astro.adapter-configured', "output: 'server' is set but no @astrojs/netlify or @astrojs/vercel adapter import was found",
+      'Add and configure the host adapter matching the recorded hosting.provider in .sws/manifest.yml.'));
+  } else {
+    const adapterHost = adapterMatch[1];
+    const recordedHost = manifest?.hosting?.provider;
+    if (!recordedHost) {
+      out.push(dunno('astro.adapter-configured', `@astrojs/${adapterHost} adapter found, but .sws/manifest.yml records no hosting.provider to compare it against`));
+    } else if (recordedHost === adapterHost) {
+      out.push(ok('astro.adapter-configured', `@astrojs/${adapterHost} adapter matches hosting.provider: ${recordedHost}`));
+    } else {
+      out.push(bad('astro.adapter-configured', `@astrojs/${adapterHost} adapter configured, but .sws/manifest.yml records hosting.provider: ${recordedHost}`,
+        'A mismatched adapter builds successfully and serves wrongly. Fix the adapter import or the manifest.'));
+    }
+  }
   return out;
 }
 
@@ -971,7 +1003,7 @@ const CONSENT_TOOLING = [
   'quantcast', 'civic-cookie-control', 'cookiehub', 'cookiefirst',
 ];
 
-export function manifest({ root, html }) {
+export function manifest({ root, html, standards }) {
   const p = join(root, '.sws', 'manifest.yml');
   if (!existsSync(p)) {
     return [
@@ -981,6 +1013,7 @@ export function manifest({ root, html }) {
       dunno('minweb.ownership', 'no manifest to read'),
       dunno('manifest.divergences-explained', 'no manifest to read'),
       dunno('privacy.consent-tooling-declared', 'no manifest to read'),
+      dunno('hosting.recorded', 'no manifest to read'),
     ];
   }
   const m = readYaml(p) || {};
@@ -1036,6 +1069,21 @@ export function manifest({ root, html }) {
       'No cookie banner is required at Stanford; the Global Footer Privacy link carries the disclosure. If you are keeping this, record it under privacy.consent_tooling with the reason, and consult the University Privacy Office.'));
   }
 
+  // This is the criterion that makes the hosting axis legible: neither Netlify
+  // nor Vercel is a divergence (SWS runs both), so this only asks that the
+  // choice be WRITTEN DOWN rather than guessed from a lockfile.
+  const hostingProvider = m.hosting?.provider;
+  if (!hostingProvider) {
+    out.push(bad('hosting.recorded', 'no hosting.provider recorded in .sws/manifest.yml',
+      'Record hosting: { provider: github-pages|netlify|vercel, production_url: ... }. See standards/hosting/.'));
+  } else {
+    const profile = standards ? join(standards, 'hosting', `${hostingProvider}.yml`) : null;
+    out.push(profile && existsSync(profile)
+      ? ok('hosting.recorded', `hosting.provider: ${hostingProvider}, matches standards/hosting/${hostingProvider}.yml`)
+      : bad('hosting.recorded', `hosting.provider: ${hostingProvider} has no matching profile under standards/hosting/`,
+          'Check for a typo in hosting.provider, or pass --standards if this run cannot resolve the standards directory.'));
+  }
+
   return out;
 }
 
@@ -1050,18 +1098,55 @@ function nextConfig(root) {
   return f ? { path: f, body: read(f) } : null;
 }
 
+// Astro (and a static build on any host) sends response headers from HOST
+// CONFIG, not application code -- see astro-ssr/RECIPE.md step 3b. Middleware
+// is the wrong place: it does not run for prerendered routes, so headers set
+// there apply to some pages and not others, and the pages that miss out are
+// the prerendered ones, which is most of a content site.
+function hostConfig(root) {
+  const netlifyPath = join(root, 'netlify.toml');
+  if (existsSync(netlifyPath)) return { kind: 'netlify', file: 'netlify.toml', body: read(netlifyPath) };
+  const vercelPath = join(root, 'vercel.json');
+  if (existsSync(vercelPath)) return { kind: 'vercel', file: 'vercel.json', body: read(vercelPath) };
+  return null;
+}
+
+const DEFAULT_HEADER_SET = [
+  ['Strict-Transport-Security', 'HSTS'],
+  ['X-Content-Type-Options', 'nosniff'],
+  ['Referrer-Policy', 'referrer policy'],
+  ['Permissions-Policy', 'permissions policy'],
+  ['X-Frame-Options', 'frame options'],
+];
+
 export function security({ root }) {
   const cfg = nextConfig(root);
-  if (!cfg) {
-    return [
-      na('security.csp-present', 'no Next config; response headers are not applicable to a static build'),
-      // NOTE: headers-set is `na` rather than `fail` here for the same reason.
-      // A static build genuinely cannot send headers; that is a stated cost of
-      // astro-static, not a defect in the project.
-      na('security.headers-set', 'no Next config'),
-    ];
-  }
+  const host = hostConfig(root);
   const out = [];
+
+  // Astro-specific: headers in host config. Meaningful regardless of whether
+  // a Next config is also present, so it runs independently of the block below.
+  out.push(host
+    ? (() => {
+        const missing = DEFAULT_HEADER_SET.filter(([h]) => !new RegExp(h, 'i').test(host.body)).map(([, l]) => l);
+        return missing.length
+          ? bad('astro.headers-in-host-config', `${host.file} is missing: ${missing.join(', ')}`,
+              `Add the default header set (see standards/hosting/capabilities.yml) under ${
+                host.kind === 'netlify' ? '[[headers]] in netlify.toml' : '"headers" in vercel.json'}.`)
+          : ok('astro.headers-in-host-config', `default security header set found in ${host.file}`);
+      })()
+    : na('astro.headers-in-host-config', 'no netlify.toml or vercel.json found'));
+
+  if (!cfg) {
+    out.push(na('security.csp-present', host
+      ? 'no Next config; this project configures response headers in host config instead (see astro.headers-in-host-config)'
+      : 'no Next config; response headers are not applicable to a static build'));
+    // NOTE: headers-set is `na` rather than `fail` here for the same reason.
+    // A static build genuinely cannot send headers; that is a stated cost of
+    // astro-static, not a defect in the project.
+    out.push(na('security.headers-set', host ? 'no Next config; see astro.headers-in-host-config' : 'no Next config'));
+    return out;
+  }
   const b = cfg.body;
 
   // A dynamically built CSP is normal (the homesite composes it from an array),
@@ -1077,9 +1162,6 @@ export function security({ root }) {
     out.push(bad('security.headers-set', 'no headers() function in the Next config',
       'Add headers() returning the default set: HSTS, nosniff, Referrer-Policy, ' +
       'Permissions-Policy, and X-Frame-Options: SAMEORIGIN. See standards/hosting/capabilities.yml.'));
-    // Emit `na` rather than nothing. A criterion with no finding silently
-    // withholds its weight, which reads as a score drop nobody can explain.
-    out.push(na('security.csp-strict-dynamic', 'no CSP configured, which is the default'));
   } else {
     out.push(/Content-Security-Policy/i.test(b)
       ? ok('security.csp-present', 'CSP configured in headers(); record it in .sws/manifest.yml')
@@ -1098,18 +1180,6 @@ export function security({ root }) {
           'Report per header. Every one of these is cheap and none of them can break a page, ' +
           'which is exactly why they are the default and a CSP is not.')
       : ok('security.headers-set', 'the default security header set is configured'));
-
-    if (!/Content-Security-Policy/i.test(b)) {
-      out.push(na('security.csp-strict-dynamic', 'no CSP configured, which is the default'));
-    } else if (/strict-dynamic/.test(b)) {
-      out.push(ok('security.csp-strict-dynamic', "CSP uses 'strict-dynamic'"));
-    } else {
-      out.push(bad('security.csp-strict-dynamic',
-        "CSP does not use 'strict-dynamic'",
-        'A host allowlist drifts and eventually allows everything, and every embed a content ' +
-        'owner adds becomes a ticket they cannot diagnose. Prefer strict-dynamic with nonces, ' +
-        'or drop the CSP: it is optional.'));
-    }
   }
 
   // The Storyblok Visual Editor CSP check lived here until 2026-09-03. REMOVED

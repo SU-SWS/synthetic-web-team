@@ -107,7 +107,7 @@ criteria:
       CHANGED 2026-09-03. This was severity warn, weight 5, described as "the
       main capability this recipe has and astro-static does not". Both were
       wrong. MinWeb requires no response headers, so a site with no CSP is
-      fully compliant, and SWS confirmed nonce CSP is a nice-to-have. Reporting
+      fully compliant, and SWS confirmed CSP is a nice-to-have. Reporting
       a missing CSP as a warning pushed people towards a header that breaks
       pages at content-edit time, which is the opposite of helpful. The
       sensible-default header set in security.headers-set is what this recipe
@@ -135,21 +135,6 @@ criteria:
   # This package is scoped to static content with no CMS (standards/scope.md),
   # so there is no editor route, and a criterion that can only report
   # not_applicable is dead weight in the contract. Returns with the CMS.
-
-  - id: security.csp-strict-dynamic
-    requires: >
-      IF a CSP is configured, it uses 'strict-dynamic' with nonces rather than a
-      host allowlist. Not applicable when there is no CSP, which is the default.
-    check: security
-    severity: info
-    weight: 2
-    policy: minsec
-    applies_when: a CSP is configured
-    note: >
-      A CSP built from a long list of allowed hosts drifts, eventually allows
-      everything, and makes every future embed a support ticket for someone who
-      cannot diagnose it. @netlify/plugin-csp-nonce injects nonces at the edge;
-      on Vercel there is no equivalent and it is hand-rolled in proxy.ts.
 
   - id: security.no-fontawesome-pro
     requires: '@fortawesome/pro-* packages are not dependencies.'

@@ -57,10 +57,8 @@ capabilities:
       means new work here should ship the default set from capabilities.yml
       rather than copy the family. See below for the config.
     csp: >
-      Hand-rolled. There is no @netlify/plugin-csp-nonce equivalent, so a nonce
-      policy means writing it in proxy.ts (Next's renamed middleware) and
-      threading the nonce into the document. Still OFF by default per
-      capabilities.yml, and here the implementation cost is real on top of the
+      Hand-rolled: there is no first-party plugin for it. Still OFF by default
+      per capabilities.yml, and here the implementation cost is real on top of
       support cost.
     preview-urls: Yes, per pull request, and the best-in-class version of it.
     redirects: >

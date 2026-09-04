@@ -12,9 +12,8 @@ prior_art_family: storyblok-next-netlify
 pick_this_when: >
   The unit is already on Netlify, or wants to inherit the ADAPT/OOD family's
   wiring wholesale. This is the better-trodden of the two paid paths for CONTENT
-  sites: six repos including www.stanford.edu sit here, the Vault secrets plugin
-  is a solved problem, and it is the only place in SWS where edge-injected CSP
-  nonces already work.
+  sites: six repos including www.stanford.edu sit here, and the Vault secrets
+  plugin is a solved problem.
 
 do_not_pick_this_when: >
   The unit already administers a Vercel account. Moving them is not worth it —
@@ -42,11 +41,9 @@ capabilities:
     security-headers-default: >
       Yes, two ways. Ship the default set from capabilities.yml.
     csp: >
-      The best CSP story of any host SWS uses: @netlify/plugin-csp-nonce
-      injects per-request nonces at the edge, which is what makes
-      'strict-dynamic' practical rather than theoretical. Still OFF by default
-      per capabilities.yml — the plugin removes the implementation cost, not the
-      support cost of a page an owner cannot un-break.
+      OFF by default per capabilities.yml -- the plugin ecosystem removes some
+      of the implementation cost of adding one, not the support cost of a page
+      an owner cannot un-break.
     preview-urls: Yes, per pull request. The main reason to move off Pages.
     redirects: >
       Yes, netlify.toml [[redirects]] or a _redirects file. Full support
@@ -94,9 +91,8 @@ prior_art:
   - repo: adapt-stanford-homesite
     ref: dev
     for: >
-      THE reference for this host. CSP nonce plugin, Vault variables, and
-      environment detection. Read its Netlify-specific wiring; do NOT read its
-      CSS or copy FontAwesome Pro.
+      THE reference for this host. Vault variables and environment detection.
+      Read its Netlify-specific wiring; do NOT read its CSS or copy FontAwesome Pro.
   - repo: ccc-bulletin
     ref: dev
     for: >

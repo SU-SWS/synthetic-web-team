@@ -72,11 +72,12 @@ criteria:
     severity: warn
     weight: 4
     policy: patterns
-    unimplemented: >
-      The build check parses astro.config.* for `output` and `site` but has no
-      adapter awareness yet. Implementing it needs the manifest `hosting` field
-      to compare against, which landed the same day this recipe did. Reports
-      `unknown` and withholds its weight until then, which is the honest cost.
+    mechanism: >
+      Parses astro.config.* for an `@astrojs/netlify` or `@astrojs/vercel`
+      import and compares it against `.sws/manifest.yml`'s `hosting.provider`.
+      `not_applicable` when `output` is not `'server'`; `unknown` when an
+      adapter is found but the manifest records no `hosting.provider` to
+      compare it against.
     note: >
       A mismatch here is a real and quiet failure: @astrojs/vercel configured on
       a project deploying to Netlify builds successfully and serves wrongly.
@@ -87,9 +88,7 @@ criteria:
     severity: warn
     weight: 2
     policy: patterns
-    unimplemented: >
-      Same parser gap as astro.adapter-configured. Cheap to add once the build
-      check reads `output` for a value other than 'static'.
+    mechanism: The build check reads `output` from astro.config.* directly.
     note: >
       'hybrid' was removed from Astro. Its presence signals a config copied from
       an older project, and it fails at build time rather than silently, so this
@@ -103,11 +102,11 @@ criteria:
     severity: warn
     weight: 5
     policy: minsec
-    unimplemented: >
-      The security check reads next.config.* only and returns not_applicable
-      when there is none, so it does not see Astro projects at all. Extending it
-      to parse netlify.toml and vercel.json is the next piece of work this
-      recipe needs. Reports `unknown` and withholds the weight.
+    mechanism: >
+      Reads netlify.toml or vercel.json (whichever is present) and checks each
+      header in the default set by name. `not_applicable` when neither file
+      exists, since a Next config is then the thing to check instead (see
+      security.headers-set).
     note: >
       MIDDLEWARE IS THE WRONG PLACE and this is the substantive Astro-specific
       finding in this recipe. Astro middleware does not run for prerendered
@@ -115,26 +114,6 @@ criteria:
       pages that miss out are the prerendered ones, which is most of a content
       site. Host config covers both. Canonical values are in
       standards/hosting/capabilities.yml under default_header_set.
-
-  - id: astro.no-prerendered-nonce
-    requires: >
-      If a CSP with per-request nonces is configured, no prerendered route
-      depends on that nonce.
-    check: security
-    severity: info
-    weight: 1
-    policy: minsec
-    applies_when: a nonce-based CSP is configured, which is not the default
-    unimplemented: >
-      Needs cross-referencing CSP config against per-route prerender exports.
-      Not worth building until someone actually opts into a nonce CSP on Astro;
-      declared here so the limitation is recorded rather than discovered.
-    note: >
-      A per-request nonce cannot exist on a page rendered at build time. The
-      combination fails silently: the page renders, the script is blocked. Edge
-      injection (@netlify/plugin-csp-nonce) sidesteps it; Vercel has no
-      equivalent. CSP remains optional and off by default -- see
-      standards/hosting/capabilities.yml.
 
   - id: hosting.recorded
     requires: >
@@ -144,11 +123,9 @@ criteria:
     severity: warn
     weight: 3
     policy: patterns
-    unimplemented: >
-      The `hosting` manifest field was defined on 2026-09-03 with
-      standards/hosting/ and the manifest check does not read it yet. This is
-      the criterion that makes the hosting axis legible to `sws check`, so it is
-      the first of these to implement.
+    mechanism: >
+      Reads `hosting.provider` from .sws/manifest.yml and confirms
+      standards/hosting/<provider>.yml exists.
     note: >
       Neither Netlify nor Vercel is a divergence: SWS runs both, one per family.
       This criterion asks only that the choice be WRITTEN DOWN, so the next

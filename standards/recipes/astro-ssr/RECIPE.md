@@ -165,7 +165,7 @@ Two notes on the values:
 
 #### Content-Security-Policy is optional, and off by default
 
-**Confirmed by SWS 2026-09-03: nonce-based CSP is a nice-to-have.** MinWeb
+**Confirmed by SWS 2026-09-03: CSP is a nice-to-have.** MinWeb
 requires no response headers at all, so a site without a CSP is fully compliant.
 
 It is off by default because of **who absorbs the breakage**. CSP is the one
@@ -176,11 +176,6 @@ diagnose it is the one holding the problem.
 
 - **Never build a CSP from a domain allowlist.** It drifts, ends up allowing
   everything, and makes every future embed a support ticket.
-- **If you add one**, use `'strict-dynamic'` with per-request nonces. Astro can
-  generate a nonce in middleware, but note that **prerendered pages cannot carry
-  a per-request nonce** — this is the genuine Astro-specific wrinkle. On Netlify,
-  `@netlify/plugin-csp-nonce` injects at the edge and sidesteps it. On Vercel
-  there is no equivalent.
 - **Start with `Content-Security-Policy-Report-Only`.** It cannot break a page by
   construction and still tells you what a real policy would have blocked.
 - **Record it in `.sws/manifest.yml`** as a divergence, and name who owns the
@@ -234,7 +229,7 @@ it is up.
 | `next-ssr` instead | Same capability, more weight. Right if you want the React ecosystem or a decoupled Drupal front end; wrong if you only want headers |
 | Netlify or Vercel, either way | **Not a divergence.** SWS runs both. Pick what the unit administers |
 | `output: 'static'` with a host adapter | Legitimate and often overlooked: a fully static build deploys to Netlify or Vercel unchanged and still gets headers, redirects, and previews from host config. **You do not need `output: 'server'` for headers.** Take this if you want the host but not the runtime |
-| A CSP, nonce-based | Supported and welcome. You take on the support cost of a policy that breaks at content-edit time, plus the prerendered-nonce wrinkle above. Name who owns it |
+| A CSP | Supported and welcome. You take on the support cost of a policy that breaks at content-edit time. Name who owns it |
 | A CMS for content | **Out of scope for now, and not a swap you can take here.** See `standards/scope.md`. Content comes from the repo. Eleven SWS repos are CMS-backed in production, so the capability exists at SWS — just not as anything this recipe can hand you |
 
 Record every swap in `.sws/manifest.yml` under `divergences` with a one-line
@@ -253,12 +248,10 @@ All ten from `astro-static` still apply. These are additional:
 4. **Setting headers in middleware instead of host config.** Middleware does not
    run for prerendered routes, so you get headers on some pages and not others —
    and the pages that miss out are the ones most likely to be public.
-5. **Expecting a per-request CSP nonce on a prerendered page.** It cannot work by
-   construction. Use edge injection or drop the CSP.
-6. **Setting the same header in both host config and application code.** On
+5. **Setting the same header in both host config and application code.** On
    Netlify the `netlify.toml` value wins; on Vercel the collision is not merged
    predictably. Pick one place.
-7. **Assuming the adapter is interchangeable mid-project.** Swapping
+6. **Assuming the adapter is interchangeable mid-project.** Swapping
    `@astrojs/netlify` for `@astrojs/vercel` also means moving secrets, redirects,
    headers, and DNS. Decide the host before launch, not after.
 
@@ -269,11 +262,11 @@ Astro, Decanter 8, and Tailwind 4 wiring inherited wholesale from
 
 **The SSR and hosting half of this recipe has not been executed, and no SWS
 Astro project runs SSR.** `sws-astro` is static with no deploy config. The
-adapter configuration, the header mechanisms, and the prerendered-nonce
-limitation are reasoned from the Astro documentation and from how the Next
-families do the equivalent thing on the same two hosts — not copied from a
-running Astro deployment. Treat the step ordering as reasoned rather than
-proven, and executing it is the next task for this recipe.
+adapter configuration and the header mechanisms are reasoned from the Astro
+documentation and from how the Next families do the equivalent thing on the
+same two hosts — not copied from a running Astro deployment. Treat the step
+ordering as reasoned rather than proven, and executing it is the next task for
+this recipe.
 
 Written 2026-09-03, alongside `standards/hosting/`. The header and CSP posture
 follows the SWS answer of the same day: security headers ship with sensible

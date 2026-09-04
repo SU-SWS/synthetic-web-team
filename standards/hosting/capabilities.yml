@@ -23,7 +23,7 @@
 # engineering value sits, and it is advisory in the ordinary way: report, offer
 # a fix, move on.
 #
-# Confirmed by SWS 2026-09-03: nonce-based CSP is a NICE-TO-HAVE.
+# Confirmed by SWS 2026-09-03: CSP is a NICE-TO-HAVE.
 # ==============================================================================
 
 version: 1
@@ -204,10 +204,6 @@ csp_guidance:
       has agreed to own the breakage. This is the whole reason it is off by
       default.
   if_you_do:
-    - >
-      Prefer 'strict-dynamic' with per-request nonces over a host allowlist.
-      @netlify/plugin-csp-nonce does this at the edge on Netlify. On Vercel it
-      is hand-rolled in proxy.ts (Next's renamed middleware).
     - >
       Start with Content-Security-Policy-Report-Only. It cannot break a page by
       construction, and it tells you what a real policy would have blocked.
