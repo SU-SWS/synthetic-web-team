@@ -156,6 +156,129 @@ gotchas:
     Deploying from an individual's personal Vercel account rather than the team
     breaks named-admin-access the day that person leaves.
 
+# ------------------------------------------------------------------ provisioning
+# The agent-run path, for a project that has already decided Vercel per the
+# table above. NOT VERIFIED against a live deploy: no project in this repo runs
+# Vercel yet, the same disclaimer standards/hosting/netlify.yml carries. Treat
+# every step as reasoned from the Vercel CLI's own --help output and
+# documentation and from how the decoupled-drupal family is shaped -- not as
+# proven. Correct this file the first time someone actually runs it. The
+# `sws-vercel` skill drives these in order.
+#
+# THE SAME SHAPE OF LIMIT AS NETLIFY, for the same underlying reason: Vercel's
+# git integration also runs through a GitHub App, and installing that app for
+# an account or org the first time is a browser consent screen with no API
+# substitute -- `vercel git connect` assumes the app grant already exists or
+# walks you to get it. requirements.yml already reflects this: vercel-cli is
+# `optional`, because deploy comes from the git integration, not the CLI.
+provisioning:
+  prerequisite:
+    run: |
+      npx sws preflight        # then install what it names, then run it again
+    needs: >
+      git, mandatory regardless of host. The Vercel CLI (`vercel-cli`, binary
+      `vercel`) is OPTIONAL here, same as netlify-cli -- useful for env vars,
+      verification, and a manual first deploy, but not required to make
+      push-to-main deploy.
+    the_decision: >
+      Use the CLI where it helps (linking, env vars, verification) and the
+      dashboard where the CLI cannot substitute for it (the first GitHub App
+      grant for a team that has never connected a repo before). No MCP-server
+      alternative is worth adding, same reasoning as Netlify: the one step that
+      genuinely needs a browser needs it regardless of transport.
+    version_floor: Anything current. Install latest; do not pin.
+
+  steps:
+    - id: auth
+      what: Authenticate. Opens a browser; there is no headless flow.
+      run: |
+        vercel whoami || vercel login
+      note: >
+        `vercel login` supports email OTP or browser SSO and stores the token
+        in the CLI's own global config, not in the project. `vercel whoami`
+        first makes a re-run a no-op, same reasoning as `gh auth status` and
+        `netlify status`.
+      honest_limit: >
+        Creating a VERCEL ACCOUNT, as opposed to logging into an existing one,
+        needs a browser and cannot be scripted -- the same shape of limit as
+        GitHub account creation in github-pages.yml.
+
+    - id: choose-team
+      what: Decide which team owns the project. Ask; do not assume.
+      run: |
+        vercel teams ls
+      note: >
+        PREFER A TEAM, NOT A PERSONAL ACCOUNT, same reasoning as
+        github-pages.yml's choose-owner and netlify.yml's choose-team: a site
+        whose only deploy access belongs to one person breaks
+        named-admin-access the day that person leaves. If they have no team
+        access, that is an escalation, not something to work around -- see
+        standards/policy/escalation.md.
+
+    - id: link-project
+      what: Link the local working directory to a new or existing Vercel project.
+      run: |
+        vercel link --yes --scope <team-slug>
+      note: >
+        `--yes` accepts Vercel's detected framework defaults rather than
+        prompting for each one, which is what makes this step scriptable where
+        the next one is not. Creates `.vercel/project.json` locally; add it to
+        `.gitignore` -- it is a machine-local pointer, not project config.
+      honest_limit: NOT VERIFIED. Reasoned from `vercel link --help`.
+
+    - id: connect-repo
+      what: >
+        Connect the project to the GitHub repo for continuous deployment. THE
+        STEP THAT CAN NEED A BROWSER, same shape as `netlify.yml`'s
+        connect-repo and GitHub account creation in github-pages.yml -- name it
+        rather than pretending around it.
+      run: |
+        vercel git connect
+      note: >
+        Works without a browser prompt once the team's Vercel-for-GitHub App
+        already covers this repo's org. For a team's FIRST repo, it walks the
+        GitHub App installation, which is an OAuth consent screen with no API
+        substitute. Tell the person this is coming before running it.
+      honest_limit: >
+        NOT VERIFIED end to end. Reasoned from `vercel git connect --help` and
+        Vercel's own Git integration documentation.
+
+    - id: build-config
+      what: Commit `vercel.json` for headers, redirects, and build overrides.
+      source: standards/recipes/astro-ssr/RECIPE.md, step 8b
+      note: >
+        Prefer config that travels with the repo over dashboard settings, for
+        the same reason secrets go in Vault rather than a host UI. Reserve
+        `vercel env add` for values that must not be committed, and prefer
+        `node-vault` -- the host-portable option and the decoupled-drupal
+        family convention -- over hand-set dashboard values. See
+        `no-committed-secrets` above.
+
+    - id: verify
+      what: Confirm the deploy, and check what MinWeb asks for while you are here.
+      run: |
+        vercel project ls
+        vercel inspect <deployment-url>
+      note: >
+        Same caveat as Netlify: there is no single boolean confirmed here
+        against a live API response the way `gh api .../pages` returns
+        `https_enforced`. Vercel's automatic HTTPS is close to unconditional for
+        a Vercel-managed or correctly CNAMEd custom domain, but confirm the
+        certificate is actually live on first real use. Also confirm the
+        production URL is not still a bare `*.vercel.app` preview domain -- see
+        the custom-domain gotcha above.
+
+  what_this_does_not_do:
+    - Approve the stanford.edu subdomain. University Communications, with a lead time.
+    - Request the ODA accessibility review. Pre-launch gate, needs lead time.
+    - Register with Siteimprove. Required for public sites, its own intake.
+    - Attest MFA on the Vercel team dashboard. An administrative login under MinWeb.
+    - Name the business owner and technical administrator in .sws/manifest.yml.
+    - >
+      Wire up node-vault end to end. That is a Vault credential exchange the
+      unit's Vault administrator has to grant, not something this CLI sequence
+      can provision alone.
+
 procurement: >
   An existing SWS vendor relationship, so a project joining an existing team
   account has nothing new to procure. A NEW account, or a new billing

@@ -88,6 +88,12 @@ an account someone already administers. Ask before recommending.
 Full profiles, with the capability each host does and does not cover, are in
 `standards/hosting/`. Read those rather than reasoning from vendor marketing.
 
+**To provision Netlify, use the `sws-netlify` skill.** Unlike `sws-github`, it
+cannot be fully headless: Netlify's git-based continuous deployment needs a
+GitHub App authorization, which is a browser consent screen with no API
+substitute. Say so up front. **To provision Vercel, use the `sws-vercel`
+skill**, which carries the same honest limit for the same reason.
+
 Both give **per-PR preview URLs**, which is the actual reason to move off Pages
 once review matters.
 

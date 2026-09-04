@@ -204,6 +204,13 @@ rather than from a Pages workflow:
   includes the hosting dashboard, which can trigger a deploy and read
   environment variables. Most-missed item in `capabilities.yml`.
 
+**To provision Netlify, use the `sws-netlify` skill.** It drives the account,
+team, and site-creation steps in `standards/hosting/netlify.yml`, and is honest
+about the one step that cannot be scripted: connecting the repo needs a GitHub
+App authorization in a browser, the same shape of limit as GitHub account
+creation in `sws-github`. **For Vercel, use the `sws-vercel` skill** instead;
+it carries the same honest limit at its own `connect-repo` step.
+
 ### 9. Verify
 
 ```bash
