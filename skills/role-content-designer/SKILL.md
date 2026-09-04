@@ -1,6 +1,6 @@
 ---
 name: role-content-designer
-description: Write and structure content for a Stanford site. Use for content models, page tables, copy, headings, link text, alt text, microcopy, error messages, and plain language; when reviewing or editing existing copy; or when setting up a CMS so content authors can work safely.
+description: Write and structure content for a Stanford site. Use for content models, page tables, copy, headings, link text, alt text, microcopy, error messages, and plain language, or when reviewing or editing existing copy. Content is authored in the repo; this package has no CMS path yet.
 ---
 
 # Content design and copywriting
@@ -86,16 +86,26 @@ policy, not optional and not a nice-to-have.
 
 ## Content published after launch is the real accessibility risk
 
-Everything in CI tests the site as built. It says nothing about what an editor
-publishes next week, and on a CMS-backed site most accessibility debt arrives
-that way: an untagged heading, a "click here," an image with no alt, a table used
-for layout.
+Everything in CI tests the site as built. On a CMS-backed site that is a real
+limitation, because most accessibility debt arrives in content published later:
+an untagged heading, a "click here," an image with no alt, a table used for
+layout. The control there is `sa11y` in the Visual Editor overlay.
 
-The control that reaches this is **`sa11y` in the CMS Visual Editor overlay**,
-which gives content authors accessibility feedback while they edit. Every SWS
-Storyblok project does this. If the site has a CMS and no authoring-time
-checker, that is a gap worth raising, and it belongs to this role as much as to
-`role-accessibility-lead`.
+**This package has no CMS** (`standards/scope.md`), so content lives in the repo
+and every edit is a commit that runs `sws a11y` before it is public. The gap
+mostly closes, and the control is stronger in CI than in an overlay.
+
+Two things that does not fix, and both belong to this role:
+
+- **The 30 percent ceiling.** Automated testing catches roughly that share of
+  issues. Moving the check into CI does nothing to it.
+- **Embedded third-party content** — a Qualtrics form, a YouTube player, an
+  iframed map. Published outside the build, invisible to CI, and its
+  accessibility is not yours to control. Raise it as a procurement question with
+  a VPAT rather than absorbing it.
+
+And whoever edits the Markdown still needs a short, specific guide rather than a
+link to WCAG. **Five rules they will remember beats twenty they will not.**
 
 Beyond tooling: give authors a short, specific guide rather than a link to WCAG.
 Five rules they will remember beats twenty they will not.

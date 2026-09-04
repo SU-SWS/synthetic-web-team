@@ -1055,8 +1055,10 @@ export function security({ root }) {
   if (!cfg) {
     return [
       na('security.csp-present', 'no Next config; response headers are not applicable to a static build'),
+      // NOTE: headers-set is `na` rather than `fail` here for the same reason.
+      // A static build genuinely cannot send headers; that is a stated cost of
+      // astro-static, not a defect in the project.
       na('security.headers-set', 'no Next config'),
-      na('security.editor-csp-separate', 'no Next config'),
     ];
   }
   const out = [];
@@ -1065,72 +1067,62 @@ export function security({ root }) {
   // A dynamically built CSP is normal (the homesite composes it from an array),
   // so look for the header name rather than trying to parse a policy.
   const hasHeaders = /async\s+headers\s*\(/.test(b) || /headers\s*:\s*async/.test(b);
+  // CSP IS OPTIONAL AND ABSENCE IS A PASS. Corrected 2026-09-03: this used to
+  // report a missing CSP as a failure, which nudged people towards the one
+  // header that breaks pages at CONTENT-EDIT time rather than at deploy time.
+  // MinWeb requires no response headers at all. The default header set below
+  // is what we actually ask for, because none of it can break a page.
   if (!hasHeaders) {
-    out.push(bad('security.csp-present', 'no headers() function in the Next config',
-      "This recipe's main capability over astro-static is response headers. Add headers() returning a Content-Security-Policy."));
-    out.push(bad('security.headers-set', 'no headers() function in the Next config'));
+    out.push(ok('security.csp-present', 'no CSP, which is compliant: CSP is optional'));
+    out.push(bad('security.headers-set', 'no headers() function in the Next config',
+      'Add headers() returning the default set: HSTS, nosniff, Referrer-Policy, ' +
+      'Permissions-Policy, and X-Frame-Options: SAMEORIGIN. See standards/hosting/capabilities.yml.'));
+    // Emit `na` rather than nothing. A criterion with no finding silently
+    // withholds its weight, which reads as a score drop nobody can explain.
+    out.push(na('security.csp-strict-dynamic', 'no CSP configured, which is the default'));
   } else {
     out.push(/Content-Security-Policy/i.test(b)
-      ? ok('security.csp-present', 'CSP configured in headers()')
-      : bad('security.csp-present', 'headers() exists but sets no Content-Security-Policy'));
+      ? ok('security.csp-present', 'CSP configured in headers(); record it in .sws/manifest.yml')
+      : ok('security.csp-present', 'no CSP, which is compliant: CSP is optional'));
 
     const want = [
       ['Strict-Transport-Security', 'HSTS'],
       ['X-Content-Type-Options', 'nosniff'],
       ['Referrer-Policy', 'referrer policy'],
       ['Permissions-Policy', 'permissions policy'],
+      ['X-Frame-Options', 'frame options'],
     ];
     const missing = want.filter(([h]) => !new RegExp(h, 'i').test(b)).map(([, l]) => l);
     out.push(missing.length
       ? bad('security.headers-set', `missing: ${missing.join(', ')}`,
-          'Report per header. All four are cheap and all four are expected on a Stanford site.')
-      : ok('security.headers-set', 'HSTS, nosniff, referrer policy, and permissions policy all set'));
+          'Report per header. Every one of these is cheap and none of them can break a page, ' +
+          'which is exactly why they are the default and a CSP is not.')
+      : ok('security.headers-set', 'the default security header set is configured'));
 
-    if (/strict-dynamic/.test(b)) {
+    if (!/Content-Security-Policy/i.test(b)) {
+      out.push(na('security.csp-strict-dynamic', 'no CSP configured, which is the default'));
+    } else if (/strict-dynamic/.test(b)) {
       out.push(ok('security.csp-strict-dynamic', "CSP uses 'strict-dynamic'"));
-    } else if (/Content-Security-Policy/i.test(b)) {
+    } else {
       out.push(bad('security.csp-strict-dynamic',
         "CSP does not use 'strict-dynamic'",
-        'A host allowlist drifts and eventually allows everything. Prefer strict-dynamic with nonces, injected at the edge.'));
+        'A host allowlist drifts and eventually allows everything, and every embed a content ' +
+        'owner adds becomes a ticket they cannot diagnose. Prefer strict-dynamic with nonces, ' +
+        'or drop the CSP: it is optional.'));
     }
   }
 
-  // Storyblok Visual Editor needs its own policy: the app must not be iframable,
-  // the editor must be.
-  const usesStoryblok = Object.keys(deps(root)).some((d) => d.startsWith('@storyblok/'));
-  if (!usesStoryblok) {
-    out.push(na('security.editor-csp-separate', 'Storyblok not in use'));
-  } else {
-    // A CSP composed at runtime (the homesite builds it from an array via a
-    // helper) cannot be read reliably by regex: `frame-ancestors` and the
-    // allowed origin end up in different expressions. Reporting `fail` there
-    // would be a false alarm on a CORRECT config, so report `unknown` and say
-    // why. Guessing in either direction is worse than admitting the limit.
-    const dynamic = /frame-ancestors\s*\$\{/.test(b) || /=>\s*\[/.test(b);
-    const allowsStoryblok = /storyblok\.com/i.test(b);
-    const noindexed = /X-Robots-Tag/i.test(b) && /noindex/i.test(b);
-
-    if (dynamic && allowsStoryblok && noindexed) {
-      out.push(dunno('security.editor-csp-separate',
-        'CSP is composed at runtime, so this cannot be verified statically. ' +
-        'storyblok.com and a noindex header are both present, which is consistent with a correct setup. ' +
-        'Confirm against the served headers on a deploy preview.'));
-    } else if (dynamic) {
-      out.push(dunno('security.editor-csp-separate',
-        'CSP is composed at runtime and this check cannot follow it. ' +
-        [!allowsStoryblok && 'no storyblok.com origin found anywhere in the config',
-         !noindexed && 'no noindex X-Robots-Tag found'].filter(Boolean).join('; ') +
-        '. Verify against the served headers.'));
-    } else {
-      const editorPolicy = /frame-ancestors[^;'"`]*storyblok\.com/i.test(b);
-      out.push(editorPolicy && noindexed
-        ? ok('security.editor-csp-separate', 'editor route has its own CSP and is noindexed')
-        : bad('security.editor-csp-separate',
-            [!editorPolicy && 'no frame-ancestors allowing storyblok.com',
-             !noindexed && 'editor route not noindexed'].filter(Boolean).join('; '),
-            "One policy cannot serve both: the app needs frame-ancestors 'none', the editor must be iframable by the CMS."));
-    }
-  }
+  // The Storyblok Visual Editor CSP check lived here until 2026-09-03. REMOVED
+  // with the CMS scope, not because it was wrong: this package is scoped to
+  // static content authored in the repo, so there is no Visual Editor to iframe
+  // and no second policy to verify. See standards/scope.md.
+  //
+  // Deleting it rather than leaving it dormant is deliberate. A check that can
+  // only ever report not_applicable is noise in every report, and its criterion
+  // was dead weight in the acceptance contract. It comes back with the CMS, and
+  // the logic worth keeping is recorded in git history: a runtime-composed CSP
+  // cannot be read by regex, so the honest result there was `unknown` rather
+  // than a guess in either direction.
   return out;
 }
 

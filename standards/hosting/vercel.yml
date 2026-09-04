@@ -1,0 +1,163 @@
+# Host profile: Vercel
+#
+# reviewed: 2026-09-03
+# status: in production across the decoupled-drupal family (5 repos, 1 lineage).
+#
+# NOTE ON THIS FILE'S HISTORY: until 2026-09-03 this project's standards said
+# Vercel "appears once across eleven repos" and called it a swap that costs you
+# the shared tooling. Both statements were wrong. Vercel carries library.stanford.edu,
+# the Cardinal Sites front end, and sup.org. See standards/prior-art/repos.yml,
+# ANSWERED block H1.
+
+id: vercel
+name: Vercel
+pairs_with: [astro-static, astro-ssr, next-ssr]
+prior_art_family: decoupled-drupal
+
+# ----------------------------------------------------------------- the opinion
+pick_this_when: >
+  The unit is already on Vercel, or the project is a decoupled Drupal front end
+  and wants to inherit the Cardinal Sites family's wiring. Five SWS repos sit
+  here including library.stanford.edu, so this is well-trodden ground, not a
+  detour. It is also the most natural home for a Next project: the framework and
+  the platform ship from the same vendor, so Next features tend to work on
+  release day rather than after an adapter catches up.
+
+do_not_pick_this_when: >
+  The unit already administers a Netlify account. Neither host is the house
+  default and moving a team between them buys nothing.
+
+# ------------------------------------------------------------------- capability
+capabilities:
+  required:
+    https-live-cert: Yes, automatic, including custom domains.
+    custom-domain: >
+      Yes. CHECK THIS ONE: press-nextjs currently publishes to
+      stanford-university-press.vercel.app, and a *.vercel.app URL is a preview
+      domain, not an approved Stanford subdomain. Fine pre-launch, not fine at
+      launch.
+    admin-mfa: >
+      Available and REQUIRED BY MINWEB for the dashboard. Not on by default.
+      Enable it and attest to it on the launch checklist.
+    no-committed-secrets: >
+      node-vault, reading from HashiCorp Vault in application code. This is the
+      family convention AND the host-portable one, since it does not depend on a
+      host build plugin. Prefer it over the Vercel environment variable UI, and
+      prefer it generally if the project might change hosts.
+    named-admin-access: >
+      Team membership. Same failure mode as Netlify: a site deployed from a
+      personal account rather than the team.
+    sunsettable: Delete the project, then remove the DNS record.
+  recommended:
+    security-headers-default: >
+      Yes, and THIS IS THE GAP TO CLOSE. No repo in the Vercel family sets any
+      security headers: sulgryphon-nextjs's headers() sets only X-Robots-Tag for
+      non-production, and its vercel.json has redirects and rewrites but no
+      headers key at all. That is PERMITTED — MinWeb requires no headers — but it
+      means new work here should ship the default set from capabilities.yml
+      rather than copy the family. See below for the config.
+    csp: >
+      Hand-rolled. There is no @netlify/plugin-csp-nonce equivalent, so a nonce
+      policy means writing it in proxy.ts (Next's renamed middleware) and
+      threading the nonce into the document. Still OFF by default per
+      capabilities.yml, and here the implementation cost is real on top of the
+      support cost.
+    preview-urls: Yes, per pull request, and the best-in-class version of it.
+    redirects: >
+      Yes, vercel.json. sulgryphon-nextjs is the reference and worth copying
+      wholesale for any site replacing a legacy Drupal or WordPress install.
+    cms-rebuild-webhook: >
+      DEFERRED, not missing. Deploy hooks work; this package has no CMS to fire
+      them. See standards/scope.md.
+    server-runtime: >
+      Yes, and the strongest of the three. ISR, route handlers, image
+      optimization, and Next features generally land here first.
+
+# ---------------------------------------------------------------------- how to
+adapters:
+  astro: "@astrojs/vercel"
+  next: none needed. First-party.
+  note: Install latest. Do not pin.
+
+headers:
+  mechanism: >
+    Prefer headers() in next.config.ts (or the Astro adapter's config) so the
+    policy travels with the app. vercel.json's headers array is the alternative
+    and is right for a static build with no framework config.
+  vercel_json_mechanism: |
+    // vercel.json — for astro-static, or when you want it in host config.
+    {
+      "headers": [
+        {
+          "source": "/(.*)",
+          "headers": [
+            {"key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains; preload"},
+            {"key": "X-Content-Type-Options", "value": "nosniff"},
+            {"key": "Referrer-Policy", "value": "origin-when-cross-origin"},
+            {"key": "Permissions-Policy", "value": "geolocation=(), camera=(), microphone=(), midi=(), payment=(), usb=()"},
+            {"key": "X-Frame-Options", "value": "SAMEORIGIN"}
+          ]
+        }
+      ]
+    }
+  precedence_gotcha: >
+    vercel.json headers and next.config.ts headers() BOTH apply and are not
+    merged predictably when they collide. Pick one place.
+
+deploy:
+  trigger: >
+    Push to main deploys, via the git integration. GitHub Actions is then for
+    checks only.
+  config_file: vercel.json
+  build_note: >
+    sulgryphon-nextjs sets buildCommand "yarn build --webpack" and installCommand
+    "yarn workspaces focus --production" in vercel.json. The --webpack flag is a
+    point-in-time decision, NOT guidance: Turbopack is the forward default, and
+    press-nextjs has already dropped the flag.
+
+prior_art:
+  - repo: sulgryphon-nextjs
+    ref: 1.x
+    public: true
+    for: >
+      THE reference for this host, and readable without access since it is
+      public and MIT licensed. Its vercel.json is the best legacy-redirect
+      example in the set: nine rules catching /node/*, /taxonomy/*, /wp-content/*,
+      *.php, *.htm* and *.sh, plus three rewrites to discover.stanford.edu.
+      Also carries proxy.ts, a honeypot bot filter on /all — note that this is
+      NOT a CSP implementation, in case the filename suggests otherwise.
+  - repo: press-nextjs
+    ref: 1.x
+    public: true
+    for: >
+      The NEWEST member of the family, so cite it over its siblings for current
+      practice. First in the set to drop --webpack. sup.org is also the live
+      MinWeb example of a Stanford-branded non-stanford.edu domain.
+  - repo: cardinalsites-nextjs
+    ref: 1.x
+    for: >
+      Decoupled Drupal via graphql-codegen, the SAML reference via passport-saml,
+      and node-vault secret retrieval.
+
+prior_art_note: >
+  All five are Decanter 7 and Tailwind 3. Read them for hosting, redirects, data
+  fetching, and secrets. NEVER for CSS.
+
+gotchas:
+  - >
+    Do not copy the family's header posture. It has none. Copying it is how a
+    "follow prior art" instinct produces a site with weaker defaults than the
+    recipe intends.
+  - >
+    A *.vercel.app production URL is not an approved Stanford subdomain. The
+    subdomain name is University Communications' decision, has a lead time, and
+    is not something this tool or a developer can approve.
+  - >
+    Deploying from an individual's personal Vercel account rather than the team
+    breaks named-admin-access the day that person leaves.
+
+procurement: >
+  An existing SWS vendor relationship, so a project joining an existing team
+  account has nothing new to procure. A NEW account, or a new billing
+  arrangement, is a procurement question. State the obligation, name the
+  office, stop. See standards/policy/procurement.md.

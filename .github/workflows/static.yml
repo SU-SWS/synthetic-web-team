@@ -31,7 +31,7 @@ on:
     paths:
       - 'site/**'
       - 'standards/fragments/**'   # the footer is generated from the contract
-      - '.github/workflows/pages.yml'
+      - '.github/workflows/static.yml'
   pull_request:
     paths:
       - 'site/**'

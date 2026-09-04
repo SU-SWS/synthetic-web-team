@@ -179,6 +179,25 @@ owners:
     name: ${q(answers.techAdminName)}
     email: ${q(answers.techAdminEmail)}
 
+# WHERE THIS SITE IS SERVED. SWS runs BOTH Netlify and Vercel, one per family,
+# so neither is a divergence -- pick whichever the unit already administers.
+# Profiles, with what each host does and does not cover:
+# standards/hosting/. Leave provider null until the choice is made.
+#
+# Recording this matters more than it looks. Until 2026-09-03 this project
+# believed Netlify was the only SWS host, because hosting was inferred from
+# package.json and package.json does not record a deploy target.
+hosting:
+  provider: null          # github-pages | netlify | vercel
+  production_url: null    # the approved Stanford subdomain, NOT a *.vercel.app
+                          # or *.netlify.app preview domain
+  dashboard_mfa: null     # set to the date MFA was confirmed on the host account.
+                          # MinWeb's "MFA on all administrative logins" includes
+                          # the hosting dashboard, which is the most-missed item.
+  csp: false              # OPTIONAL and off by default. A CSP breaks pages at
+                          # content-edit time, so if you enable it, record it in
+                          # divergences and name who owns the breakage.
+
 # Required for public-facing Stanford sites. Google Analytics is NOT required.
 siteimprove:
   registered: null   # set to the date once the intake form is submitted
@@ -197,6 +216,14 @@ skills_installed: ${skills}
 # install latest and pin nothing, so this is provenance rather than a gate.
 resolved:
   node: ${q(process.versions.node)}
+
+# Where content comes from. This package is scoped to static content authored in
+# the repo: no CMS, not Storyblok, not decoupled Drupal. See standards/scope.md.
+# A CMS is not a divergence you can record here -- it is out of scope, which is
+# a different thing. If a project needs one, raise it rather than recording it.
+content:
+  source: repo
+  cms: none
 
 # What was reused from existing SWS work, so the next person can trace it.
 prior_art: []

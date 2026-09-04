@@ -1,0 +1,345 @@
+# Host profile: GitHub Pages
+#
+# reviewed: 2026-09-03
+# status: in production for this project's own site. No SWS unit site uses it yet.
+
+id: github-pages
+name: GitHub Pages
+pairs_with: [astro-static]
+incompatible_with: [astro-ssr, next-ssr]
+
+# ----------------------------------------------------------------- the opinion
+pick_this_when: >
+  The site is static, the unit has no hosting account and no budget line, and
+  nobody needs a preview URL. It is free, it is already attached to the repo the
+  code lives in, and there is no vendor relationship to procure. For a
+  department, lab, or course site that is a dozen pages of content, this is
+  genuinely the right answer and the cheapest thing to keep compliant.
+
+do_not_pick_this_when: >
+  You need response headers, per-PR previews, redirects, or any server runtime.
+  And do NOT statically export a Next site to fit here: that forfeits the entire
+  reason to use Next. Use astro-static instead.
+
+# ------------------------------------------------------------------- capability
+capabilities:
+  required:
+    https-live-cert: >
+      Yes, automatic, including on a custom domain. Enforce HTTPS in
+      Settings -> Pages.
+    custom-domain: >
+      Yes, via a CNAME file in the build output plus a DNS record. See the
+      dotfile gotcha below, which bites exactly here.
+    admin-mfa: >
+      Inherited from GitHub org SSO, so usually already satisfied. Worth
+      confirming rather than assuming.
+    no-committed-secrets: >
+      GitHub Actions secrets. NOTE: a static build has no runtime, so any value
+      reaching the browser is public whatever you call it. Do not put a secret
+      in a static build and expect it to stay secret.
+    named-admin-access: >
+      Repo permissions. Strong here: access is the same access the code uses,
+      and it survives someone leaving if the org owns the repo.
+    sunsettable: >
+      Yes. Disable Pages, remove the DNS record. Remember the DNS half.
+  recommended:
+    security-headers-default: >
+      NO. This is the real limitation. Pages serves files, not headers, so the
+      default header set in capabilities.yml cannot be sent. A <meta
+      http-equiv> CSP partially works, but HSTS, X-Frame-Options,
+      Referrer-Policy and Permissions-Policy do not exist as meta equivalents,
+      and frame-ancestors is ignored in meta form. Accept this or change host;
+      do not fake it.
+    csp: Partial at best, via meta. Not worth doing here.
+    preview-urls: >
+      NO, structurally. Pages serves one site per repo. A pull request gets
+      checks but no URL. Say so up front rather than letting someone expect it.
+    redirects: >
+      Almost none. No server, no _redirects equivalent. A 404.html and
+      client-side redirect shims are the whole toolkit. If the site replaces a
+      legacy site with inbound links, this is a strong reason to pick another
+      host.
+    cms-rebuild-webhook: >
+      DEFERRED, not missing. repository_dispatch and workflow_dispatch both
+      work, but this package has no CMS to call them. See standards/scope.md.
+      Worth knowing that GitHub web UI editing already covers the common case:
+      an editor commits Markdown to main and the site rebuilds.
+    server-runtime: NO. By definition.
+
+# ---------------------------------------------------------------------- how to
+deploy:
+  mechanism: GitHub Actions, first-party actions only.
+  trigger: >
+    Push to main deploys. Trigger on push, pull_request, and workflow_dispatch,
+    then gate only the deploy job. Do NOT add branch protection or required
+    checks: each quietly converts push-to-main into a pull-request requirement,
+    and campus editors working through the GitHub web UI cannot open one.
+  actions:
+    checkout: v7
+    setup-node: v7
+    configure-pages: v6
+    upload-pages-artifact: v5
+    deploy-pages: v4
+  note: >
+    Artifact actions v3 are no longer supported for Pages, and
+    upload-pages-artifact v4+ requires deploy-pages v4 or newer. Note that is
+    NOT the same as "deploy major >= artifact major": these values are what
+    .github/workflows/static.yml runs against a live Pages deploy, and they are
+    v5 + v4. Verified 2026-09-03. Check the release pages at generation time.
+  permissions: >
+    contents: read, pages: write, id-token: write, plus issues: write and
+    pull-requests: write if the advisory report should be visible. Omitting the
+    last two produces a report nobody sees, which is worse than no report.
+  reference: standards/recipes/astro-static/RECIPE.md, step 8
+
+gotchas:
+  - >
+    upload-pages-artifact EXCLUDES DOTFILES. This is the one that costs an
+    afternoon: a CNAME file survives (no dot) but .well-known/ does not. If the
+    build output needs a dotfile, verify it survives or build the tar yourself.
+  - >
+    Subpath deploys need `base` set in the framework config, or internal links
+    work locally and 404 in production.
+  - >
+    Settings -> Pages -> Source must be set to "GitHub Actions". It lives
+    outside the workflow file and is easy to forget when a deploy mysteriously
+    serves nothing.
+  - >
+    Do not write files into the build output between the build and `sws check`.
+    Both a11y and perf measurements record the build's newest mtime and report
+    `unknown` if the build is newer.
+
+# ------------------------------------------------------------------ provisioning
+# The agent-run path. `gh` does nearly all of this, so almost nobody needs to be
+# sent to a web UI. The `sws-github` skill drives these in order.
+#
+# VERIFIED 2026-09-03 against SU-SWS/synthetic-web-team, which is a live Pages
+# deploy, unless a step says otherwise.
+provisioning:
+  # ---------------------------------------------------------------------------
+  # ASSUME A BARE MACHINE. No gh, possibly no git, no package manager. The whole
+  # point of this block is that the agent installs what it needs rather than
+  # sending a new user on a scavenger hunt.
+  # ---------------------------------------------------------------------------
+  prerequisite:
+    the_decision: >
+      INSTALL git AND THE gh CLI. Not the MCP server, except as a supplement.
+      The reasoning is below, because "use gh" is worth nothing without it and
+      the obvious counter-argument -- that an MCP server needs no install -- is
+      a good one that happens to be wrong for this task.
+
+    why_not_mcp: >
+      GIT IS MANDATORY EITHER WAY, and that settles it. This task pushes a
+      working tree: git init, a commit, a remote, a push. The GitHub REST API
+      can create a repo, write individual files, and switch Pages on, but it
+      cannot init a repo, make a local commit, add a remote, or push a tree. So
+      an MCP server cannot finish the job, and "no install" was never really on
+      offer -- you are installing git regardless. Once git is going in, adding
+      gh is one more binary and it buys a lot.
+    what_gh_buys:
+      - >
+        OAuth device flow, so there is NO RAW TOKEN for the agent to mishandle.
+        gh stores it in the OS keychain. Committed credentials are the only
+        blocking finding in this system, so an auth path that never puts a
+        secret in a shell command or a file is worth real money.
+      - >
+        It configures the git remote AND the git credential helper in the same
+        step, so the push just works. With a PAT you wire that up yourself.
+      - "`gh api` gives the full REST surface, which is how Pages gets enabled."
+      - "`gh run watch` follows the deploy, so verification is one command."
+      - One auth system instead of two.
+    when_mcp_is_right: >
+      An agent with NO SHELL. Add the hosted server, which needs no binary:
+      `claude mcp add --transport http github https://api.githubcopilot.com/mcp/`
+      then authorise in the browser. Be aware such an agent also cannot run git,
+      so it can do the GitHub half and not the local half -- someone has to
+      supply the commits. Do not install gh AND the MCP server for the same job;
+      that is two auth systems for one task. NOT VERIFIED here.
+
+    step_0_git:
+      what: >
+        Check for git FIRST. It is the one dependency with no substitute.
+      run: |
+        git --version
+      install: >
+        macOS: `xcode-select --install` (a GUI prompt, so the person has to
+        click it) or install Xcode Command Line Tools. Windows:
+        `winget install --id Git.Git -e`. Debian/Ubuntu: `sudo apt-get install
+        -y git`. Fedora/RHEL: `sudo dnf install -y git`. Arch: `sudo pacman -S
+        --noconfirm git`.
+      note: >
+        On macOS `git --version` can itself trigger the Command Line Tools
+        prompt. That is a dialog a human clicks, not something an agent can
+        accept, so say what is about to happen rather than letting a box appear
+        from nowhere.
+
+    step_0_gh:
+      what: Then check for gh, and install it if missing.
+      run: |
+        gh --version
+      install_via_package_manager: >
+        Try in this order, whichever exists. macOS: `brew install gh`. Windows:
+        `winget install --id GitHub.cli -e`, else `scoop install gh`, else
+        `choco install gh -y`. Debian/Ubuntu: gh is in recent apt repos as
+        `gh`; older releases need GitHub's apt source added first, which is
+        several steps and a keyring, so prefer the tarball below if apt does not
+        already know it. Fedora/RHEL: `sudo dnf install -y gh`. Arch:
+        `sudo pacman -S --noconfirm github-cli`.
+      install_without_a_package_manager: >
+        DO NOT INSTALL HOMEBREW JUST TO GET gh. On a machine with no package
+        manager, Homebrew is a very large dependency (and on macOS pulls the
+        Command Line Tools) to acquire one binary. Take the official release
+        asset instead: github.com/cli/cli/releases/latest publishes
+        gh_<version>_macOS_arm64.zip and _amd64.zip plus a universal .pkg,
+        gh_<version>_windows_amd64.msi and .zip, and
+        gh_<version>_linux_amd64.tar.gz plus .deb and .rpm. Unpack and put the
+        binary on PATH; no admin rights needed for the zip and tarball forms.
+      verified: >
+        Asset names read from the live releases API on 2026-09-04, latest
+        v2.100.0, and the download URLs were then requested: macOS_arm64.zip,
+        linux_amd64.tar.gz and windows_amd64.msi all return 200 at
+        github.com/cli/cli/releases/download/v<version>/gh_<version>_<asset>.
+        So the no-package-manager path is real rather than aspirational. The
+        package-manager commands themselves are NOT verified across platforms
+        from this repo, and the install itself was not executed here because gh
+        was already present.
+      version_floor: >
+        Anything current is fine. Every command in `steps` below was confirmed
+        working on 2.21, which is from early 2023, so an old gh is not a reason
+        to stop and upgrade.
+
+    fallback_no_install_possible: >
+      A locked-down machine where nothing can be installed but git already
+      exists. **This project already requires Node** (engines: >=22.12.0), and
+      Node 18+ has a global `fetch`, so the REST calls in `steps` can be made
+      from a few lines of Node with NO new dependency at all. curl works too and
+      is present on macOS, modern Windows, and most Linux.
+      Auth then needs a Personal Access Token, which is the part to be careful
+      with -- see token_handling.
+
+    token_handling: >
+      ONLY when the OAuth device flow is not possible. A PAT is a credential and
+      this project's one blocking rule is about credentials, so handle it like
+      one:
+        - Pipe it in on STDIN: `gh auth login --with-token < token.txt`, then
+          delete the file. Never pass it as a command argument and never put it
+          in an env var inline, because both land in shell history and the
+          process list.
+        - Scopes: gh documents `repo` and `read:org` as the minimum. FOR THIS
+          TASK YOU ALSO NEED `workflow`, because pushing a .github/workflows
+          file with a token that lacks it fails with "refusing to allow a
+          Personal Access Token to create or update workflow". That error names
+          the token, not the scope, and it is a classic hour lost. `gh auth
+          refresh -s workflow` adds it to an existing gh session.
+        - Never commit it. `npx sws check` reads minweb.no-secrets and that is
+          the only finding in this system that blocks.
+
+  steps:
+    - id: auth
+      what: Authenticate, without sending anyone to a web form to sign up.
+      run: |
+        gh auth status || gh auth login --web --git-protocol ssh
+      note: >
+        `--web` prints a one-time code and opens the device flow, so the person
+        confirms in a browser they are already signed into and comes straight
+        back. `gh auth status` first means a re-run is a no-op.
+      honest_limit: >
+        CREATING a GitHub account cannot be done from the CLI or the API. There
+        is no signup endpoint, by design. If they have no account at all, that
+        one step is github.com/signup in a browser, and then `gh auth login`
+        takes over. Do not pretend otherwise, and do not ask for their password.
+
+    - id: choose-owner
+      what: Decide which org owns the repo. Ask; do not assume.
+      run: |
+        gh api user/orgs --jq '.[].login'
+      note: >
+        PREFER AN ORG, NOT A PERSONAL ACCOUNT. A site whose only deploy access
+        belongs to one person breaks the named-admin-access requirement above the
+        day that person graduates or leaves, and it is the most common quiet
+        failure in this whole file. If they have no org access, that is an
+        escalation, not something to work around -- see escalation.md.
+
+    - id: prep-workspace
+      what: git, on main, with a first commit. Idempotent.
+      run: |
+        git rev-parse --git-dir >/dev/null 2>&1 || git init
+        git symbolic-ref HEAD refs/heads/main
+        git add -A && git commit -m "Initial commit" || true
+      note: >
+        `git symbolic-ref` sets the branch without needing a commit to exist
+        first, so it works on an empty repo and is safe to re-run. Never rename
+        a default branch that already has history and a remote.
+      verified: >
+        Executed 2026-09-03 in a scratch directory. First run produced branch
+        `main` with one commit; a second run was a clean no-op, still one commit.
+        Tested outside the repo deliberately -- never prove a git sequence works
+        by running it against tracked source.
+      before_you_commit: >
+        Run `npx sws check` and look at minweb.no-secrets FIRST. Committed
+        credentials are the only blocking finding in this system, and the reason
+        is that pushing is the irreversible step. Rotate before you push, not
+        after.
+
+    - id: create-and-push
+      what: Create the remote and push in one call.
+      run: |
+        gh repo create <owner>/<name> --public --source=. --remote=origin --push
+      note: >
+        `--public` for a public site's source is normal and is what the SWS
+        repos do. Use `--private` if the unit asks; Pages still works on private
+        repos for org plans, and the site is public either way.
+
+    - id: enable-pages
+      what: >
+        Set Settings -> Pages -> Source to GitHub Actions, from the API. THIS IS
+        THE STEP EVERYONE FORGETS, including this project on its own first run.
+      run: |
+        gh api -X POST repos/<owner>/<name>/pages -f build_type=workflow           || gh api -X PUT repos/<owner>/<name>/pages -f build_type=workflow
+      verified: >
+        The `build_type: workflow` field is confirmed real: reading
+        repos/SU-SWS/synthetic-web-team/pages returns it. POST creates and PUT
+        updates, so a 409 on POST means Pages is already on and the PUT handles
+        it. The POST itself is not exercised in this repo -- confirm on first run.
+      why_it_matters: >
+        Until this is set, the github-pages environment keeps its default
+        deployment-branch protection and the deploy job fails with "Branch main
+        is not allowed to deploy to github-pages due to environment protection
+        rules." That error names protection rules, so people go and fight the
+        environment settings instead of switching the source.
+
+    - id: workflow
+      what: Add the Pages workflow.
+      source: standards/recipes/astro-static/RECIPE.md, step 8
+      note: >
+        Do not hand-write it. The recipe has the shape, the permissions block,
+        and the concurrency group. Two things to carry over deliberately: it
+        triggers on push, pull_request and workflow_dispatch but GATES ONLY THE
+        DEPLOY JOB, and it sets no branch protection.
+
+    - id: verify
+      what: Confirm the deploy, and check two MinWeb items while you are here.
+      run: |
+        gh run watch
+        gh api repos/<owner>/<name>/pages --jq '{url: .html_url, https: .https_enforced, cname: .cname}'
+      note: >
+        `https_enforced: true` is the MinWeb HTTPS requirement, verifiable rather
+        than attested. `cname: null` means no custom domain yet, so the site is
+        still on a github.io URL -- fine pre-launch, not fine at launch. The
+        subdomain NAME is University Communications' decision.
+
+  what_this_does_not_do:
+    # Say these out loud at the end. Provisioning is not launching.
+    - Approve the stanford.edu subdomain. University Communications, with a lead time.
+    - Request the ODA accessibility review. Pre-launch gate, needs lead time.
+    - Register with Siteimprove. Required for public sites, its own intake.
+    - >
+      Attest MFA on the GitHub account and on any org owner account. That is an
+      administrative login under MinWeb.
+    - Name the business owner and technical administrator in .sws/manifest.yml.
+
+procurement: >
+  Nothing to procure. Already covered by the university's GitHub relationship,
+  which is the quiet reason this is the lowest-friction option. Getting a person
+  ADDED to a Stanford GitHub org is an access request, not a purchase, and it
+  needs an org owner -- see standards/policy/escalation.md.

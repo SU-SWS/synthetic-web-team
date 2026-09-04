@@ -78,6 +78,18 @@ Five for five with Storyblok, six for six without. A perfect correlation with th
 
 Note `ccc-bulletin` is on sa11y 5.x while the others are on 4.x, so check for a migration guide.
 
+**SCOPE NOTE, added 2026-09-03.** The analysis above stands and the correction it
+records was right. But **this package now has no CMS** — see
+`standards/scope.md` — so the authoring-time row has nothing to attach to and
+`sa11y` is deferred with the CMS.
+
+Worth being precise about what that does to the gap, because it is the strongest
+argument for the narrow scope: with content in the repo there is no "what an
+editor publishes next week" that bypasses the build. Every content change is a
+commit, and it runs the build-time gate. The control did not disappear; it moved
+into CI, where it is harder to skip. The 30 percent ceiling is unchanged, and
+embedded third-party content is still published outside the build.
+
 ## Testing: Playwright forward, Cypress present
 
 Cypress is configured in `adapt-stanford-homesite`, `adapt-directory`, and `ccc-bulletin`, with e2e and component testing. Playwright appears in none.
@@ -100,9 +112,34 @@ These held up, and unlike the sa11y case the purpose is unambiguous from usage.
 
 `netlify-plugin-vault-variables` across the ADAPT family, `node-vault` across the decoupled Drupal family. SWS does not keep production secrets in `.env` files. This means MinWeb's "no API keys in Git" requirement is already handled institutionally, and our secrets check is a backstop rather than the primary control.
 
-### Netlify is the platform
+### Two platforms, split by family
 
-`@netlify/functions`, `@netlify/blobs`, `@netlify/edge-functions`, `netlify-cli`, `@netlify/plugin-nextjs`, `@netlify/plugin-csp-nonce`. Vercel appears once, as `@vercel/speed-insights`. The hosting path is GitHub Pages then **Netlify**; Vercel is a swap that costs you the shared tooling.
+**Corrected 2026-09-03.** This section previously read "Netlify is the platform"
+and called Vercel a swap that costs you the shared tooling. That was wrong, and
+wrong in a way worth keeping visible.
+
+There are **two hosts in production, one per lineage**:
+
+| Family | Host | Secrets |
+|---|---|---|
+| `storyblok-next-netlify` (ADAPT/OOD, 6 repos) | **Netlify** | `netlify-plugin-vault-variables` |
+| `decoupled-drupal` (Cardinal Sites, 5 repos) | **Vercel** | `node-vault` |
+
+Count lineages, not repos: that is **two decisions**, not eleven, and neither is
+a majority over the other.
+
+**How the error happened**, because the mechanism will recur. Hosting was
+inferred from `package.json`, and `package.json` does not record where a repo
+deploys. The Vercel family barely appears in dependency data *because* it uses
+`node-vault` rather than a host build plugin — the more portable choice, and
+therefore the invisible one. The single real signal, a stray
+`@vercel/speed-insights` in `csp-nextjs`, got discounted as copy-fork noise.
+Absence of vendor dependencies is not absence of the vendor.
+
+So: **neither host is the default in the abstract.** Recipes carry a hosting
+axis instead, in `standards/hosting/`, and the right host is usually the one the
+unit is already on. GitHub Pages remains the cheapest path for a purely static
+site.
 
 ### Decanter 8 arrives from the git branch
 
@@ -115,9 +152,17 @@ Both v8 consumers install from git, predating the npm publish:
 
 Recipes prefer npm since it is versioned and lockfile-friendly, and the `decanter.installed` check must accept both forms without flagging the git one.
 
-### Two CMS paths, both current
+### Two CMS paths, both current at SWS, both out of scope here
+
+**Deferred 2026-09-03.** Recorded because the record is accurate and the scope is
+expected to widen, not because you should wire one up today. See
+`standards/scope.md`.
 
 **Storyblok** via `@storyblok/react`, with versions spread from 3.x in the older OOD sites to 6.x in `ccc-bulletin` and `adapt-online-giving`. Cite `ccc-bulletin` for current practice. **Decoupled Drupal** via `graphql-request` plus `graphql-codegen`, or `next-drupal` in `sulgryphon-nextjs`.
+
+Both are real, in production, and not wrong. This package simply has no tested
+recipe for either, and a CMS request is **out of scope rather than a divergence**
+— see the `sws-diverge` skill for how to handle it.
 
 ### Search: Algolia default, Coveo by context
 

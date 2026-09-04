@@ -1,0 +1,129 @@
+# Host profile: Netlify
+#
+# reviewed: 2026-09-03
+# status: in production across the storyblok-next-netlify family (6 repos, 1 lineage).
+
+id: netlify
+name: Netlify
+pairs_with: [astro-static, astro-ssr, next-ssr]
+prior_art_family: storyblok-next-netlify
+
+# ----------------------------------------------------------------- the opinion
+pick_this_when: >
+  The unit is already on Netlify, or wants to inherit the ADAPT/OOD family's
+  wiring wholesale. This is the better-trodden of the two paid paths for CONTENT
+  sites: six repos including www.stanford.edu sit here, the Vault secrets plugin
+  is a solved problem, and it is the only place in SWS where edge-injected CSP
+  nonces already work.
+
+do_not_pick_this_when: >
+  The unit already administers a Vercel account. Moving them is not worth it —
+  see vercel.yml. Also not worth it for a purely static twelve-page site that
+  needs no headers and no previews; GitHub Pages is free.
+
+# ------------------------------------------------------------------- capability
+capabilities:
+  required:
+    https-live-cert: Yes, automatic, Let's Encrypt, including custom domains.
+    custom-domain: Yes. DNS via CNAME to the Netlify hostname.
+    admin-mfa: >
+      Available and REQUIRED BY MINWEB for the dashboard. Not on by default —
+      enable it and attest to it. Team-level SSO where the account supports it.
+    no-committed-secrets: >
+      netlify-plugin-vault-variables, pulling from HashiCorp Vault at build
+      time. This is the family convention; follow it rather than introducing a
+      new pattern. Netlify's own environment variable UI works but leaves the
+      value outside Vault.
+    named-admin-access: >
+      Team membership. Watch for sites deployed from an individual's personal
+      account rather than the team — that is the failure mode here.
+    sunsettable: Delete the site, then remove the DNS record.
+  recommended:
+    security-headers-default: >
+      Yes, two ways. Ship the default set from capabilities.yml.
+    csp: >
+      The best CSP story of any host SWS uses: @netlify/plugin-csp-nonce
+      injects per-request nonces at the edge, which is what makes
+      'strict-dynamic' practical rather than theoretical. Still OFF by default
+      per capabilities.yml — the plugin removes the implementation cost, not the
+      support cost of a page an owner cannot un-break.
+    preview-urls: Yes, per pull request. The main reason to move off Pages.
+    redirects: >
+      Yes, netlify.toml [[redirects]] or a _redirects file. Full support
+      including splats, query params, and status codes.
+    cms-rebuild-webhook: >
+      DEFERRED, not missing. Build hooks work and are well-trodden here, but
+      this package has no CMS to fire them. See standards/scope.md.
+    server-runtime: >
+      Yes. Functions, edge functions, blobs, and @netlify/plugin-nextjs for
+      full Next support. All in production use in this family.
+
+# ---------------------------------------------------------------------- how to
+adapters:
+  astro: "@astrojs/netlify"
+  next: "@netlify/plugin-nextjs"
+  note: Install latest. Do not pin. See standards/stack/reference-versions.yml.
+
+headers:
+  static_mechanism: |
+    # netlify.toml — works for astro-static and astro-ssr alike.
+    [[headers]]
+      for = "/*"
+      [headers.values]
+        Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options = "nosniff"
+        Referrer-Policy = "origin-when-cross-origin"
+        Permissions-Policy = "geolocation=(), camera=(), microphone=(), midi=(), payment=(), usb=()"
+        X-Frame-Options = "SAMEORIGIN"
+  next_mechanism: >
+    On Next, prefer headers() in next.config.ts so the config travels with the
+    app rather than living in host config. @netlify/plugin-nextjs honours it.
+    Gate on the deploy environment if it fights local development.
+  precedence_gotcha: >
+    If you set the same header in BOTH netlify.toml and next.config.ts, the
+    netlify.toml value wins on Netlify. Pick one place. Two places is how a
+    header ends up with a value nobody in the repo wrote.
+
+deploy:
+  trigger: >
+    Push to main deploys. Netlify's git integration handles this; the GitHub
+    Actions workflow is then for checks only, not for deploying.
+  config_file: netlify.toml
+
+prior_art:
+  - repo: adapt-stanford-homesite
+    ref: dev
+    for: >
+      THE reference for this host. CSP nonce plugin, Vault variables, and
+      environment detection. Read its Netlify-specific wiring; do NOT read its
+      CSS or copy FontAwesome Pro.
+  - repo: ccc-bulletin
+    ref: dev
+    for: >
+      Netlify blobs, edge functions, and functions on a Decanter 8 project.
+      Closest thing to next-ssr in production.
+  - repo: ood-giving-campaign
+    ref: dev
+    for: >
+      A small campaign site on this host. Closest in scope to a unit site.
+      NOTE: like the rest of this family it is Storyblok-backed, which is out of
+      scope here. Read it for host wiring and site shape, not for content
+      plumbing. See standards/scope.md.
+
+gotchas:
+  - >
+    The homesite gates its headers on being on Netlify and returns [] locally.
+    Copy that, or spend a day fighting your own CSP in development.
+  - >
+    Do not import the homesite's two-CSP-policy pattern. It exists so a CMS
+    Visual Editor can iframe the site while the app cannot, and there is no CMS
+    in scope here. The SAMEORIGIN default from capabilities.yml is enough.
+  - >
+    Deploying from an individual's personal Netlify account rather than a team
+    breaks the named-admin-access requirement the day that person leaves.
+
+procurement: >
+  An existing SWS vendor relationship, so nothing new to procure for a project
+  joining an existing team account. A NEW account with a new billing
+  arrangement is a procurement question: state the obligation, name the office,
+  stop. See standards/policy/procurement.md.

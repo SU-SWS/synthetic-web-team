@@ -80,20 +80,35 @@ register** in the repo so it survives a redesign.
 **Captions and audio description are required on all new video** per Stanford
 policy. Not optional, not a nice-to-have.
 
-## Content published after launch is the real accessibility risk
+## Content authored in the repo closes most of the post-launch gap
 
-Everything in CI tests the site **as built**. It says nothing about what an editor
-publishes next week, and on a CMS-backed site most accessibility debt arrives
-exactly that way: an untagged heading, a "click here," an image with no alt, a
-table used for layout.
+**Updated 2026-09-03 for the static-content scope.** See `standards/scope.md`.
 
-The only control that reaches this is **`sa11y` in the CMS Visual Editor
-overlay**, which gives content authors feedback while they edit. Every SWS
-Storyblok project does this. **If the site has a CMS and no authoring-time
-checker, that is a gap worth raising.**
+Everything in CI tests the site **as built**. On a CMS-backed site that is a real
+limitation: it says nothing about what an editor publishes next week, and most
+accessibility debt arrives exactly that way — an untagged heading, a "click
+here," an image with no alt, a table used for layout. The control for that is
+`sa11y` in the CMS Visual Editor overlay, which every SWS Storyblok project uses.
 
-Beyond tooling: give authors a short, specific guide rather than a link to WCAG.
-**Five rules they will remember beats twenty they will not.**
+**This package has no CMS, so that gap mostly closes.** Content lives in the
+repo, every content change is a commit, and every commit runs `sws a11y` and
+`sws perf` before it is public. The control moved from an authoring-time overlay
+into CI, where it is stronger and harder to skip.
+
+Do not overclaim it, though. Two things are unchanged:
+
+- **Automated testing still catches roughly 30 percent of issues** per ODA
+  guidance. This is the limit that matters, and moving the check into CI does
+  nothing to it. A green axe run is a floor, never a conformance claim.
+- **Embedded third-party content is still published outside the build.** A
+  Qualtrics form, a YouTube player, an iframed map: its accessibility is not
+  yours to control and CI cannot see inside it. That is a procurement question
+  with a VPAT attached, per `standards/policy/procurement.md`.
+
+Beyond tooling: give whoever edits the content a short, specific guide rather
+than a link to WCAG. **Five rules they will remember beats twenty they will
+not.** This matters just as much when the author is committing Markdown through
+the GitHub web UI as it did in a CMS.
 
 ## Required content that is not yours to reword
 

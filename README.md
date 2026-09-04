@@ -17,11 +17,14 @@ Early. The plan is complete and reviewed; the implementation is partway through.
 | | |
 |---|---|
 | Project plan | Done. [`PROJECT-PLAN.md`](PROJECT-PLAN.md) |
-| Standards (L0) | **Complete for v1.** 8 policy files, 7 patterns, prior art, 2 recipes, the footer fragment, reference versions |
+| Scope | **Static sites, content in the repo, no CMS.** [`standards/scope.md`](standards/scope.md) |
+| Standards (L0) | **Complete for v1.** 8 policy files, 7 patterns, prior art, 3 recipes, 4 hosting profiles, the footer fragment, reference versions |
 | `astro-static` recipe | Written, and **executed end to end** against a real build |
-| `next-netlify` recipe | Written, extends `astro-static`. Not yet executed end to end |
-| Shared skills | 6 of 6 done |
-| Role skills | **8 of 8 built, 11 of 11 stubs.** 25 skills total, all validated |
+| `astro-ssr` recipe | Written, extends `astro-static`. **Not executed**, and no SWS Astro project runs SSR, so its hosting half is reasoned rather than copied |
+| `next-ssr` recipe | Written, extends `astro-static`. Renamed from `next-netlify` on 2026-09-03. Not yet executed end to end |
+| Hosting profiles | **New.** `standards/hosting/`: a capability contract plus GitHub Pages, Netlify, and Vercel |
+| Shared skills | **7 of 7 done**, including `sws-github`, which provisions a repo and Pages deploy through `gh` |
+| Role skills | **8 of 8 built, 11 of 11 stubs.** 26 skills total, all validated |
 | Documentation site | **Working.** [`site/`](site/), built by our own recipe, scores 91/100 with zero failures |
 | `sws` CLI | **Working.** `doctor` and `check` run 13 check modules against 68 criteria. `sws a11y` runs axe and an interactive-state audit — hover and focus measured with a real mouse and a real Tab key — and `sws perf` measures a byte budget, all in real Chromium |
 | Report delivery | **Working.** PR comment and a persistent "Site health" issue, both updated in place. Score trend, sparkline, HTML artifact, README badge |
@@ -162,7 +165,7 @@ node packages/cli/bin/sws.mjs doctor --standards standards
 | Path | What it does |
 |---|---|
 | [`AGENTS.md`](AGENTS.md) | The behavioral contract. 100 lines, read by every tool |
-| [`skills/`](skills/) | The team: 25 skills, each one `SKILL.md` with two frontmatter keys. 8 built roles, 11 honest stubs, 6 shared |
+| [`skills/`](skills/) | The team: 26 skills, each one `SKILL.md` with two frontmatter keys. 8 built roles, 11 honest stubs, 7 shared |
 | [`standards/policy/`](standards/policy/) | Stanford requirements: MinSec, MinWeb, accessibility, privacy, brand, identity, procurement, escalation. Each file carries a `reviewed:` date |
 | [`standards/patterns/`](standards/patterns/) | How SWS actually builds: Decanter, components, content, IA, forms, discoverability, plus conventions derived from reading 11 production repos |
 | [`standards/stack/`](standards/stack/) | `reference-versions.yml`, a dated baseline. Advisory — nothing installs from it. Plus `performance-budget.yml`, the byte budget `sws perf` enforces |
@@ -193,7 +196,13 @@ The report is designed to **find the reader** rather than expecting the reader t
 
 **Push to `main` deploys.** Pull requests are first-class but never required, and nothing in the setup makes one mandatory. Many campus editors work through the GitHub web UI and will not open a pull request to fix a typo. With a CMS, git disappears entirely.
 
-**Recipes extend each other.** `next-netlify` declares `extends: astro-static` and contains only its differences: three criteria that do not apply, two whose mechanism changes, and ten that are new. The 52 shared criteria live in one place, so they cannot drift between recipes. Four CI gates enforce the contract in both directions: every criterion maps to a check, is marked manual, or declares `unimplemented:` with a reason; every finding a check can emit has a criterion somewhere; every criterion naming a check has a check that emits its id; and every `check:` names a module that exists. Each gate was added after the previous set missed something real — the last two because five criteria named checks that emitted nothing and one named a module that had never existed.
+**Recipes extend each other.** `next-ssr` declares `extends: astro-static` and contains only its differences: three criteria that do not apply, two whose mechanism changes, and ten that are new. The 52 shared criteria live in one place, so they cannot drift between recipes. Four CI gates enforce the contract in both directions: every criterion maps to a check, is marked manual, or declares `unimplemented:` with a reason; every finding a check can emit has a criterion somewhere; every criterion naming a check has a check that emits its id; and every `check:` names a module that exists. Each gate was added after the previous set missed something real — the last two because five criteria named checks that emitted nothing and one named a module that had never existed.
+
+**Scoped to static sites with content in the repo.** No CMS: not Storyblok, not decoupled Drupal. [`standards/scope.md`](standards/scope.md) is the declaration. The narrow scope is what makes the rest of the guidance testable — nothing arrives after the build that CI cannot see. It also has a genuine accessibility payoff: `standards/patterns/content.md` used to say content published after launch was the real risk, reachable only by `sa11y` in a CMS Visual Editor overlay. With content in git, every edit is a commit that runs `sws a11y` before it is public, so that gap mostly closes and the control moves somewhere stronger. The 30 percent ceiling on automated testing is untouched by this, and embedded third-party content is still outside the build. Out of scope is not forbidden, and the eleven CMS-backed SWS repos are not wrong — there is simply no tested recipe here yet, and saying so beats shipping guidance nobody has run.
+
+**Hosting is an axis, not a recipe.** Recipes are framework- and build-shaped; hosts live in `standards/hosting/` as a capability contract plus one profile each. This keeps two frameworks times three hosts from becoming six near-identical recipes. The contract is deliberately short, because **MinWeb requires no response headers at all** — not CSP, not HSTS — so hosting is not where compliance is won or lost, and a recipe implying otherwise is overreaching. Security headers ship as sensible defaults that cannot break a page; a **CSP is optional and off by default**, since it breaks pages at content-edit time and the person holding that problem is the one least able to diagnose it.
+
+**SWS runs two hosts, not one.** `storyblok-next-netlify` (6 repos) is on Netlify; `decoupled-drupal` (5 repos, including `library.stanford.edu`) is on Vercel. That is two lineages and two decisions, neither a majority. Until 2026-09-03 this project asserted Netlify was the platform and Vercel "appears once", because hosting had been inferred from `package.json` — which does not record a deploy target. The Vercel family was nearly invisible to dependency inspection *because* it uses `node-vault` rather than a host build plugin, the more portable choice. That correction is [kept in full](standards/prior-art/repos.yml), and it is the second time the third precedence clause produced the largest fix in a pass.
 
 **Prior art is step zero.** SWS has built a lot of sites and most problems are solved. The agent checks existing work before inventing anything, under a rule with three clauses, the third of which is that prior art cannot tell you *why* a choice was made or *where* the team is going. Both need a person. That clause exists because ignoring it produced three wrong conclusions in an afternoon, [written up as a record of error](standards/patterns/sws-conventions.md).
 

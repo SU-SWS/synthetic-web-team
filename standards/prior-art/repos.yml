@@ -33,15 +33,20 @@
 
 version: 1
 inspected: 2026-08-10
-corrected: 2026-08-10
+corrected: 2026-09-03
 method: package.json on default branch via GitHub API, then SWS review
+
+# 2026-09-03: hosting recorded per family for the first time, and it corrected a
+# standing error. This file previously implied Netlify was the only platform.
+# See the ANSWERED block at the foot of this file, entry H1.
 
 # ------------------------------------------------------------------------------
 # WATCH THE DEFAULT BRANCH. It is not `main` for most of these.
 #   main -> sws-astro
 #   dev  -> adapt-stanford-homesite, adapt-online-giving, adapt-directory,
 #           ood-giving-campaign, ood-stanford-tour, ccc-bulletin
-#   1.x  -> cardinalsites-nextjs, csp-nextjs, sulgryphon-nextjs, summer-nextjs
+#   1.x  -> cardinalsites-nextjs, csp-nextjs, sulgryphon-nextjs, summer-nextjs,
+#           press-nextjs
 # Any prior-art pointer MUST carry an explicit ref or it silently reads the
 # wrong branch.
 #
@@ -52,6 +57,7 @@ method: package.json on default branch via GitHub API, then SWS review
 families:
   astro-decanter8:
     what: Astro with Decanter 8 and Tailwind 4. Newest, smallest, closest to astro-static.
+    hosting: not established. No deploy config in the repo.
     members:
       - sws-astro
   storyblok-next-netlify:
@@ -59,6 +65,10 @@ families:
       Next + Storyblok + Netlify. The Office of Development / ADAPT family.
       npm, cnbuilder, netlify-plugin-vault-variables for secrets, and sa11y in
       the Visual Editor overlay for content authors.
+    hosting: >
+      NETLIFY. The Netlify-specific tooling in this family is the evidence:
+      netlify-plugin-vault-variables for secrets, @netlify/plugin-csp-nonce and
+      blobs/edge/functions in the homesite and ccc-bulletin.
     members:
       - adapt-stanford-homesite
       - adapt-online-giving
@@ -68,13 +78,21 @@ families:
       - ccc-bulletin
   decoupled-drupal:
     what: >
-      Next + GraphQL against Drupal. yarn 4, --webpack (deliberately not
-      Turbopack), graphql-codegen, Algolia, clsx + tailwind-merge, .githooks.
+      Next + GraphQL against Drupal. yarn 4, graphql-codegen, Algolia,
+      clsx + tailwind-merge, .githooks. Four of five run --webpack; the newest
+      member does not.
+    hosting: >
+      VERCEL. Confirmed by SWS 2026-09-03 and verified in source: vercel.json at
+      the root of sulgryphon-nextjs with no netlify.toml, and press-nextjs
+      publishes to stanford-university-press.vercel.app. Secrets come from
+      node-vault rather than a host build plugin, which is what makes this
+      family's secret handling host-portable.
     members:
       - cardinalsites-nextjs
       - csp-nextjs
       - sulgryphon-nextjs
       - summer-nextjs
+      - press-nextjs
 
 repos:
   # ============================================================ DECANTER 8 ERA
@@ -120,6 +138,7 @@ repos:
     url: https://github.com/SU-SWS/ccc-bulletin
     ref: dev
     family: storyblok-next-netlify
+    hosting: netlify
     era: decanter-8
     rating: exemplary
     stack:
@@ -141,7 +160,7 @@ repos:
         - BackstopJS
     why_exemplary: >
       The only Next + Decanter 8 + Tailwind 4 project in the set, and therefore
-      THE reference for the next-static recipe. Also the most complete testing
+      THE reference for the next-ssr recipe. Also the most complete testing
       setup after the homesite.
     use_for:
       - Next + Decanter 8 + Tailwind 4 via "@tailwindcss/postcss"
@@ -163,6 +182,7 @@ repos:
     url: https://github.com/SU-SWS/adapt-stanford-homesite
     ref: dev
     family: storyblok-next-netlify
+    hosting: netlify
     era: decanter-derived
     lineage: >
       NOT a Decanter consumer. Its own design system, heavily derived from
@@ -236,6 +256,7 @@ repos:
     url: https://github.com/SU-SWS/adapt-online-giving
     ref: dev
     family: storyblok-next-netlify
+    hosting: netlify
     era: decanter-7
     rating: sound
     live: https://give.stanford.edu
@@ -279,6 +300,7 @@ repos:
     url: https://github.com/SU-SWS/adapt-directory
     ref: dev
     family: storyblok-next-netlify
+    hosting: netlify
     era: decanter-7
     rating: dated
     stack:
@@ -323,6 +345,7 @@ repos:
     url: https://github.com/SU-SWS/ood-giving-campaign
     ref: dev
     family: storyblok-next-netlify
+    hosting: netlify
     era: decanter-7
     rating: sound
     live: https://momentum.stanford.edu/
@@ -356,6 +379,7 @@ repos:
     url: https://github.com/SU-SWS/ood-stanford-tour
     ref: dev
     family: storyblok-next-netlify
+    hosting: netlify
     era: decanter-7
     rating: sound
     live: https://openminds.stanford.edu/
@@ -389,6 +413,7 @@ repos:
     family: decoupled-drupal
     era: decanter-7
     rating: exemplary
+    hosting: vercel
     stack:
       framework: "next 16.2.10, run with --webpack"
       decanter: "^7.4.0"
@@ -437,6 +462,7 @@ repos:
     family: decoupled-drupal
     era: decanter-7
     rating: sound
+    hosting: vercel
     stack:
       framework: "next 16.2.10, run with --webpack"
       decanter: "^7.4.0"
@@ -466,6 +492,12 @@ repos:
         differing only by "@vercel/speed-insights" and a couple of patch
         versions. This is expected, not a problem.
       - >
+        CORRECTED 2026-09-03: that "@vercel/speed-insights" was the ONE visible
+        signal that this whole family deploys to Vercel, and the 2026-08-10 pass
+        discounted it as copy-fork noise. It was the only true thing in the
+        dependency data about hosting. Weak signals that contradict a confident
+        inference deserve a question, not a dismissal.
+      - >
         Despite the repo name, no CSP-specific dependency is present. CSP work
         in this org appears in adapt-stanford-homesite via
         "@netlify/plugin-csp-nonce" instead. The name likely refers to the
@@ -478,6 +510,7 @@ repos:
     era: decanter-7
     rating: sound
     live: https://library.stanford.edu
+    hosting: vercel
     stack:
       framework: "next ^16.0.10, run with --webpack"
       decanter: "^7.4.0"
@@ -515,6 +548,7 @@ repos:
     family: decoupled-drupal
     era: decanter-7
     rating: sound
+    hosting: vercel
     stack:
       framework: "next 16.2.12, run with --webpack"
       decanter: "^7.4.0"
@@ -547,6 +581,56 @@ repos:
         hand-roll one, and DO NOT NAME A VENDOR. Route the person to the
         University Privacy Office. See the "route, don't recommend" principle in
         the project plan.
+
+  - name: press-nextjs
+    url: https://github.com/SU-SWS/press-nextjs
+    ref: 1.x
+    family: decoupled-drupal
+    era: decanter-7
+    rating: sound
+    live: https://stanford-university-press.vercel.app
+    hosting: vercel
+    stack:
+      framework: "next 16.3.3, built with plain `next build`"
+      decanter: "^7.5.3"
+      tailwind: "^3.4.19"
+      cms: "Drupal via graphql-request + graphql-codegen"
+      package_manager: "yarn@4.9.2"
+      other:
+        - "@base-ui/react ^1.7.0"
+        - algoliasearch + react-instantsearch-nextjs
+        - plaiceholder
+        - sharp
+        - clsx + tailwind-merge
+        - "@formkit/auto-animate"
+        - "@next/third-parties"
+        - react-slick
+        - react-focus-lock
+    use_for:
+      - >
+        The NEWEST member of the decoupled Drupal family, so cite it over its
+        siblings for current practice within that lineage.
+      - Vercel deployment of a decoupled Drupal front end.
+      - "`sup.org` is a MinWeb scope example: Stanford-branded non-stanford.edu."
+    do_not_use_for:
+      - CSS setup. Decanter 7 and Tailwind 3.
+      - >
+        Security headers. Like the rest of this family it sets none. That is
+        permitted, not exemplary. See the note below.
+    notable:
+      - >
+        DROPS `--webpack`. Its build script is plain `next build`, unlike the
+        other four members. Consistent with the SWS answer of 2026-09-01 that
+        --webpack was point-in-time and Turbopack is the forward choice, and it
+        is the first repo in the set to actually act on it.
+      - >
+        Was ABSENT from this file until 2026-09-03. It was not found by the
+        original inspection pass and had to be named by a person, which is
+        clause 3 of the precedence rule in miniature.
+      - >
+        The deployed homepage is a *.vercel.app URL, not a stanford.edu
+        subdomain. Whatever the production domain is, it is not recorded here.
+    priority: high
 
 # ==============================================================================
 # ANSWERED (SWS, 2026-08-10)
@@ -597,4 +681,54 @@ repos:
 #    blocked simply goes their own way. Only the POLICIES bind, and they govern
 #    only a sliver of the aesthetic.
 #    -> standards/policy/brand.md, "What is actually binding"
+# ==============================================================================
+
+# ==============================================================================
+# ANSWERED BY SWS, 2026-09-03. The hosting question, and the biggest single
+# correction this file has taken.
+#
+# H1. Which hosts do we actually deploy to?
+#     ANSWER: TWO, split cleanly by family.
+#       - storyblok-next-netlify (ADAPT/OOD)  -> NETLIFY
+#       - decoupled-drupal (Cardinal Sites)   -> VERCEL
+#     And press-nextjs, a fifth decoupled-drupal repo, was missing from this
+#     file entirely.
+#
+#     WHAT WE HAD WRONG. This file and sws-conventions.md both asserted
+#     "Netlify is the platform. Vercel appears once, as @vercel/speed-insights."
+#     That reading came from counting npm dependencies, and npm dependencies do
+#     not record where a repo deploys. The Vercel family leaves almost no trace
+#     in package.json BECAUSE it uses node-vault for secrets instead of a host
+#     build plugin -- the more portable choice, which is precisely why it is
+#     invisible to dependency inspection. The one signal we did see, a stray
+#     @vercel/speed-insights, we then discounted as copy-fork noise.
+#
+#     Verified in source after the answer, 2026-09-03: sulgryphon-nextjs has
+#     vercel.json at its root and no netlify.toml, and press-nextjs publishes to
+#     stanford-university-press.vercel.app.
+#
+#     WHY IT MATTERS BEYOND THE FACT. "Netlify is the platform" was about to
+#     become a recipe naming scheme and a swap-point cost ("you leave the
+#     platform every other SWS project uses"). That sentence would have been
+#     wrong to roughly half the org, and it is the kind of wrong that makes a
+#     team ignore the whole toolchain. Recipes now carry a hosting axis:
+#     standards/hosting/.
+#     -> standards/hosting/, standards/patterns/sws-conventions.md
+#
+# H2. Do we require a Content-Security-Policy?
+#     ANSWER: NO. Nonce-based CSP is a NICE-TO-HAVE, not a requirement.
+#     Confirmed against minweb.md, which requires no response headers at all.
+#     Security headers SHOULD ship with sensible defaults, but a CSP locked to
+#     specific domains is explicitly NOT wanted: it puts a non-technical site
+#     owner one embedded video away from a broken page they cannot diagnose.
+#
+#     So the decoupled-drupal family setting no security headers is PERMITTED,
+#     not a finding. Only the homesite's full header set is exemplary, and
+#     exemplary is not the bar.
+#     -> standards/hosting/capabilities.yml
+#
+# METHOD NOTE, for the next person doing an inspection pass: package.json tells
+# you what a project INSTALLS. It does not tell you where it deploys, who owns
+# it, or what the production domain is. Three of those four need a person. This
+# is now the second time clause 3 has produced the largest correction in a pass.
 # ==============================================================================

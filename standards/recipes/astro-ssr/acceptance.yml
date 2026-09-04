@@ -1,0 +1,191 @@
+# Acceptance criteria for recipe: astro-ssr
+#
+# EXTENDS astro-static. Everything about Decanter, the footer, the Identity Bar,
+# accessibility, MinWeb, privacy, discoverability, and provenance is SHARED and
+# lives there. Duplicating those criteria would guarantee they drift, which is
+# the failure this whole project is organised against.
+#
+# Only differences belong in this file:
+#   - criteria that do not apply here (marked `applies: false`)
+#   - criteria whose mechanism differs under output: 'server'
+#   - criteria that exist only here
+#
+# Same rules as the parent: every criterion maps to an implemented check, is
+# marked `manual: true`, or declares `unimplemented:` with a reason. `unknown`
+# is never a pass. `block` is reserved for irreversible harm, which today is
+# exactly one thing: committed secrets.
+
+recipe: astro-ssr
+version: 1
+extends: astro-static
+
+standard:
+  accessibility: WCAG 2.1 AA
+  policy_refs: [minweb, minsec/applications/low, accessibility, minpriv]
+
+# ---------------------------------------------------------------- overrides
+overrides:
+  - id: build.static-output
+    applies: false
+    why: >
+      This recipe uses output: 'server' with a host adapter. That is the whole
+      point of it. Individual pages opt back into prerendering with
+      `export const prerender = true`, which is the right default for most
+      pages on a content site, but the build as a whole is not static.
+
+  - id: build.base-path
+    applies: false
+    why: >
+      Netlify and Vercel both serve from the root. `base` is a GitHub Pages
+      subpath concern.
+
+  - id: build.site-set
+    mechanism: >
+      UNCHANGED from the parent, and worth stating because it is the criterion
+      people assume server rendering makes redundant. It does not: `site` is
+      still required or @astrojs/sitemap emits nothing and canonical URLs are
+      wrong. Check astro.config.* for `site` exactly as the parent does.
+
+  - id: workflow.push-to-main-deploys
+    mechanism: >
+      On this recipe the HOST's git integration deploys, not a GitHub Actions
+      job, so do not look for a deploy job. The criterion still holds and still
+      matters: pushing to the default branch must publish. Report `unknown`
+      rather than `fail` when no deploy job is found and a host config file
+      (netlify.toml or vercel.json) is present, because the deploy is then
+      configured outside the repo and this check cannot see it.
+
+  - id: workflow.report-reaches-a-reader
+    mechanism: >
+      Same requirement, different plumbing. There is no Pages deploy job to
+      attach the report to, so the advisory report comes from the checks
+      workflow. `issues: write` and `pull-requests: write` are still needed, and
+      omitting them still produces a report nobody sees.
+
+# ---------------------------------------------------------------- additions
+criteria:
+  - id: astro.adapter-configured
+    requires: >
+      astro.config.* sets `output: 'server'` and an `adapter`, and the adapter
+      package matches the host recorded in .sws/manifest.yml.
+    check: build
+    severity: warn
+    weight: 4
+    policy: patterns
+    unimplemented: >
+      The build check parses astro.config.* for `output` and `site` but has no
+      adapter awareness yet. Implementing it needs the manifest `hosting` field
+      to compare against, which landed the same day this recipe did. Reports
+      `unknown` and withholds its weight until then, which is the honest cost.
+    note: >
+      A mismatch here is a real and quiet failure: @astrojs/vercel configured on
+      a project deploying to Netlify builds successfully and serves wrongly.
+
+  - id: astro.no-hybrid-output
+    requires: "astro.config.* does not set output: 'hybrid'."
+    check: build
+    severity: warn
+    weight: 2
+    policy: patterns
+    unimplemented: >
+      Same parser gap as astro.adapter-configured. Cheap to add once the build
+      check reads `output` for a value other than 'static'.
+    note: >
+      'hybrid' was removed from Astro. Its presence signals a config copied from
+      an older project, and it fails at build time rather than silently, so this
+      is a low-severity convenience rather than a real risk.
+
+  - id: astro.headers-in-host-config
+    requires: >
+      The default security header set is configured in host config
+      (netlify.toml [[headers]] or vercel.json headers), not only in middleware.
+    check: security
+    severity: warn
+    weight: 5
+    policy: minsec
+    unimplemented: >
+      The security check reads next.config.* only and returns not_applicable
+      when there is none, so it does not see Astro projects at all. Extending it
+      to parse netlify.toml and vercel.json is the next piece of work this
+      recipe needs. Reports `unknown` and withholds the weight.
+    note: >
+      MIDDLEWARE IS THE WRONG PLACE and this is the substantive Astro-specific
+      finding in this recipe. Astro middleware does not run for prerendered
+      routes, so headers set there apply to some pages and not others -- and the
+      pages that miss out are the prerendered ones, which is most of a content
+      site. Host config covers both. Canonical values are in
+      standards/hosting/capabilities.yml under default_header_set.
+
+  - id: astro.no-prerendered-nonce
+    requires: >
+      If a CSP with per-request nonces is configured, no prerendered route
+      depends on that nonce.
+    check: security
+    severity: info
+    weight: 1
+    policy: minsec
+    applies_when: a nonce-based CSP is configured, which is not the default
+    unimplemented: >
+      Needs cross-referencing CSP config against per-route prerender exports.
+      Not worth building until someone actually opts into a nonce CSP on Astro;
+      declared here so the limitation is recorded rather than discovered.
+    note: >
+      A per-request nonce cannot exist on a page rendered at build time. The
+      combination fails silently: the page renders, the script is blocked. Edge
+      injection (@netlify/plugin-csp-nonce) sidesteps it; Vercel has no
+      equivalent. CSP remains optional and off by default -- see
+      standards/hosting/capabilities.yml.
+
+  - id: hosting.recorded
+    requires: >
+      .sws/manifest.yml records `hosting` with the chosen host, and that host
+      has a profile in standards/hosting/.
+    check: manifest
+    severity: warn
+    weight: 3
+    policy: patterns
+    unimplemented: >
+      The `hosting` manifest field was defined on 2026-09-03 with
+      standards/hosting/ and the manifest check does not read it yet. This is
+      the criterion that makes the hosting axis legible to `sws check`, so it is
+      the first of these to implement.
+    note: >
+      Neither Netlify nor Vercel is a divergence: SWS runs both, one per family.
+      This criterion asks only that the choice be WRITTEN DOWN, so the next
+      person knows where the site lives without guessing from a lockfile. That
+      guess is exactly how this project spent three weeks believing Netlify was
+      the only SWS host.
+
+  - id: hosting.dashboard-mfa
+    requires: >
+      MFA, or SSO with MFA, is enabled on the hosting dashboard, not only on
+      GitHub.
+    manual: true
+    check: manifest
+    severity: warn
+    weight: 4
+    policy: minweb
+    note: >
+      THE MOST-MISSED ITEM in standards/hosting/capabilities.yml. MinWeb's "MFA
+      on all administrative logins" is routinely read as covering only the
+      obvious ones, but the host dashboard can trigger a deploy and read
+      environment variables, so it is an administrative login. Neither host
+      enables it by default. Attest to it on the launch checklist; no automated
+      check can see it.
+
+  - id: hosting.production-domain
+    requires: >
+      The production URL is the approved Stanford subdomain, not a
+      *.netlify.app or *.vercel.app preview domain.
+    manual: true
+    check: manifest
+    severity: warn
+    weight: 3
+    policy: minweb
+    note: >
+      Worth checking explicitly because it happens: press-nextjs publishes to
+      stanford-university-press.vercel.app. A vendor preview domain is fine
+      pre-launch and not fine at launch. The subdomain NAME is approved by
+      University Communications, has a lead time, and is not a decision this
+      tool, an agent, or a developer can make. Route per
+      standards/policy/escalation.md.

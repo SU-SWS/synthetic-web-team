@@ -76,6 +76,31 @@ Do not record these, and do not treat them as departures:
   deliberately. Add a way to see what has changed since; do not frame the fork
   as a mistake.
 
+## Requests that are out of scope rather than divergent
+
+**A CMS is the live example.** `standards/scope.md` scopes this package to
+static content authored in the repo, and it has no tested CMS path — not
+Storyblok, not decoupled Drupal.
+
+That is **not a divergence you can record and move on from.** A divergence is
+choosing something different to build the same thing with; this is asking for a
+capability the package does not ship. Recording `divergences: [storyblok]` in
+the manifest would imply a supported swap point exists, and it does not.
+
+So handle it differently:
+
+- **Say plainly that it is not covered yet.** Eleven SWS repos are CMS-backed in
+  production, so the capability exists in the org. There is just no tested
+  recipe here, and saying so beats shipping guidance nobody has run.
+- **Ask what they actually need.** Often it is "a non-developer must edit the
+  copy," which GitHub web UI editing already handles for one or two people.
+- **If they need a real CMS**, that is a legitimate project. Point them at
+  Stanford Sites if they will maintain the site alone, or raise it as scope for
+  a `*-storyblok` overlay. Do not build half a content backend to avoid the
+  conversation.
+- **Out of scope is not forbidden.** Do not tell anyone they cannot have a CMS,
+  and do not imply the existing SWS CMS work is wrong.
+
 ## Divergences that change the compliance tier
 
 Different category, and these are not yours to wave through. If a divergence

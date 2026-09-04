@@ -19,7 +19,12 @@ contract. Read it once, follow it throughout.
    that blocks a build, because it is the only irreversible harm.
 5. **A named business owner and technical administrator**, both with valid
    Stanford affiliation and email, must be discoverable on the site.
-6. **No cookie consent banner is required.** The Global Footer's Privacy link
+6. **Content comes from the repository.** This package has no tested CMS path:
+   not Storyblok, not decoupled Drupal. Out of scope is not forbidden, and the
+   existing SWS CMS work is not wrong — but do not prescribe a content backend
+   here, and do not build half of one to avoid telling someone it is not covered
+   yet. `standards/scope.md`.
+7. **No cookie consent banner is required.** The Global Footer's Privacy link
    satisfies the disclosure obligation, so a banner is never the default. It is
    **not forbidden** — a unit may add one. If it does, record the choice in
    `.sws/manifest.yml` and send the vendor question to the University Privacy
@@ -106,10 +111,12 @@ email**), and `counts` to tell a fresh install from a no-op re-run. Verify with
 
 | Path | What |
 |---|---|
+| `standards/scope.md` | **What this package covers.** Static sites, content in the repo, no CMS. Read it before proposing a content backend |
 | `standards/policy/` | Stanford requirements: MinSec, MinWeb, accessibility, privacy, brand, identity, procurement, escalation. Each file dated with `reviewed:` |
 | `standards/patterns/` | How SWS builds: Decanter, components, content, IA, forms, discoverability, conventions |
 | `standards/stack/` | `reference-versions.yml`, a dated snapshot for the canary to diff. Advisory. **Nothing installs from it** |
 | `standards/recipes/` | Build contracts, with acceptance criteria per recipe |
+| `standards/hosting/` | `capabilities.yml`, what a site needs from a host, plus one profile per host. **SWS runs both Netlify and Vercel**, one per family, so neither is a divergence |
 | `standards/fragments/` | Byte-exact compliance content. The Global Footer lives here |
 | `standards/prior-art/` | Existing SWS work, with era, lineage, and judgment |
 | `.sws/manifest.yml` | What this project is, resolved versions, divergences, prior art reused |
@@ -118,11 +125,18 @@ email**), and `counts` to tell a fresh install from a no-op re-run. Verify with
 ## Current stack defaults
 
 Astro or Next, Tailwind 4 via Decanter 8, npm (yarn is fine, never convert a
-project), Playwright plus axe for testing, Netlify after GitHub Pages. No
-component workshop: these sites have few components and one consumer. On a
-CMS-backed site, put `sa11y` in the Visual Editor overlay so content authors get
-accessibility feedback while they edit, because that is the only control that
-reaches content published after launch.
+project), Playwright plus axe for testing. **Hosting: GitHub Pages for static,
+then Netlify or Vercel** — SWS runs both, one per family, so start from whichever
+the unit already administers rather than picking for them. Ship the default
+security headers from `standards/hosting/capabilities.yml`; a **CSP is optional
+and off by default**, because it breaks pages at content-edit time and the person
+holding that problem is the one least able to diagnose it. No
+component workshop: these sites have few components and one consumer.
+
+**Content is authored in the repo. No CMS.** See `standards/scope.md`. Every
+content change is therefore a commit that runs `sws a11y` in CI, which is a
+stronger control than an authoring-time overlay — but automated testing still
+catches only about 30 percent of issues, so that floor has not moved.
 
 Push to `main` deploys. Pull requests are first-class but never required, and
 nothing should make one mandatory.

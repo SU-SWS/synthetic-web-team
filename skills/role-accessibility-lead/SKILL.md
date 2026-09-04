@@ -16,7 +16,7 @@ revisions. Not just new work.
 
 | Signal | When | Catches |
 |---|---|---|
-| **`sa11y`** in the CMS Visual Editor overlay | While authors edit | Content problems, before publish |
+| **Content review in git** | Every content change | Content problems, before publish. Content is authored in the repo (`standards/scope.md`), so every edit is a commit that runs the two signals below |
 | **axe** via Playwright in CI | Every build | Roughly 30 percent of issues in the built site. Run it with `sws a11y` |
 | **State audit**, same command | Every build | Hover and focus states that change colour and nothing else — which axe cannot see at all |
 | **Manual checklist** | Pre-launch, and on significant change | The other ~70 percent |

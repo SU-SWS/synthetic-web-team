@@ -1,13 +1,17 @@
-# Recipe: next-netlify
+# Recipe: next-ssr
 
-**Generate a compliant Stanford Next.js site on Netlify, with Decanter 8.**
+**Generate a compliant Stanford Next.js site with Decanter 8, served with a
+runtime.**
 
 | | |
 |---|---|
-| Recipe ID | `next-netlify` |
+| Recipe ID | `next-ssr` |
+| Renamed from | `next-netlify`, on 2026-09-03. See "Choosing a host" below |
 | Status | Draft |
-| Compliance tier | Depends. `low` for content-only. Storyblok alone does not raise it |
+| Compliance tier | `low` for a content site. Rises if you add a form collecting personal data, auth, or payments |
+| Content source | **The repo. No CMS** — see `standards/scope.md` |
 | Acceptance | `acceptance.yml` in this directory, which extends `astro-static` |
+| Hosting | Netlify or Vercel. Pick per `standards/hosting/` |
 | Versions | **None specified by design.** Install latest |
 
 ## Two baselines, and which part comes from which
@@ -30,22 +34,56 @@ screenshot.
 
 Both repos are **private**. If you cannot read them, everything you need is below.
 
-## Why Netlify and not GitHub Pages
+## Why a runtime, and not static hosting
 
-The homesite baseline depends on **response headers** for Content Security Policy
-and the security header set. Static export emits files, not headers, so it cannot
-carry them. Under `output: 'export'` Next also forfeits `redirects`, `rewrites`,
-Proxy (the renamed middleware), ISR, Server Actions, Draft Mode, and default-loader
-image optimization, and Route Handlers become `GET`-only.
+This recipe exists because some things need a **server response**, and a static
+build cannot produce one. Choosing it buys you:
 
-So this recipe targets **Netlify**, which is where SWS runs anyway: functions,
-blobs, edge functions, the CSP nonce plugin, and Vault-backed environment
-variables are all in production use.
+- **Response headers**, including the default security header set in
+  `standards/hosting/capabilities.yml`. Static export emits files, not headers.
+- `redirects` and `rewrites`, which matter enormously on a site replacing a
+  legacy one.
+- Proxy (Next's renamed middleware), ISR, Server Actions, Draft Mode, Route
+  Handlers beyond `GET`, and default-loader image optimization — all of which
+  `output: 'export'` forfeits.
 
-**If you need GitHub Pages, use `astro-static` instead.** It is a better fit for
-static hosting and it is the cheaper thing to maintain. Choosing Next for a
-content site and then statically exporting it gives you the worst of both: React's
-weight without its capabilities.
+**Be honest about the size of this.** MinWeb requires none of it. The header set
+is good engineering, not policy, and a content site that needs no redirects and
+no server logic is better served by `astro-static` on GitHub Pages for free.
+Reach for this recipe when you need what is in that list, not by default.
+
+**If you want static output, use `astro-static`.** Choosing Next for a content
+site and then statically exporting it gives you the worst of both: React's weight
+without its capabilities.
+
+## Choosing a host
+
+**This recipe was called `next-netlify` until 2026-09-03**, which was a mistake
+worth explaining, because the reasoning behind it was wrong in a way that would
+have shown in the output. The old text said Netlify is "where SWS runs" and that
+choosing Vercel meant leaving the platform every other project uses. In fact SWS
+runs **both**, split cleanly by family:
+
+| Family | Host |
+|---|---|
+| `storyblok-next-netlify` (ADAPT/OOD, 6 repos) | Netlify |
+| `decoupled-drupal` (Cardinal Sites, 5 repos) | Vercel |
+
+That is two lineages and two decisions, not a majority and an outlier.
+
+**So the recipe does not pick for you. Start from where the unit already is:**
+
+| If the unit... | Host |
+|---|---|
+| Already administers a Netlify account | **Netlify.** `standards/hosting/netlify.yml` |
+| Already administers a Vercel account | **Vercel.** `standards/hosting/vercel.yml` |
+| Has neither, and wants the better-trodden path for a content site | Netlify, to inherit the ADAPT family's Vault wiring |
+| Has no account and no budget, and needs no runtime | You want `astro-static` on GitHub Pages |
+
+An account someone already knows how to administer is worth more than the
+shared-tooling argument. Record the choice in `.sws/manifest.yml` under
+`hosting`. Do not introduce a third host on your own: that is a procurement
+question, and it goes to the office, not to us.
 
 ## Steps
 
@@ -150,41 +188,69 @@ A comment marking a deliberate divergence at the token level is the same
 discipline as recording one in `.sws/manifest.yml`. Silent divergence is the only
 kind that is a problem.
 
-### 5. Security headers and CSP, from the homesite
+### 5. Security headers
 
-This is the most valuable thing the homesite baseline gives you, and it is the
-part a static site cannot have. In `next.config.ts`, return these from
-`headers()`:
+**Ship the sensible defaults, switched on. Leave CSP off.** In
+`next.config.ts`, return these from `headers()`:
 
 | Header | Value |
 |---|---|
-| `Content-Security-Policy` | Built per environment. See below |
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` |
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `origin-when-cross-origin` |
-| `Permissions-Policy` | Deny what you do not use: geolocation, camera, microphone, midi, and so on |
-| `X-Frame-Options` | `DENY` on the app |
+| `Permissions-Policy` | `geolocation=(), camera=(), microphone=(), midi=(), payment=(), usb=()` |
+| `X-Frame-Options` | `SAMEORIGIN` |
 
-Three things the homesite does that are worth imitating:
+That set is deliberately the headers that **cannot break a page**. It is the
+canonical list in `standards/hosting/capabilities.yml`; take it from there
+rather than from here if the two ever disagree.
 
-1. **Two CSP policies, not one.** The app gets `frame-ancestors 'none'`. The
-   Storyblok Visual Editor route gets `frame-ancestors https://*.storyblok.com`,
-   because it must be iframed by the CMS. One policy cannot serve both.
-2. **`noindex, nofollow` on the editor route**, plus a path-exclusion pattern so
-   the app policy does not apply to it.
-3. **Headers only in the deployed environment.** The homesite checks whether it
-   is on Netlify and returns `[]` locally, which keeps local development from
-   fighting the policy.
+Two notes on the values:
 
-Use `'strict-dynamic'` with nonces rather than a host allowlist for scripts.
-`@netlify/plugin-csp-nonce` injects the nonces at the edge. A CSP built from a
-long list of allowed hosts drifts and eventually allows everything.
+1. **`SAMEORIGIN`, not `DENY`.** The homesite uses `DENY` and then needs a
+   second policy for the CMS Visual Editor route it has to let be iframed.
+   **This recipe has no CMS**, so that whole problem is absent and `SAMEORIGIN`
+   is simply the right answer. Do not import the two-policy pattern from the
+   homesite to solve a problem you do not have.
+2. **Gate on the deploy environment.** The homesite checks whether it is on the
+   host and returns `[]` locally. Copy that, or spend a day fighting your own
+   headers in development.
+
+#### Content-Security-Policy is optional, and off by default
+
+**Confirmed by SWS 2026-09-03: nonce-based CSP is a nice-to-have.** MinWeb
+requires no response headers at all, so a site without a CSP is fully compliant.
+
+The reason it is off by default is not effort, it is **who absorbs the
+breakage**. A CSP is the one header that breaks pages, and it breaks them when
+someone *edits content*, not when someone deploys. A content owner embeds a
+YouTube video, a Qualtrics survey, or a Google Font; the browser blocks it
+silently; and the person who can least diagnose it is the person holding the
+problem.
+
+So:
+
+- **Never build a CSP from a domain allowlist.** It drifts, it ends up allowing
+  everything, and every future embed is a support ticket.
+- **If you do add one**, use `'strict-dynamic'` with per-request nonces. On
+  Netlify, `@netlify/plugin-csp-nonce` injects them at the edge. On Vercel there
+  is no equivalent and you write it in `proxy.ts` yourself.
+- **Start with `Content-Security-Policy-Report-Only`.** It cannot break a page by
+  construction, and it tells you what a real policy would have blocked.
+- **Record it in `.sws/manifest.yml`.** It is a divergence from this default, and
+  somebody should have agreed to own the breakage.
+
+Worth knowing: **none of the five Vercel-hosted SWS repos sets any security
+headers**, and `sulgryphon-nextjs`'s `headers()` sets only `X-Robots-Tag` for
+non-production. That is permitted, not a finding — but do not copy it either.
+New work should ship the default set above.
 
 ### 6. Images
 
-Set `images.remotePatterns` for whatever actually serves your images. For
-Storyblok that is the `a.storyblok.com` family. Do not use a wildcard: the point
-of the list is that it is a list.
+Set `images.remotePatterns` for whatever actually serves your images. With
+content in the repo, most images are local and need no entry at all — add hosts
+only for what you genuinely fetch remotely, typically `**.stanford.edu`. Do not
+use a wildcard: the point of the list is that it is a list.
 
 ### 7. Required content
 
@@ -309,8 +375,9 @@ npx sws check
 |---|---|
 | `astro-static` instead | **Usually the better choice for a content site.** Less weight, simpler hosting, works on GitHub Pages |
 | Static export (`output: 'export'`) | Forfeits CSP and security headers, `redirects`, `rewrites`, Proxy, ISR, Server Actions, Draft Mode, and default-loader image optimization. Route Handlers become `GET`-only. If you want this, you want `astro-static` |
-| Vercel instead of Netlify | Supported, but you leave the platform every other SWS project uses and lose the shared tooling. `@netlify/plugin-csp-nonce` has no direct equivalent |
-| Decoupled Drupal instead of Storyblok | `graphql-request` plus `graphql-codegen`, per `cardinalsites-nextjs`. That family runs `--webpack`, but it is a point-in-time decision rather than guidance: Turbopack is the forward default for new Next.js work |
+| Vercel instead of Netlify, or the reverse | **Not a divergence.** SWS runs both, one per family. Pick per `standards/hosting/`, and prefer whichever the unit already administers. The only real asymmetry: `@netlify/plugin-csp-nonce` has no Vercel equivalent, which costs you nothing unless you opt into CSP |
+| A CSP, nonce-based | Supported and welcome. You are taking on the support cost of a policy that breaks at content-edit time. Name who owns that |
+| A CMS, either Storyblok or decoupled Drupal | **Out of scope for now, and not a swap you can take here.** See `standards/scope.md`. Eleven SWS repos do this in production, so the capability exists — just not as anything this recipe can hand you. Raise it in discovery rather than building half of it |
 | Cypress instead of Playwright | Reasonable if the project already has it. Both baselines do |
 | `clsx` + `tailwind-merge` instead of `cnbuilder` | Both are in SWS use, split by project family. One per project |
 | yarn instead of npm | Fine. `ccc-bulletin` uses yarn 4, the homesite uses npm. Never convert a project |
@@ -321,7 +388,7 @@ npx sws check
 2. **Copying the homesite's `styles/global.css` verbatim.** Its first line is `@import 'tailwindcss'` because it does not use Decanter. Yours must be `@import 'decanter'`.
 3. **Copying the homesite's `tailwind/theme.css`.** That is its derived design system, a parallel token vocabulary. Yours should be short and only contain deviations.
 4. **Scaffolding with `--tailwind`.** Conflicts with the Decanter integration.
-5. **One CSP for both the app and the editor route.** The editor must be iframable by Storyblok; the app must not be.
+5. **Importing the homesite's two-CSP pattern.** It exists to let a CMS Visual Editor iframe the site. There is no CMS here, so it solves nothing and adds a policy to maintain.
 6. **CSP headers enabled locally.** Gate them on the deploy environment or fight them all day.
 7. **Assuming static export is a small change.** It removes the entire reason to use this recipe over `astro-static`.
 8. **FontAwesome Pro**, inherited from the homesite. Licence-gated, fails installs.
@@ -331,6 +398,12 @@ npx sws check
 Next.js configuration shape, CSP and security header approach, PostCSS config, and
 file organisation read from `adapt-stanford-homesite` (`dev`) on 2026-08-11.
 Decanter 8 integration read from `ccc-bulletin` (`dev`) the same day. Both private.
+
+Hosting facts corrected on 2026-09-03 after SWS named the Vercel family, and
+`sulgryphon-nextjs` and `press-nextjs` were then read directly to verify it.
+Those two are public. The header and CSP posture in step 5 changed the same day,
+on the SWS answer that CSP is a nice-to-have and that defaults must not put a
+non-technical owner in trouble.
 
 **Not yet executed end to end.** `astro-static` was validated by running it;
 this recipe has not been, and until it is, treat the step ordering as reasoned

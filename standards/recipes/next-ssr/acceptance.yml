@@ -1,4 +1,4 @@
-# Acceptance criteria for recipe: next-netlify
+# Acceptance criteria for recipe: next-ssr
 #
 # EXTENDS astro-static. Everything about the footer, Identity Bar, accessibility,
 # MinWeb, privacy, discoverability, and provenance is shared and lives there.
@@ -14,7 +14,7 @@
 # marked manual; `unknown` is never a pass; `block` is reserved for irreversible
 # harm, which today is exactly one thing.
 
-recipe: next-netlify
+recipe: next-ssr
 version: 1
 extends: astro-static
 
@@ -29,8 +29,10 @@ overrides:
     applies: false
     why: >
       This recipe deliberately does NOT use output: 'export'. Static export
-      cannot emit response headers, which removes CSP and the security header
-      set, and that is the main reason to choose this recipe over astro-static.
+      cannot emit response headers, and also forfeits redirects, rewrites,
+      Proxy, ISR, Server Actions, Draft Mode and default-loader image
+      optimization. Headers alone are NOT sufficient reason to choose this
+      recipe: MinWeb requires none of them. Choose it for the whole list.
 
   - id: build.base-path
     applies: false
@@ -89,11 +91,11 @@ criteria:
 
   - id: security.csp-present
     requires: >
-      A Content-Security-Policy header is configured for the deployed
-      environment.
+      RECORDED, NOT REQUIRED. Whether a Content-Security-Policy is configured
+      for the deployed environment. Absence is a PASS.
     check: security
-    severity: warn
-    weight: 5
+    severity: info
+    weight: 1
     policy: minsec
     mechanism: >
       Parse next.config.* for a headers() function returning a
@@ -102,45 +104,52 @@ criteria:
       cannot be read or is generated dynamically in a way this check cannot
       follow.
     note: >
-      The main capability this recipe has and astro-static does not. Prefer
-      'strict-dynamic' with nonces over a host allowlist, which drifts and
-      eventually allows everything.
+      CHANGED 2026-09-03. This was severity warn, weight 5, described as "the
+      main capability this recipe has and astro-static does not". Both were
+      wrong. MinWeb requires no response headers, so a site with no CSP is
+      fully compliant, and SWS confirmed nonce CSP is a nice-to-have. Reporting
+      a missing CSP as a warning pushed people towards a header that breaks
+      pages at content-edit time, which is the opposite of helpful. The
+      sensible-default header set in security.headers-set is what this recipe
+      actually asserts. See standards/hosting/capabilities.yml.
 
   - id: security.headers-set
     requires: >
-      Strict-Transport-Security, X-Content-Type-Options, Referrer-Policy, and
-      Permissions-Policy are configured.
+      The sensible default header set is configured: Strict-Transport-Security,
+      X-Content-Type-Options, Referrer-Policy, Permissions-Policy, and
+      X-Frame-Options.
     check: security
     severity: warn
-    weight: 4
+    weight: 6
     policy: minsec
     mechanism: Parse next.config.* headers(). Report per missing header, not as one failure.
-
-  - id: security.editor-csp-separate
-    requires: >
-      If the Storyblok Visual Editor is in use, its route has its own CSP
-      allowing frame-ancestors from storyblok.com, and carries
-      noindex, nofollow.
-    check: security
-    severity: info
-    weight: 2
-    policy: minsec
-    applies_when: cms == storyblok
     note: >
-      One policy cannot serve both: the app needs frame-ancestors 'none' and the
-      editor must be iframable by the CMS. The homesite solves this with two
-      policies and a path-exclusion pattern.
+      These are deliberately the headers that CANNOT break a page, which is why
+      they are a default and CSP is not. Canonical values live in
+      standards/hosting/capabilities.yml under default_header_set. Prefer
+      X-Frame-Options SAMEORIGIN over DENY: DENY breaks a CMS Visual Editor
+      preview and then needs a second policy to work around itself.
+
+  # REMOVED 2026-09-03: security.editor-csp-separate. It asserted that a
+  # Storyblok Visual Editor route carries its own CSP and a noindex header.
+  # This package is scoped to static content with no CMS (standards/scope.md),
+  # so there is no editor route, and a criterion that can only report
+  # not_applicable is dead weight in the contract. Returns with the CMS.
 
   - id: security.csp-strict-dynamic
     requires: >
-      The CSP uses 'strict-dynamic' with nonces rather than a host allowlist.
+      IF a CSP is configured, it uses 'strict-dynamic' with nonces rather than a
+      host allowlist. Not applicable when there is no CSP, which is the default.
     check: security
     severity: info
     weight: 2
     policy: minsec
+    applies_when: a CSP is configured
     note: >
-      A CSP built from a long list of allowed hosts drifts and eventually allows
-      everything. @netlify/plugin-csp-nonce injects nonces at the edge.
+      A CSP built from a long list of allowed hosts drifts, eventually allows
+      everything, and makes every future embed a support ticket for someone who
+      cannot diagnose it. @netlify/plugin-csp-nonce injects nonces at the edge;
+      on Vercel there is no equivalent and it is hand-rolled in proxy.ts.
 
   - id: security.no-fontawesome-pro
     requires: '@fortawesome/pro-* packages are not dependencies.'

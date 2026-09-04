@@ -12,7 +12,7 @@
 
 ## When to use this
 
-Public-facing informational Stanford site: department, lab, program, project, event, or documentation. Content is authored in the repo or comes from Storyblok. No user accounts, no personal data collection, no server-side logic.
+Public-facing informational Stanford site: department, lab, program, project, event, or documentation. **Content is authored in the repo** — as Markdown, MDX, or Astro templates — and reviewed through git. No CMS, no user accounts, no personal data collection, no server-side logic.
 
 **Do not use this for:** anything requiring authentication (needs the identity overlay, not yet written), anything storing personal or research data (needs a DRA first), or a site a non-technical unit will maintain alone (point them at Stanford Sites instead, it is free and already compliant).
 
@@ -334,7 +334,7 @@ Add a test that walks every route in the built output and asserts zero violation
 Two things this harness does **not** cover, and the report must say so:
 
 - Roughly 70 percent of accessibility issues, per ODA guidance. A green run is a floor, not conformance. The manual checklist in `role-accessibility-lead` covers the rest.
-- **Content authored after launch.** Everything here tests the built site at build time. It says nothing about what an editor publishes next week. If this site gets a CMS, see the `sa11y` note in the Storyblok swap below, which is how SWS gives authors a11y feedback while they edit.
+- **Content authored after launch.** Everything here tests the built site at build time. Under this package's static-content scope that is a much smaller gap than it sounds: content lives in the repo, so every edit is a commit that runs this harness before it is public. What CI still cannot see is **embedded third-party content** — a Qualtrics form, a YouTube player, an iframed map — whose accessibility is not yours to control and belongs in a procurement conversation with a VPAT. See `standards/scope.md`.
 
 Siteimprove applies further criteria after launch, and its registration is a MinWeb requirement.
 
@@ -366,7 +366,9 @@ Note that GitHub Pages serves **one site**, so a pull request gets checks but **
 
 Use the first-party actions in the documented **two-job** pattern: a `build` job running `configure-pages` → build → `upload-pages-artifact`, and a `deploy` job with `needs: build` running `deploy-pages`.
 
-Current majors as of August 2026: `actions/checkout@v5`, `actions/setup-node@v6`, `actions/configure-pages@v5`, `actions/upload-pages-artifact@v4`, `actions/deploy-pages@v5` (v4 also valid). Check the release pages at generation time rather than trusting this line.
+Current majors, updated 2026-09-03 to match this project's own live Pages deploy: `actions/checkout@v7`, `actions/setup-node@v7`, `actions/configure-pages@v6`, `actions/upload-pages-artifact@v5`, `actions/deploy-pages@v4`. Check the release pages at generation time rather than trusting this line.
+
+**To provision the repo and switch Pages on, use the `sws-github` skill.** It drives `gh` through auth, org choice, repo creation, push, and the Pages API, including the source-setting step below that is otherwise easy to forget.
 
 Two version traps. `upload-pages-artifact@v4` requires `deploy-pages@v4` or newer, and **artifact actions v3 are no longer supported for Pages** as of a December 2024 deprecation. Separately, **older action majors emit a Node 20 deprecation warning**: Node 24 became the default JavaScript action runtime in 2026 and Node 20 is being removed from hosted runners, so `checkout@v4` and `setup-node@v4` produce noise even though they still run. Use the current majors.
 
@@ -425,15 +427,15 @@ Deviation is expected and supported. Each swap below is legitimate; the cost col
 
 | Swap | Cost |
 |---|---|
-| Next.js instead of Astro | Static export forfeits `redirects`, `headers`, `rewrites`, Proxy, ISR, Server Actions, and default-loader image optimization. Route Handlers become `GET`-only. Use `next-static` recipe |
+| Next.js instead of Astro | Use the **`next-ssr`** recipe, and do not statically export it: `output: 'export'` forfeits `redirects`, `headers`, `rewrites`, Proxy, ISR, Server Actions, and default-loader image optimization, and Route Handlers become `GET`-only. Next with a static export is the worst of both options |
+| **`astro-ssr` instead of static** | The smaller step, and usually the right one if all you need is response headers or redirects. Keeps Astro and Decanter identical; adds a host adapter and a paid host. See `standards/recipes/astro-ssr/` |
 | yarn instead of npm | Fine. npm is primary at SWS, yarn secondary, and both are in production use. Respect whatever the project already has and never convert it. Advice touching dependency overrides must be manager-aware, since npm `overrides` and yarn `resolutions` differ |
-| Netlify instead of Pages | Expected as the second step, and **Netlify is where SWS runs**: functions, blobs, edge functions, CSP nonce plugin, and Vault-backed env vars are all in production use. MinWeb HTTPS and live-certificate requirements become yours to satisfy |
-| Vercel instead of Netlify | Supported, but it means leaving the platform every other SWS project uses, so you lose the shared tooling and the institutional knowledge with it |
+| Netlify or Vercel instead of Pages | Expected as the second step, and it buys response headers, per-PR preview URLs, and real redirects. **SWS runs both**, one per family, so neither is a divergence: pick whichever the unit already administers, per `standards/hosting/`. A static build deploys to either unchanged; you only need `astro-ssr` if you want a runtime |
 | Cypress instead of Playwright | Reasonable if the project already has Cypress, which three SWS repos do. Playwright is the forward default; do not convert an existing Cypress suite just to match |
 | `clsx` + `tailwind-merge` instead of `cnbuilder` | Both are in SWS use. `cnbuilder` in the Astro and Storyblok families, `clsx` + `tailwind-merge` in the decoupled Drupal family. Pick one per project, not per file |
 | No Decanter | Identity Bar and Global Footer become hand-maintained, and every brand and a11y check still applies with nothing helping you pass them. Rarely worth it |
 | `decanter/minimal` | Only if something else owns base element styles. On a fresh Astro site this just removes needed resets |
-| Storyblok for content | **The real answer for non-technical units**: an editor never touches GitHub, because publishing fires a webhook that builds and deploys. Fetch at build time with `version: 'published'`. Astro has no ISR primitive, so freshness comes from webhook-triggered rebuilds. Keep the Visual Editor bridge in a preview-only build. **Add `sa11y` to the Visual Editor overlay**: it gives content authors accessibility feedback while they edit, which is the only way to catch issues in content published after launch. Every SWS Storyblok project does this |
+| A CMS for content | **Out of scope for now, and not a swap you can take here.** See `standards/scope.md`. This package has no tested CMS path. Six SWS repos run Storyblok and five run decoupled Drupal, all in production, so the capability plainly exists at SWS — but not as anything this recipe can hand you. If a unit needs a CMS, raise it in discovery and say so plainly rather than building half a content backend to avoid the conversation |
 | Algolia DocSearch for search | Recommended default. Free for public education content, no crawler to run |
 | Coveo instead of Algolia | Enterprise licensing and sales-gated. Atomic web components drop into Astro islands cleanly, but it is over-scoped for most unit sites |
 | Tailwind 3 | **Not a supported swap.** Decanter 8 requires Tailwind 4 |
@@ -450,8 +452,10 @@ Record every swap in `.sws/manifest.yml` under `divergences`, with a one-line re
 6. **Installing `@astrojs/tailwind`.** Dead package. Will appear to work, then fail.
 7. **Adding unit links to the Global Footer.** They go in the local footer above it.
 8. **Building a cookie consent banner.** Not required at Stanford, and a homegrown one is worse than none.
+
 9. **Assuming a green axe run means conformance.** It means roughly 30 percent of issues are absent.
 10. **Trusting an a11y result that never ran.** axe needs a real browser. If Chromium is unavailable the result is "unknown," not "clean." `sws check` reports those differently and so should you.
+11. **Wiring up a CMS because a unit asked for one.** Out of scope; see `standards/scope.md`. Say it is not covered yet, and point them at Stanford Sites if they will maintain the site alone. Half a content backend is worse than an honest no.
 
 ## Provenance
 

@@ -36,7 +36,10 @@ Say that out loud before writing the first route. It is usually the decisive fac
 ## Prior art, when v2 arrives
 
 Two established patterns at SWS, both Decanter 7 era so borrow architecture and
-not CSS:
+not CSS. **Both are CMS-backed and therefore out of scope for this package right
+now** (`standards/scope.md`) — they are recorded here because the record is
+useful and because the scope is expected to widen, not because you should wire
+one up today:
 
 - **Decoupled Drupal**: `cardinalsites-nextjs`, `csp-nextjs`, `summer-nextjs` use
   `graphql-request` plus `graphql-codegen` against Drupal. `sulgryphon-nextjs`

@@ -1,0 +1,219 @@
+# What a Stanford site needs from a host
+#
+# reviewed: 2026-09-03
+#
+# This is the platform-agnostic half of the hosting story. Recipes declare which
+# capabilities they need; the host profiles in this directory say how each host
+# meets them and what it costs. Acceptance criteria assert the OUTCOME
+# ("a canonical URL is emitted"), never the vendor mechanism ("netlify.toml
+# exists"), which is what keeps recipes portable.
+#
+# ==============================================================================
+# THE THING TO GET RIGHT ABOUT THIS FILE
+#
+# MinWeb requires NO RESPONSE HEADERS. Not CSP, not HSTS, none. Read
+# standards/policy/minweb.md and count: named owner, named technical admin, MFA
+# on admin logins, HTTPS with a live certificate, no credentials in Git,
+# approved subdomain, exact Global Footer, accessibility barrier link,
+# Siteimprove registration, DNS audits. That is the list.
+#
+# So `required` below is short, and almost every host clears it. Hosting is
+# therefore NOT where compliance is won or lost, and a recipe that implies
+# otherwise is overreaching. The `recommended` block is where most of the
+# engineering value sits, and it is advisory in the ordinary way: report, offer
+# a fix, move on.
+#
+# Confirmed by SWS 2026-09-03: nonce-based CSP is a NICE-TO-HAVE.
+# ==============================================================================
+
+version: 1
+
+required:
+  - id: https-live-cert
+    what: HTTPS served with a valid, auto-renewing certificate.
+    policy: minweb
+    why: >
+      MinWeb requirement, and the one hosting fact that is genuinely
+      non-negotiable. UIT also runs an SSL service for cases the host cannot
+      cover.
+    verify: A post-deploy request to the production URL over https succeeds.
+
+  - id: custom-domain
+    what: >
+      Serves the approved stanford.edu subdomain (or the approved
+      Stanford-branded .org/.com), not only a *.netlify.app or *.vercel.app URL.
+    policy: minweb
+    why: >
+      MinWeb scope covers Stanford-branded non-stanford.edu domains too;
+      sup.org is the live example. The NAME is approved by University
+      Communications and is not the host's decision or ours.
+    verify: Production URL matches the domain recorded in .sws/manifest.yml.
+    note: >
+      A vendor preview domain is fine pre-launch. press-nextjs currently
+      publishes to a *.vercel.app URL, which is why this is worth checking.
+
+  - id: admin-mfa
+    what: MFA, or SSO with MFA, on the hosting dashboard itself.
+    policy: minweb
+    why: >
+      "MFA on all administrative logins" is routinely read as covering only the
+      obvious logins. The
+      host dashboard can trigger a deploy and read environment variables, so it
+      is an administrative login. This is the most-missed item in this file.
+    verify: Manual attestation on the launch checklist.
+
+  - id: no-committed-secrets
+    what: >
+      Environment variables injected at build or run time, never committed.
+      Vault is the SWS source: netlify-plugin-vault-variables in the
+      storyblok-next-netlify family, node-vault in the decoupled-drupal family.
+    policy: minweb
+    why: The only irreversible harm, and the only blocking check in this system.
+    verify: minweb.no-secrets. Blocking.
+    note: >
+      node-vault is the host-portable option because it does not depend on a
+      host build plugin. Prefer it if the project might change hosts.
+
+  - id: named-admin-access
+    what: >
+      The named technical administrator can actually log in, read build logs,
+      and roll back, without going through a departed employee's account.
+    policy: [minweb, minsec]
+    why: >
+      MinSec's quarterly account and privilege review needs a human who has
+      access. A site whose only deploy credential belongs to a graduated
+      student is a real and common failure.
+    verify: Manual. Record the admin in .sws/manifest.yml.
+
+  - id: sunsettable
+    what: Site and its DNS record can both be fully removed at retirement.
+    policy: minweb
+    why: >
+      Secure sunset. A dangling CNAME pointing at a decommissioned host is a
+      subdomain-takeover risk, and it is the step everyone forgets.
+    verify: Manual. Ask for the sunset plan at project start, not at the end.
+
+recommended:
+  # Advisory. Good engineering, not policy. Never gate on these.
+  - id: security-headers-default
+    what: >
+      A sensible default security header set on every response:
+      Strict-Transport-Security, X-Content-Type-Options: nosniff,
+      Referrer-Policy, Permissions-Policy denying unused features, and
+      frame protection.
+    why: >
+      Cheap, boring, and cannot break a page. Every recipe should ship these
+      switched on. See default-header-set below for the exact values.
+    cost: None worth naming. This is why it is a default rather than an option.
+
+  - id: csp
+    what: A Content-Security-Policy.
+    why: Defence in depth against injected script.
+    cost: >
+      REAL, AND THE REASON THIS IS NOT A DEFAULT. A CSP is the one header that
+      breaks pages, and it breaks them at CONTENT-EDIT time rather than at
+      deploy time, which is the worst possible moment. An owner embeds a
+      YouTube video, a Qualtrics survey, or a Google Font, the browser blocks
+      it silently, and nobody can work out why. See csp-guidance below.
+    default: OFF.
+
+  - id: preview-urls
+    what: A unique URL per pull request.
+    why: >
+      The real reason to move off GitHub Pages once more than one person
+      reviews changes. Netlify and Vercel both do this; Pages structurally
+      cannot.
+    cost: None. Do not make pull requests mandatory to get it.
+
+  - id: redirects
+    what: Declarative redirects and rewrites without running a server.
+    why: >
+      University IA churns constantly, and most Stanford sites replace
+      something. sulgryphon-nextjs is the reference: nine redirect rules
+      catching legacy Drupal and WordPress paths (/node/*, /wp-content/*,
+      *.php) and three rewrites to discover.stanford.edu.
+    cost: Static hosting on Pages gives you almost none of this.
+
+  - id: server-runtime
+    what: SSR, route handlers, image optimization, incremental revalidation.
+    why: Needed by next-ssr and astro-ssr. Not needed by astro-static.
+    cost: >
+      Rules out purely static hosting. Do NOT reach for a server runtime you do
+      not need; a static site is cheaper to run and cheaper to keep compliant.
+
+deferred:
+  # OUT OF SCOPE for now, listed so the absence is not read as an oversight.
+  # See standards/scope.md.
+  - id: cms-rebuild-webhook
+    what: An endpoint a CMS can call to trigger a rebuild on publish.
+    why_deferred: >
+      This package is scoped to static content authored in the repo, so there is
+      no publish event to listen for. All three hosts support it -- build hooks
+      on Netlify and Vercel, repository_dispatch on Pages -- so this is a scope
+      decision, not a capability gap. It returns with the CMS.
+    note: >
+      This was the item that made git disappear for a non-technical owner, and
+      losing it has a real consequence: without a CMS, the paths are GitHub web
+      UI editing or a referral to Stanford Sites. That is a discovery
+      conversation, not a technical detail. See standards/scope.md.
+
+# ------------------------------------------------------------------ the default
+default_header_set:
+  note: >
+    Ship these ON, in every recipe, on every host. They are deliberately the
+    headers that cannot break a content edit. Values are the same ones
+    adapt-stanford-homesite serves, minus its CSP.
+  headers:
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options: "nosniff"
+    Referrer-Policy: "origin-when-cross-origin"
+    Permissions-Policy: "geolocation=(), camera=(), microphone=(), midi=(), payment=(), usb=()"
+    X-Frame-Options: "SAMEORIGIN"
+  gotchas:
+    - >
+      X-Frame-Options is SAMEORIGIN, not DENY. DENY breaks a CMS Visual Editor
+      preview, which needs to iframe the site. The homesite uses DENY on the app
+      and a separate policy for its editor route. THERE IS NO CMS IN SCOPE HERE
+      (standards/scope.md), so that problem is absent and SAMEORIGIN is simply
+      the right default -- do not import the two-policy pattern to solve a
+      problem you do not have.
+    - >
+      Permissions-Policy denies only what a university brochure site never uses.
+      Do not extend the deny-list past that without checking: a lab site with an
+      embedded instrument feed or a map may legitimately need geolocation.
+    - >
+      Gate headers on the deployed environment if they fight local development.
+      The homesite returns [] when not on the host, which is worth copying.
+    - >
+      Static hosting on GitHub Pages CANNOT send these. It serves files, not
+      headers. That is a stated cost of astro-static, not a defect to fix.
+
+# --------------------------------------------------------------------- CSP note
+csp_guidance:
+  position: >
+    Not required, not a default, genuinely nice to have. Offer it, never
+    assume it, and never let it be the reason a recipe or a host looks
+    non-compliant.
+  do_not:
+    - >
+      DO NOT build a CSP from a domain allowlist. It drifts, it eventually
+      allows everything, and every embed a content owner adds is a support
+      ticket they cannot diagnose themselves.
+    - >
+      DO NOT enable CSP on a site whose owner is non-technical unless someone
+      has agreed to own the breakage. This is the whole reason it is off by
+      default.
+  if_you_do:
+    - >
+      Prefer 'strict-dynamic' with per-request nonces over a host allowlist.
+      @netlify/plugin-csp-nonce does this at the edge on Netlify. On Vercel it
+      is hand-rolled in proxy.ts (Next's renamed middleware).
+    - >
+      Start with Content-Security-Policy-Report-Only. It cannot break a page by
+      construction, and it tells you what a real policy would have blocked.
+    - Record the choice in .sws/manifest.yml. It is a divergence from the default.
+  prior_art_note: >
+    None of the five Vercel-hosted repos sets any security headers, and
+    sulgryphon-nextjs's headers() sets only X-Robots-Tag for non-production.
+    That is PERMITTED, not a finding. Only adapt-stanford-homesite has the full
+    set, and exemplary is not the bar.

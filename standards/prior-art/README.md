@@ -4,6 +4,29 @@
 
 This directory is how that happens without vendoring anyone's code, and without dragging superseded standards into new work.
 
+## Scope note: most of this prior art is CMS-backed, and the CMS is not in scope
+
+**Read this before copying anything.** `standards/scope.md` scopes this package
+to **static content authored in the repo, with no CMS.** Six SWS repos run
+Storyblok and five run decoupled Drupal, so most of the record below is
+CMS-backed work.
+
+That record is **not rewritten to match the current scope**, because it is
+evidence rather than instruction. It is still correct about what SWS built.
+
+So when prior art shows you a Storyblok or Drupal pattern:
+
+- It is **still true** about what SWS did, and the work is not wrong.
+- It is **not a recipe you can follow here**, because there is no tested CMS
+  path in this package.
+- Cite it for the **shape of the problem** — content modelling, IA, component
+  composition, host wiring — and not for the content plumbing.
+
+This is the ordinary precedence rule doing its job: prior art tells you how we
+solved a shape of problem, standards tell you what to build it with, and when
+they disagree, standards win.
+
+
 ## The precedence rule
 
 This is the whole design, and everything below serves it:

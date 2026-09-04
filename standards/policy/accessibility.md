@@ -38,15 +38,21 @@ and never let a report imply it.
 
 | Signal | When | Catches |
 |---|---|---|
-| **`sa11y`** in the CMS Visual Editor overlay | While authors edit | Content problems, before publish |
+| **Content review in git** | Every content change | Content problems, before publish. Under this package's static-content scope every edit is a commit, so it runs the two CI signals below |
 | **axe** via Playwright in CI | Every build | ~30 percent of issues in the built site |
 | **State audit**, in the same `sws a11y` run | Every build | Hover and focus states that change colour and nothing else, which axe cannot see |
 | **Manual checklist** | Pre-launch, and on significant change | The rest |
 | **Siteimprove** | After launch, continuously | Its own criteria, site-wide |
 
-`sa11y` is a **content-author** tool, not a developer tool. It belongs in the
-Visual Editor overlay on a CMS-backed site, because content published after
-launch is the accessibility risk no CI run can reach.
+**On the `sa11y` row that used to head that table.** `sa11y` is a
+**content-author** tool, not a developer tool, and it belongs in the Visual
+Editor overlay on a CMS-backed site, because content published after launch is
+the accessibility risk no CI run can reach. **This package has no CMS** — see
+`standards/scope.md` — so content arrives through git and CI reaches all of it.
+The tool returns when a CMS does.
+
+That is a genuine improvement, and it is also the smaller of the two limits.
+The 30 percent ceiling above is untouched by it.
 
 ## Siteimprove and axe are not comparable
 

@@ -41,6 +41,7 @@ Same pattern. Fill these in as the routes get confirmed, and **never invent a do
 | Data Risk Assessment, triggered by personal data or new third-party services | UIT Security | DRA process | Route needs confirming |
 | MinSec temporary exception | UIT Security, via the Business Owner | Exception request, valid up to 3 years | Route needs confirming |
 | SSL certificate | UIT | SSL service | Route needs confirming |
+| **Access to a Stanford GitHub org**, so a site is not owned by one person's personal account | The org's own owners | Ask the unit who administers their GitHub org; if nobody knows, the general UIT contact will route it | **Route needs confirming.** There is no single Stanford-wide GitHub door, and orgs are administered per unit, so do not invent one. This is an access request, not a purchase |
 
 ## Rules for the agent
 

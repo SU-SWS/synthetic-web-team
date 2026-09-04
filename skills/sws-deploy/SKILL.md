@@ -33,8 +33,15 @@ deliberately. Report, do not remove.
 
 ## GitHub Pages
 
-Two jobs, first-party actions: `configure-pages@v5`, `upload-pages-artifact@v4`,
-`deploy-pages@v5`. Artifact actions v3 are no longer supported for Pages.
+**To provision a repo and turn Pages on, use the `sws-github` skill** — it drives
+`gh` through auth, org choice, repo creation, push, and the Pages API, so almost
+nobody needs a web UI.
+
+Two jobs, first-party actions. As of 2026-09-03 this project's own live deploy
+runs `configure-pages@v6`, `upload-pages-artifact@v5`, `deploy-pages@v4`.
+Artifact actions v3 are no longer supported for Pages, and
+`upload-pages-artifact@v4`+ needs `deploy-pages@v4` or newer. Check the release
+pages rather than trusting this line.
 
 ```yaml
 permissions:
@@ -56,7 +63,7 @@ workflow, easy to forget.
 
 **Two gotchas worth an afternoon each:**
 
-1. **`upload-pages-artifact@v4` excludes dotfiles.** If the build output needs
+1. **`upload-pages-artifact` excludes dotfiles.** If the build output needs
    `.well-known/` or similar, verify it survives or build the tar yourself.
 2. **Subpath deploys need `base`** set in the framework config, or internal
    links work locally and break in production.
@@ -64,34 +71,57 @@ workflow, easy to forget.
 Pages serves **one site**, so a pull request gets checks but **no preview URL**.
 Say so rather than letting someone expect previews.
 
-## Moving to Netlify
+## Moving off Pages: Netlify or Vercel
 
-Netlify is where SWS runs: functions, blobs, edge functions, the CSP nonce
-plugin, and Vault-backed environment variables are all in production use. Vercel
-appears once across eleven repos. Choosing Vercel means leaving the platform
-every other SWS project uses, which costs you the shared tooling.
+**SWS runs both, one per family**, and neither is the house default:
 
-Netlify also gives per-PR preview URLs, which is the real reason to move once
-review matters.
+| Family | Host | Secrets |
+|---|---|---|
+| `storyblok-next-netlify` (ADAPT/OOD, 6 repos) | Netlify | `netlify-plugin-vault-variables` |
+| `decoupled-drupal` (Cardinal Sites, 5 repos) | Vercel | `node-vault` |
+
+**Start from where the unit already is.** If they have a Netlify or Vercel
+account, people who can log into it, and a billing arrangement that works, that
+is the right host — the shared-tooling argument is real but it is worth less than
+an account someone already administers. Ask before recommending.
+
+Full profiles, with the capability each host does and does not cover, are in
+`standards/hosting/`. Read those rather than reasoning from vendor marketing.
+
+Both give **per-PR preview URLs**, which is the actual reason to move off Pages
+once review matters.
+
+**Do not rank hosts, and do not introduce a third one on your own.** A new vendor
+relationship is a procurement question with contractual consequences. State the
+obligation, name the office, stop. See `standards/policy/procurement.md`.
 
 **Secrets do not live in `.env` in production.** SWS uses HashiCorp Vault, via
 `netlify-plugin-vault-variables` in the Storyblok family and `node-vault` in the
-decoupled Drupal family. Follow that rather than introducing a new pattern.
+decoupled Drupal family. `node-vault` is the host-portable one: prefer it if you
+might move hosts later.
 
 ## Making git disappear
 
-For non-technical units this is the actual goal, and there are two paths:
+For non-technical units this is the actual goal, and it decides **who can
+maintain the site** — which matters more than any technical detail here.
 
-- **GitHub web UI editing.** Edit, commit to `main`, site updates. Already
-  supported by the trigger above.
-- **A CMS.** With Storyblok an editor never touches GitHub: publish fires a
-  webhook, the build runs, the site deploys. Astro has no ISR primitive, so
-  freshness comes from webhook-triggered rebuilds rather than in-framework
-  revalidation.
+**This package is scoped to static content authored in the repo, with no CMS**
+(`standards/scope.md`). So there are two paths, and the CMS is not one of them
+yet:
 
-If the site has content editors who are not developers, the CMS path is worth
-raising early. It changes who can maintain the site, which matters more than any
-technical detail here.
+- **GitHub web UI editing.** Edit a Markdown file, commit to `main`, the site
+  rebuilds. Already supported by the trigger above, and this is why nothing may
+  make a pull request mandatory. A real answer for a unit with one or two people
+  willing to edit Markdown.
+- **Point them at Stanford Sites.** Free, already compliant, and someone else
+  maintains it. The right referral for a unit that will maintain a site alone
+  with no appetite for git. `astro-static` says this too.
+
+**Raise it in discovery, not at launch.** If the unit genuinely needs a CMS, say
+plainly that this package does not cover it yet rather than building half a
+content backend to avoid the conversation. Eleven SWS repos are CMS-backed in
+production, so the capability exists in the org — just not as a tested recipe
+here.
 
 ## Pre-launch checklist
 

@@ -96,10 +96,15 @@ testing:
   vitest: "4.1.10"
   vite: "8.2.1"
 
-cms:
-  "@storyblok/astro": "10.2.3"
-  "@storyblok/react": "7.2.4"
-  storyblok: "4.22.0"           # CLI
+# CMS packages are DEFERRED, not recorded. See standards/scope.md.
+# This package has no tested CMS path, so these versions are noted here only so
+# their absence is not read as an oversight. NOTHING installs from this file
+# anyway -- it is a dated snapshot for the canary to diff.
+#
+# cms:
+#   "@storyblok/astro"   in use across the storyblok-next-netlify family
+#   "@storyblok/react"   same
+#   storyblok            the CLI
 
 search:
   "@docsearch/react": "5.0.0"
@@ -107,16 +112,36 @@ search:
   "react-instantsearch": "7.42.0"
 
 hosting:
-  "netlify-cli": "27.1.1"
-  vercel: "58.9.0"              # appears once across 11 SWS repos
+  "netlify-cli": "27.1.1"       # storyblok-next-netlify family
+  vercel: "58.9.0"              # decoupled-drupal family
+  # CORRECTED 2026-09-03: the old comment here said Vercel "appears once across
+  # 11 SWS repos". That counted npm dependencies, which do not record a deploy
+  # target. Both hosts are in production, one per lineage. See
+  # standards/prior-art/repos.yml, ANSWERED block H1.
 
 # Verified 2026-08-10. Check releases at generation time rather than trusting
 # these, because Actions majors move on GitHub's schedule, not npm's.
 github_actions:
-  "actions/configure-pages": "v5"
-  "actions/upload-pages-artifact": "v4"   # NOTE: excludes dotfiles
-  "actions/deploy-pages": "v5"            # v4 also valid; must be >= artifact major
+  # UPDATED 2026-09-03 to what .github/workflows/static.yml actually runs, which
+  # is a live Pages deploy (su-sws.github.io/synthetic-web-team, status "built").
+  # The previous values were the 2026-08-10 snapshot and had gone stale.
+  "actions/checkout": "v7"
+  "actions/setup-node": "v7"
+  "actions/configure-pages": "v6"
+  "actions/upload-pages-artifact": "v5"   # NOTE: excludes dotfiles
+  "actions/deploy-pages": "v4"
   # Artifact actions v3 are no longer supported for Pages (Dec 2024 deprecation).
+  #
+  # CLAIM RETRACTED: this block used to say deploy-pages "must be >= artifact
+  # major". Our own working deploy runs upload-pages-artifact v5 with
+  # deploy-pages v4, which that rule forbids. The correct, narrower constraint
+  # was already stated properly in astro-static/RECIPE.md step 8:
+  # "upload-pages-artifact@v4 requires deploy-pages@v4 or newer". v5 + v4
+  # satisfies that. This file had restated it as a general ordering rule and
+  # got it wrong -- a good argument for citing the recipe rather than
+  # paraphrasing it here.
+  #
+  # Advisory, as with everything in this file: nothing installs from here.
 
 # Things deliberately absent, so their absence is not read as an oversight.
 not_recorded:
@@ -129,3 +154,15 @@ not_recorded:
     why: These sites have few components and one consumer.
   - what: any Drupal or Acquia version
     why: v2 scope.
+  - what: "@storyblok/* and the storyblok CLI"
+    why: >
+      DEFERRED 2026-09-03. This package is scoped to static content authored in
+      the repo, with no CMS attachment. Six SWS repos run Storyblok in
+      production and that work is not wrong; there is simply no tested recipe
+      for it here yet. See standards/scope.md.
+  - what: sa11y
+    why: >
+      DEFERRED with the CMS. It is a CONTENT-AUTHOR tool for a Visual Editor
+      overlay, so it has nothing to attach to when content comes from git.
+      Under the static-content scope, `sws a11y` in CI reaches every content
+      change instead. See standards/scope.md.

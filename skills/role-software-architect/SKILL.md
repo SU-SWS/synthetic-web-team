@@ -44,14 +44,22 @@ Three families, and choosing between them is most of the architecture work on a
 new project:
 
 - **Static, no CMS.** Content in the repo. Simplest, lowest tier, fewest
-  obligations.
+  obligations. **This is the only one this package currently builds** — see
+  `standards/scope.md`. All three recipes sit here, including the two with a
+  server runtime, because a runtime is for headers, redirects, search, and forms
+  rather than for fetching content.
 - **Static plus Storyblok.** Content editors never touch git; publishing triggers
-  a rebuild. The right answer when non-developers maintain content.
+  a rebuild. Six SWS repos. **Out of scope here for now**: no tested recipe.
 - **Decoupled Drupal.** GraphQL against Drupal, for Stanford Sites-scale content
-  and existing Drupal investment.
+  and existing Drupal investment. Five SWS repos. **Out of scope here for now.**
 
 Prefer the least machinery that meets the need. Every step up adds patching
 surface, compliance obligations, and something for the next person to learn.
+
+**Choosing between the three is still architecture work**, and the honest answer
+may be that a project needs one this package does not ship. Say so — out of
+scope is not forbidden, and the existing SWS CMS work is not wrong. What you must
+not do is quietly build half a content backend to avoid the conversation.
 
 ## The constraint people miss
 
