@@ -71,12 +71,19 @@ jobs:
         with:
           node-version: '24'
 
-      # Trusted publishing needs an npm that can do the OIDC exchange. Latest,
-      # not pinned, per the house rule in AGENTS.md -- and then asserted, so the
-      # failure is "npm is too old" rather than an opaque 401 three steps later.
+      # Trusted publishing needs an npm that can do the OIDC exchange. ASSERT the
+      # floor, do NOT chase latest.
+      #
+      # This step used to run `npm install -g npm@latest`, which was a mistake:
+      # Node 24 already ships npm 11.19.0, comfortably past the 11.5.1 floor, so
+      # the upgrade swapped a known-good version for whatever shipped that
+      # morning -- npm 12.0.2 on the run that failed with ENEEDAUTH. The house
+      # rule about installing latest is about a PROJECT'S dependencies, where
+      # being current is the point. The tool that authenticates a release is the
+      # wrong place to take that risk, and "not too old" was all this ever
+      # needed.
       - name: npm new enough for OIDC
         run: |
-          npm install -g npm@latest
           V=$(npm --version)
           node -e '
           const v = process.argv[1];
@@ -94,7 +101,11 @@ jobs:
         run: |
           echo "npm:  $(npm --version)"
           echo "node: $(node --version)"
-          echo "OIDC token URL present: ${ACTIONS_ID_TOKEN_REQUEST_URL:+yes}${ACTIONS_ID_TOKEN_REQUEST_URL:-NO — id-token: write is missing}"
+          echo "OIDC request URL:   ${ACTIONS_ID_TOKEN_REQUEST_URL:+present}${ACTIONS_ID_TOKEN_REQUEST_URL:-MISSING}"
+          echo "OIDC request token: ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+present}${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-MISSING}"
+          echo "repository: ${GITHUB_REPOSITORY}"
+          echo "workflow file, which the npm trusted publisher must name exactly:"
+          echo "  ${GITHUB_WORKFLOW_REF##*/}"
           echo "registry: $(npm config get registry)"
           echo ".npmrc files npm can see:"
           npm config ls -l 2>/dev/null | grep -i "^; .*npmrc" || echo "  (none reported)"
