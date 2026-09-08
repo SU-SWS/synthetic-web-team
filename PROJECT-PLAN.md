@@ -228,7 +228,7 @@ Five layers, each independently useful, each degrading gracefully if the layer a
 │ L2  Wizard          install | init | add                     │
 │                     Detects editors, emits native files,     │
 │                     runs the upstream scaffolder + recipe    │
-│                     Optional: @su-sws/mcp for in-agent use   │
+│                     Optional: @su-sws/synthetic-web-team-mcp for in-agent use   │
 ├─────────────────────────────────────────────────────────────┤
 │ L1  Portable core   AGENTS.md + 8 role skills + 11 stubs     │
 │                     + shared reference skills + MCP map      │
@@ -305,7 +305,7 @@ synthetic-web-team/                        pnpm workspace, Node 24
 │   ├── standards/                         @su-sws/standards  (ships L0 + L1 content)
 │   ├── cli/                               @su-sws/sws-cli    → binary `sws`
 │   ├── create-web-team/                   @su-sws/create-web-team  (the wizard)
-│   └── mcp/                               @su-sws/mcp        (spec 2026-07-28)
+│   └── mcp/                               @su-sws/synthetic-web-team-mcp        (spec 2026-07-28)
 ├── docs/                                  the public docs site (Astro + Starlight)
 │                                          also our own dogfooding of astro-static
 └── .github/workflows/
@@ -319,7 +319,7 @@ synthetic-web-team/                        pnpm workspace, Node 24
 
 **Consolidated to two published packages, 1 September 2026.** The layout above lists four. Publishing four turned out to be machinery without a payer: `@su-sws/standards` and `@su-sws/create-web-team` have **no external dependencies**, and the standards get *vendored into the consumer's project* by the wizard anyway — so that package was a courier for files that end up copied regardless, and its cost was a prepack/postpack staging script and a package directory that looked empty in the working tree.
 
-What ships now is `@su-sws/synthetic-web-team` (content + CLI + wizard, published from the repository root, so no staging) and `@su-sws/mcp` (the server). The split that survives is the one with a reason: CI runs `sws check` on every push and should not download an MCP SDK to do it. `packages/cli` and `packages/wizard` remain as private workspace packages for development linking.
+What ships now is `@su-sws/synthetic-web-team` (content + CLI + wizard, published from the repository root, so no staging) and `@su-sws/synthetic-web-team-mcp` (the server). The split that survives is the one with a reason: CI runs `sws check` on every push and should not download an MCP SDK to do it. `packages/cli` and `packages/wizard` remain as private workspace packages for development linking.
 
 **Renamed to `@su-sws/synthetic-web-team`, 8 September 2026.** The published package was `@su-sws/sws` and the wizard directory was `packages/create-web-team/`. Three reasons to change both. The npx invocation is the artefact people actually paste, so it should name the repository they are being sent to rather than an abbreviation that appears nowhere else. `create-web-team` also described the *act* of scaffolding, which stopped being the whole job once re-running became the update mechanism and `add` became a first-class mode. And nothing had been published, so the rename cost nothing: no dependents, no deprecation, no alias to carry. The bins are now `synthetic-web-team` (the wizard, and the one npx resolves by default) and `sws` (the CLI). The internal CLI workspace package keeps the name `@su-sws/sws-cli`, because the binary is still `sws` and that name is correct.
 
@@ -538,7 +538,7 @@ Two deliberate choices here. **The per-editor files are thin pointers, not conte
 
 ### Optional MCP server
 
-`@su-sws/mcp`, built against spec 2026-07-28 (stateless, `server/discover`, Streamable HTTP plus stdio). It is a second entry point, never a requirement. Tools:
+`@su-sws/synthetic-web-team-mcp`, built against spec 2026-07-28 (stateless, `server/discover`, Streamable HTTP plus stdio). It is a second entry point, never a requirement. Tools:
 
 - `sws_get_standard(topic)` returns the relevant L0 document
 - `sws_check(path)` runs the advisory checks and returns structured findings
@@ -787,10 +787,10 @@ L0 complete. The 8 built role skills, the 11 stubs, the 5 shared skills. `AGENTS
 *Exit: both recipes generate projects that deploy to all three targets.*
 
 **Phase 5, MCP and Storyblok (weeks 17 to 20, Dec 7 to Jan 8)**
-*Reprioritised and partly delivered, 1 September 2026. `@su-sws/mcp` was pulled forward out of Phase 5 on the grounds that the primary installer of this package is an **agent**, not a human — which makes a tool an agent can call more important than a CLI it has to shell out to and parse. It ships with five tools (`sws_get_standard`, `sws_footer_html`, `sws_check`, `sws_decanter_token`, `sws_scaffold`) plus all 26 L0 documents as resources, verified end to end over the real stdio protocol. Storyblok and Algolia remain in this phase.*
+*Reprioritised and partly delivered, 1 September 2026. `@su-sws/synthetic-web-team-mcp` was pulled forward out of Phase 5 on the grounds that the primary installer of this package is an **agent**, not a human — which makes a tool an agent can call more important than a CLI it has to shell out to and parse. It ships with five tools (`sws_get_standard`, `sws_footer_html`, `sws_check`, `sws_decanter_token`, `sws_scaffold`) plus all 26 L0 documents as resources, verified end to end over the real stdio protocol. Storyblok and Algolia remain in this phase.*
 
 *Two divergences recorded. **Protocol version:** this section specified spec `2026-07-28` (stateless, `server/discover`). Checked against `@modelcontextprotocol/sdk` 1.30.0: that string appears nowhere in the SDK, nor does `server/discover`, and `LATEST_PROTOCOL_VERSION` is `2025-11-25`. Building against a spec no SDK implements would have produced a server that works in no editor. Built against the SDK's negotiated version instead. **Implementation:** `sws_check` and `sws_scaffold` shell out to the CLI and the wizard rather than reimplementing them, so the MCP result and the terminal result cannot disagree.*
-`@su-sws/mcp` against spec 2026-07-28. A Storyblok add-on recipe for the Astro path using the current `@storyblok/astro`, schema-as-code via the Storyblok CLI, and webhook-triggered rebuilds since Astro has no ISR primitive. Algolia DocSearch add-on recipe.
+`@su-sws/synthetic-web-team-mcp` against spec 2026-07-28. A Storyblok add-on recipe for the Astro path using the current `@storyblok/astro`, schema-as-code via the Storyblok CLI, and webhook-triggered rebuilds since Astro has no ISR primitive. Algolia DocSearch add-on recipe.
 *Exit: a Storyblok-backed Astro site generated from recipes, and the MCP server working in at least three editors.*
 
 **Phase 6, Pilot and launch (weeks 21 to 23, Jan 11 to Jan 29)**

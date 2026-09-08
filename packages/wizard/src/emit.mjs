@@ -144,7 +144,7 @@ Follow the agent contract in \`AGENTS.md\`. Skills are in \`.agents/skills/\`.
   // This used to emit an empty shell, on the reasoning that the wizard cannot
   // know which servers a person is entitled to use. That still holds for third
   // parties -- a wrong entry produces confusing tool failures -- but it does not
-  // hold for @su-sws/mcp, which is ours, optional, and read-only apart from
+  // hold for @su-sws/synthetic-web-team-mcp, which is ours, optional, and read-only apart from
   // sws_scaffold (which itself defaults to a dry run).
   //
   // The server is a SECOND entry point, never a requirement: everything it
@@ -155,7 +155,7 @@ Follow the agent contract in \`AGENTS.md\`. Skills are in \`.agents/skills/\`.
       mcpServers: {
         sws: {
           command: 'npx',
-          args: ['-y', '@su-sws/mcp'],
+          args: ['-y', '@su-sws/synthetic-web-team-mcp'],
         },
       },
     }, null, 2) + '\n';
@@ -166,7 +166,7 @@ Follow the agent contract in \`AGENTS.md\`. Skills are in \`.agents/skills/\`.
            '# Optional: the SWS MCP server, a second entry point to the same standards.\n' +
            '# [mcp_servers.sws]\n' +
            '# command = "npx"\n' +
-           '# args = ["-y", "@su-sws/mcp"]\n';
+           '# args = ["-y", "@su-sws/synthetic-web-team-mcp"]\n';
   }
   return null;
 }

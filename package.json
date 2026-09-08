@@ -11,7 +11,7 @@
     "sync-skills": "node scripts/sync-skills.mjs",
     "validate": "node scripts/validate-skills.mjs && node scripts/validate-emit.mjs && node scripts/validate-criteria.mjs && node scripts/validate-state-classifier.mjs",
     "check": "npm run validate && npm run sync-skills -- --check",
-    "pack:all": "mkdir -p .pack && npm pack --pack-destination ./.pack && npm pack -w @su-sws/mcp --pack-destination ./.pack"
+    "pack:all": "mkdir -p .pack && npm pack --pack-destination ./.pack && npm pack -w @su-sws/synthetic-web-team-mcp --pack-destination ./.pack"
   },
   "engines": {
     "node": ">=22.12.0"
@@ -21,7 +21,6 @@
     "packages/*"
   ],
   "devDependencies": {
-    "@su-sws/synthetic-web-team": "^0.1.0",
     "yaml": "^2.8.1"
   },
   "bin": {

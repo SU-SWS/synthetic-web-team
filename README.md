@@ -30,7 +30,7 @@ Early. The plan is complete and reviewed; the implementation is partway through.
 | Report delivery | **Working.** PR comment and a persistent "Site health" issue, both updated in place. Score trend, sparkline, HTML artifact, README badge |
 | Install wizard | **Working, agent-first, two-part.** `user` scope installs the skills into your tools once per machine and is removable; project scope installs `AGENTS.md`, the standards, and the per-site record. Non-interactive by default off a TTY, `--json` result with machine-readable next steps, `--answers` input, idempotent re-runs that preserve project state |
 | Copy-a-prompt install | **Working.** Five prompts on the site — install into your editor, start a new site, add to an existing project, review, update — each carrying an `npx` route and a `git clone` fallback |
-| Publishable packages | **Working, not yet published.** Two packages — `@su-sws/synthetic-web-team` and `@su-sws/mcp` — verified by installing the tarballs into a clean project with no repository present |
+| Publishable packages | **Working, not yet published.** Two packages — `@su-sws/synthetic-web-team` and `@su-sws/synthetic-web-team-mcp` — verified by installing the tarballs into a clean project with no repository present |
 | Updates | **Working.** Re-install is the update: project state preserved, local edits reported as conflicts rather than overwritten, stale files reported not deleted, staleness nag in `sws doctor` |
 | Recipe canary | **Deliberately deferred**, 2026-09-01. Not in production, so nobody is exposed to upstream drift yet. Revisit before the first pilot |
 | Standards freshness CI | Planned, and the priority ahead of the canary. Keeps policy, prior art, and sourced facts from going stale |
@@ -212,11 +212,11 @@ node packages/cli/bin/sws.mjs doctor --standards standards
 | [`standards/prior-art/`](standards/prior-art/) | Existing SWS work, with era, lineage, and judgment attached |
 | [`packages/cli/`](packages/cli/) | The `sws` CLI. 13 check modules, plus axe, interactive-state, and performance runners in real Chromium |
 | [`packages/wizard/`](packages/wizard/) | The install wizard |
-| [`packages/mcp/`](packages/mcp/) | `@su-sws/mcp`. The same standards as MCP tools and resources, for agents that prefer calling a tool to shelling out |
+| [`packages/mcp/`](packages/mcp/) | `@su-sws/synthetic-web-team-mcp`. The same standards as MCP tools and resources, for agents that prefer calling a tool to shelling out |
 
 **Two published packages, not four.** `@su-sws/synthetic-web-team` ships the content, the CLI
 and the wizard together — one version number, so the CLI always knows which
-standards version it carries. `@su-sws/mcp` is separate only so CI does not
+standards version it carries. `@su-sws/synthetic-web-team-mcp` is separate only so CI does not
 download an MCP SDK to run `sws check`. `packages/cli` and
 `packages/wizard` are internal: they are published *inside*
 `@su-sws/synthetic-web-team`, which is why there is no staging script and no empty-looking
@@ -279,6 +279,38 @@ Two rules with teeth:
 
 1. **Never edit an `acceptance.yml` criterion or a fragment to make a project pass.** Fragments change when upstream changes.
 2. **Every criterion must map to an implemented check.** A criterion with no check is a wish. Delete it or implement it.
+
+## Releasing
+
+**Every push to `main` cuts a release.** Patch by default:
+
+| You want | Do this |
+|---|---|
+| A patch | Nothing. Push to `main` |
+| A minor | Put `[minor]` anywhere in the commit message |
+| A major | Put `[major]` anywhere in the commit message |
+| No release | Put `[skip release]` in the commit message |
+| A specific bump, by hand | Run the **release** workflow and pick `patch`, `minor`, `major`, or `none` |
+| Publish the current version without bumping | Run it by hand with `none` |
+
+[`.github/workflows/release.yml`](.github/workflows/release.yml) validates,
+versions, tags, publishes and drafts release notes, in that order. It needs one
+repository secret, **`NPM_TOKEN`**, an npm automation token with publish rights
+on the `@su-sws` scope. Publishing uses `--provenance`, so releases are
+attested to this repository and this workflow.
+
+**Both packages move together.** `@su-sws/synthetic-web-team-mcp` depends on the root package, and
+a caret range survives a patch bump but not a minor one — `^0.1.0` does not
+match `0.2.0`, so a published server would quietly resolve *old* standards.
+[`scripts/set-version.mjs`](scripts/set-version.mjs) rewrites that range along
+with the versions, which is the whole reason `npm version` is not used here. Run
+it with `--dry-run` to see what a bump would do.
+
+Ordering is deliberate: the gates run before anything is versioned, the version
+is checked against the registry before anything is committed, and the tag is
+pushed before anything is published. A failure at any point leaves the registry
+untouched, because publishing to a public registry is the only step here that
+cannot be undone.
 
 ## License
 

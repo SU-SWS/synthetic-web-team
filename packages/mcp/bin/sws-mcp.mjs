@@ -23,7 +23,7 @@ if (args.includes('--help') || args.includes('-h')) {
   Add to an MCP client config:
 
     { "mcpServers": { "sws": { "command": "npx",
-        "args": ["-y", "@su-sws/mcp"] } } }
+        "args": ["-y", "@su-sws/synthetic-web-team-mcp"] } } }
 
   Tools: sws_get_standard, sws_footer_html, sws_check, sws_decanter_token,
          sws_scaffold.

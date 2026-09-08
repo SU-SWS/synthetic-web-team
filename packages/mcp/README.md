@@ -1,4 +1,4 @@
-# @su-sws/mcp
+# @su-sws/synthetic-web-team-mcp
 
 MCP server exposing Stanford Web Services standards to any MCP client.
 
@@ -9,7 +9,7 @@ server will not start, nothing else stops working.
 ## Add it to a client
 
 ```json
-{ "mcpServers": { "sws": { "command": "npx", "args": ["-y", "@su-sws/mcp"] } } }
+{ "mcpServers": { "sws": { "command": "npx", "args": ["-y", "@su-sws/synthetic-web-team-mcp"] } } }
 ```
 
 `npx @su-sws/synthetic-web-team init` writes this for you into `.mcp.json` and

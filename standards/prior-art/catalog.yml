@@ -131,7 +131,7 @@ repos:
     rating: dated
     what: Hosted MCP server for Decanter.
     use_for:
-      - Reference when we build @su-sws/mcp
+      - Reference when we build @su-sws/synthetic-web-team-mcp
     do_not_use_for:
       - Decanter 8 or Tailwind 4 questions, per SWS guidance
     open_question: Revisit as a dependency once it supports v8.
@@ -404,6 +404,6 @@ tools:
     era: decanter-7
     rating: dated
     provenance: SU-SWS, source repo private
-    use_for: [Reference when building @su-sws/mcp]
+    use_for: [Reference when building @su-sws/synthetic-web-team-mcp]
     do_not_use_for: [Decanter 8 or Tailwind 4, per SWS guidance]
 

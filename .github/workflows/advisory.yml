@@ -120,7 +120,18 @@ jobs:
           const list = (t) => execFileSync("tar", ["tzf", t], { encoding: "utf8" })
             .split("\n").map((s) => s.replace(/^package\//, "")).filter(Boolean);
 
-          const sws = list(".pack/su-sws-sws-0.1.0.tgz");
+          // Resolved from the manifests, never spelled out. Both of these were
+          // hardcoded filenames, and both were wrong: the name half went stale
+          // at the rename (su-sws-sws no longer exists) and the version half
+          // would break on the first automated bump. A tarball assertion that
+          // cannot find its tarball is worse than no assertion.
+          const { readFileSync } = require("node:fs");
+          const tgz = (dir) => {
+            const m = JSON.parse(readFileSync(dir + "package.json", "utf8"));
+            return ".pack/" + m.name.replace("@", "").replace("/", "-") + "-" + m.version + ".tgz";
+          };
+
+          const sws = list(tgz("./"));
           const need = [
             "AGENTS.md",
             "packages/cli/bin/sws.mjs",
@@ -145,13 +156,13 @@ jobs:
             if (sws.some((n) => n.startsWith(leak))) { console.log(`::error::${leak} leaked into the package`); bad++; }
           }
 
-          const mcp = list(".pack/su-sws-mcp-0.1.0.tgz");
+          const mcp = list(tgz("./packages/mcp/"));
           for (const m of ["bin/sws-mcp.mjs","src/server.mjs","src/tools.mjs","src/scaffold.mjs"]) {
             if (!mcp.includes(m)) { console.log(`::error::mcp tarball missing ${m}`); bad++; }
           }
 
           console.log(`@su-sws/synthetic-web-team: ${sws.length} files, ${skills} skills, ${policy} policy, ${cliSrc} cli modules`);
-          console.log(`@su-sws/mcp: ${mcp.length} files`);
+          console.log(`@su-sws/synthetic-web-team-mcp: ${mcp.length} files`);
           process.exit(bad ? 1 : 0)'
 
       # The server speaks a protocol; asserting the files exist is not enough.

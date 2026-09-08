@@ -357,12 +357,12 @@ if (mode === 'user') {
   ];
   if (detected.some((e) => e.id === 'claude-code')) {
     userNext.push({
-      kind: 'optional-mcp', command: 'claude mcp add --scope user sws -- npx -y @su-sws/mcp',
+      kind: 'optional-mcp', command: 'claude mcp add --scope user sws -- npx -y @su-sws/synthetic-web-team-mcp',
       why: 'Registers the standards as MCP tools for every project at once. Optional, never required: everything it exposes is also a file under standards/ once a project is initialised.',
     });
   } else {
     userNext.push({
-      kind: 'optional-mcp', command: 'npx -y @su-sws/mcp --help',
+      kind: 'optional-mcp', command: 'npx -y @su-sws/synthetic-web-team-mcp --help',
       why: 'An MCP server for these standards, which can be registered in your tool\'s user-level MCP config so it covers every project. Optional, never required. Paths differ per tool, so this does not guess at one.',
     });
   }
@@ -576,7 +576,7 @@ function emitJson({ written, write: wr }) {
   }
   if (chosen.some((e) => e.emits.some((x) => x.endsWith('mcp.json')))) {
     next.push({
-      kind: 'optional-mcp', command: 'npx -y @su-sws/mcp --help',
+      kind: 'optional-mcp', command: 'npx -y @su-sws/synthetic-web-team-mcp --help',
       why: 'An MCP server for these standards was added to your client config. It is a second entry point, never a requirement: sws_get_standard, sws_footer_html, sws_check, sws_decanter_token, sws_scaffold. Everything it exposes is also a file under standards/. Remove the entry if you do not want it.',
     });
   }

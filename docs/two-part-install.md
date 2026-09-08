@@ -299,7 +299,7 @@ more paragraph in it.
 
 The plan said Part 1 would register the MCP server in each detected user-level
 config. It does not. It emits the registration as a `next[]` step instead — the
-exact `claude mcp add --scope user sws -- npx -y @su-sws/mcp` for Claude Code,
+exact `claude mcp add --scope user sws -- npx -y @su-sws/synthetic-web-team-mcp` for Claude Code,
 and the server command plus a pointer to the person's own config for anything
 else.
 
