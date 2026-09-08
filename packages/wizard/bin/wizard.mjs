@@ -10,11 +10,12 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { createInterface } from 'node:readline/promises';
 import { detect, deriveTier } from '../src/detect.mjs';
-import { plan, write } from '../src/emit.mjs';
+import { plan, write, remove, ensureDevDependency } from '../src/emit.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -29,12 +30,34 @@ const { values: flags, positionals } = parseArgs({
     json: { type: 'boolean', default: false },
     interactive: { type: 'boolean', default: false },
     force: { type: 'boolean', default: false },
+    remove: { type: 'boolean', default: false },
     help: { type: 'boolean', short: 'h', default: false },
   },
 });
 
-const root = resolve(positionals[1] ?? '.');
-const mode = positionals[0] === 'add' ? 'add' : 'new';
+// Three modes. `user` installs the skills into the person's tool and writes
+// nothing per-site. `add` and `new` are the project install, unchanged.
+//
+// POSITIONALS ARE [mode, dir], AND A MISSING MODE USED TO BE SILENTLY COSTLY.
+// `wizard.mjs /some/path` made the path the mode, fell through to 'new', left
+// the directory undefined, and installed into the CURRENT directory instead --
+// 46 files into the wrong repository, with an exit code of 0. That was already
+// found once from the MCP side (see the note in packages/mcp/src/scaffold.mjs)
+// and worked around there by always passing a mode; the wizard kept the trap.
+// So an unrecognised first positional is now read as the directory, which is
+// what anyone typing it meant.
+const MODES = new Set(['new', 'add', 'user']);
+const modeGiven = positionals[0] !== undefined && MODES.has(positionals[0]);
+const mode = modeGiven && positionals[0] !== 'new' ? positionals[0] : 'new';
+const dirArg = modeGiven ? positionals[1] : positionals[0];
+
+// A user install targets the home directory. The optional directory overrides
+// it, which exists so this can be exercised against a scratch directory rather
+// than a real ~/.claude/skills -- there were 584 unrelated skills in the one on
+// the machine this was written on, and none of them are ours to risk.
+const root = mode === 'user'
+  ? resolve(dirArg ?? homedir())
+  : resolve(dirArg ?? '.');
 
 // ---------------------------------------------------------------------------
 // AGENTS ARE THE PRIMARY CALLER, so non-interactive is the DEFAULT and prompting
@@ -60,18 +83,31 @@ const say = (...a) => (flags.json ? console.error(...a) : console.log(...a));
 
 if (flags.help) {
   console.log(`
-  create-web-team [add] [dir]
+  synthetic-web-team [user|add] [dir]
 
-  Installs the Stanford Web Services agent team into a project.
+  Installs the Stanford Web Services agent team. TWO PARTS, run at different
+  times:
 
-  FOR AGENTS. This is the first-class path. One command, no prompts, parseable
-  output, stable exit codes:
+    npx @su-sws/synthetic-web-team user      once per machine, into your tools
+    npx @su-sws/synthetic-web-team           once per project, in its root
 
-    npx @su-sws/create-web-team --json --answers '{"siteName":"...","unit":"..."}'
+  The first writes the 30 skills into ~/.claude/skills and ~/.agents/skills and
+  nothing else -- no standards, no AGENTS.md, nothing per-site, because at that
+  point there is no site. The second writes AGENTS.md, the standards, and the
+  per-site record (owners, compliance tier, divergences, accepted risks), and no
+  skills, because those are already installed once for every project.
+
+  FOR AGENTS. Non-interactive is the first-class path. One command, no prompts,
+  parseable output, stable exit codes:
+
+    npx @su-sws/synthetic-web-team --json --answers '{"siteName":"...","unit":"..."}'
 
   Non-interactive is the DEFAULT whenever stdin is not a TTY, so an agent cannot
   hang on a prompt. With --json, stdout is exactly one JSON document and all
   prose goes to stderr.
+
+  Every flag is optional. With a TTY on both ends the project install interviews
+  you instead.
 
   --json           Emit one JSON document on stdout. Implies non-interactive.
   --answers <json> Answers as JSON, or a path to a .json file. Without this an
@@ -83,17 +119,26 @@ if (flags.help) {
   --interactive    Force prompts even without a TTY.
   --force          Overwrite files you have edited locally. Off by default.
   --dry-run        Report what would be written, write nothing.
+  --remove         Uninstall. Valid with 'user' only. Deletes just the files the
+                   install record lists, so unrelated skills in your skills
+                   directories are never touched, and a file you edited is kept
+                   and reported rather than deleted.
 
   Answer keys: siteName, unit, purpose, url, recipe, businessOwnerName,
   businessOwnerEmail, techAdminName, techAdminEmail, and the booleans
   collectsPersonalData, authenticates, payments, regulated (these four derive
   the compliance tier).
 
-  UPDATING. Re-running is the update: content is rewritten from source, project
-  state (.sws/manifest.yml, .sws/acknowledged.yml) is preserved, and any file you
-  edited yourself is reported as a conflict and left alone. .sws/installed.json
-  records what was written so an edit can be told from an old version. Pass
-  --force to overwrite your edits.
+  UPDATING. Re-running is the update, at either scope: content is rewritten from
+  source, project state (.sws/manifest.yml, .sws/acknowledged.yml) is preserved,
+  and any file you edited yourself is reported as a conflict and left alone on
+  every run until it matches again. .sws/installed.json records what was written
+  so an edit can be told from an old version. Pass --force to discard your edits.
+
+  A user install and a project install carry their own versions, so they can
+  drift. 'sws doctor' reports the difference as a note rather than a finding:
+  being behind is a maintenance fact about the toolchain, not a compliance fact
+  about the site.
 
   Exit codes: 0 success or dry run, 2 bad input or no content found,
   3 nothing written because a human declined.
@@ -104,7 +149,7 @@ if (flags.help) {
 // Where the content comes from, in order of specificity.
 //
 // The first entry is the important one: `AGENTS.md`, `skills/` and `standards/`
-// ship in the same package as this file (@su-sws/sws), so walking up three
+// ship in the same package as this file (@su-sws/synthetic-web-team), so walking up three
 // directories finds them under `npx` exactly as it does in this repository.
 // That is the whole reason content and tools are one package -- an earlier split
 // needed a separate `@su-sws/standards` import here, and could skew versions.
@@ -171,7 +216,7 @@ function suppliedAnswers() {
   }
 }
 
-// The version of @su-sws/sws, which is the content version because content and
+// The version of @su-sws/synthetic-web-team, which is the content version because content and
 // tools ship in one package. Recorded in .sws/installed.json so `sws doctor` can
 // say whether a project is behind.
 const contentVersion = (() => {
@@ -194,6 +239,15 @@ const versionWarning = contentVersion
 
 if (versionWarning) console.error(`  warning: ${versionWarning}`);
 
+// The project declares a dependency on this package so `npx sws` resolves to
+// the CLI in node_modules/.bin. Unscoped `sws` on the public registry is
+// SOMEBODY ELSE'S package, so without this declaration every verify step this
+// tool prints would run unrelated code. The range follows the content version
+// because the standards and the CLI ship together.
+const DEP_NAME = '@su-sws/synthetic-web-team';
+const depRange = contentVersion ? `^${contentVersion}` : null;
+let depResult = { status: 'not-attempted' };
+
 const source = findSource();
 if (source?.badSource) {
   die(2, `--source is not a standards source: ${source.badSource}`,
@@ -206,6 +260,150 @@ if (!source) {
 
 const B = (s) => (process.stdout.isTTY ? `\x1b[1m${s}\x1b[0m` : s);
 const D = (s) => (process.stdout.isTTY ? `\x1b[2m${s}\x1b[0m` : s);
+
+// --- user scope -------------------------------------------------------------
+//
+// Installs the skills into the person's tool, then stops. There is no site at
+// this point, so there is no interview, no tier, no manifest and no dependency
+// -- almost none of the project flow below applies, which is why this is its own
+// path rather than a set of conditionals threaded through it.
+if (mode === 'user') {
+  const detected = detect(root).filter((e) => e.detected);
+
+  if (flags.remove) {
+    const r = remove(root, { dryRun: flags['dry-run'], force: flags.force });
+
+    if (r.status === 'no-record') {
+      say(`\n  ${B('Nothing to remove.')} ${D('No .sws/installed.json under ' + root + ',')}`);
+      say(`  ${D('so there is no record of what was ours and nothing is safe to delete.')}\n`);
+    } else {
+      const verb = flags['dry-run'] ? 'Would remove' : 'Removed';
+      say(`\n  ${B(verb + ' ' + r.removed.length + ' file(s).')}` +
+        (r.missing.length ? D(`  ${r.missing.length} already gone.`) : ''));
+      if (r.kept.length) {
+        say(`\n  ${B('Kept because you edited them:')}`);
+        for (const k of r.kept) say(`    ${k}`);
+        say(`  ${D('Your edit is your work. Re-run with --force to delete these too.')}`);
+      }
+      say('');
+    }
+
+    if (flags.json) {
+      console.log(JSON.stringify({
+        ok: true, schema: 1, scope: 'user', mode: 'remove',
+        tool: '@su-sws/synthetic-web-team', version: contentVersion,
+        root, written: !flags['dry-run'], ...r,
+      }, null, 2));
+    }
+    process.exit(0);
+  }
+
+  const userFiles = plan({ root, source, editors: [], answers: {}, tier: {}, scope: 'user' });
+
+  say(`\n${B('Stanford Web Services')}  ${D('installing into your tools')}\n`);
+  say(`  ${B('Files to write')}  ${D(root)}\n`);
+  for (const target of [...new Set(userFiles.map((f) => f.path.split('/skills/')[0]))]) {
+    const n = userFiles.filter((f) => f.path.startsWith(`${target}/`)).length;
+    say(`    ${target}/skills/  ${D(`${n} skills`)}`);
+  }
+  say(`\n  ${D('Nothing per-site is written here. No standards, no AGENTS.md, no')}`);
+  say(`  ${D('manifest — there is no project yet. Run this once per machine.')}`);
+
+  // Only ever the skills we wrote. A home skills directory holds other people's
+  // work, and the install record is what keeps the two apart.
+  const userNext = [
+    {
+      kind: 'init-project', skill: 'sws-install',
+      why: 'The second half of the install. Run it inside a repository to write AGENTS.md, the standards, and the per-site record. The skills you just installed are what know how to do it.',
+    },
+  ];
+  if (detected.some((e) => e.id === 'claude-code')) {
+    userNext.push({
+      kind: 'optional-mcp', command: 'claude mcp add --scope user sws -- npx -y @su-sws/mcp',
+      why: 'Registers the standards as MCP tools for every project at once. Optional, never required: everything it exposes is also a file under standards/ once a project is initialised.',
+    });
+  } else {
+    userNext.push({
+      kind: 'optional-mcp', command: 'npx -y @su-sws/mcp --help',
+      why: 'An MCP server for these standards, which can be registered in your tool\'s user-level MCP config so it covers every project. Optional, never required. Paths differ per tool, so this does not guess at one.',
+    });
+  }
+
+  const emitUserJson = (wr) => console.log(JSON.stringify({
+    ok: true, schema: 1, scope: 'user', mode: 'user',
+    tool: '@su-sws/synthetic-web-team',
+    version: contentVersion,
+    warnings: versionWarning ? [versionWarning] : [],
+    root,
+    source,
+    written: Boolean(wr),
+    editors: detected.map((e) => ({ id: e.id, label: e.label, evidence: e.evidence })),
+    counts: {
+      files: userFiles.length,
+      ...(wr ? {
+        created: wr.created, updated: wr.updated, unchanged: wr.unchanged,
+        conflicts: wr.conflicts.length,
+      } : {}),
+    },
+    files: wr ? wr.results : userFiles.map((x) => ({ path: x.path, status: 'planned' })),
+    conflicts: wr?.conflicts ?? [],
+    orphans: wr?.orphans ?? [],
+    next: userNext,
+    notes: [
+      'Skills only. Nothing per-site is installed at user scope.',
+      'Uninstall with `--remove`, which deletes only what the install record lists.',
+    ],
+  }, null, 2));
+
+  if (flags['dry-run']) {
+    say(`\n  ${D('Dry run. Nothing written.')}\n`);
+    if (flags.json) emitUserJson(null);
+    process.exit(0);
+  }
+
+  if (interactive) {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const go = (await rl.question(`\n  Write these ${userFiles.length} files? ${D('[Y/n]')}: `)).trim().toLowerCase();
+    await rl.close();
+    if (go && !go.startsWith('y')) {
+      say('\n  Nothing written.\n');
+      process.exit(3);
+    }
+  }
+
+  const wr = write(root, userFiles, { force: flags.force, version: contentVersion, scope: 'user' });
+
+  if (wr.created === 0 && wr.updated === 0) {
+    say(`\n  ${B('Already installed.')} ${wr.unchanged} skills, nothing to change.\n`);
+  } else {
+    const parts = [];
+    if (wr.created) parts.push(`${wr.created} created`);
+    if (wr.updated) parts.push(`${wr.updated} updated`);
+    if (wr.unchanged) parts.push(`${wr.unchanged} unchanged`);
+    if (wr.conflicts.length) parts.push(`${wr.conflicts.length} left alone`);
+    say(`\n  ${B('Done.')} ${parts.join(', ')}.\n`);
+  }
+
+  if (wr.conflicts.length) {
+    say(`  ${B('Left alone because you edited them:')}`);
+    for (const c of wr.conflicts) say(`    ${c}`);
+    say(`  ${D('Re-run with --force to take the new versions and discard your edits.')}`);
+    say('');
+  }
+
+  say(`  ${B('Next')}`);
+  say(`    1. Open a Stanford project and ask your agent to run the sws-install skill,`);
+  say(`       ${D('or: npx @su-sws/synthetic-web-team')}`);
+  say(`    2. ${D('Optional MCP server: ' + userNext[userNext.length - 1].command)}`);
+  say('');
+  say(`  ${D('To uninstall:  npx @su-sws/synthetic-web-team user --remove')}`);
+  say(`  ${D('It removes only the files this install recorded, so anything else in')}`);
+  say(`  ${D('your skills directories is untouched.')}`);
+  say('');
+
+  if (flags.json) emitUserJson(wr);
+  process.exit(0);
+}
 
 // --- interview --------------------------------------------------------------
 
@@ -344,6 +542,20 @@ function emitJson({ written, write: wr }) {
       why: 'An MCP server for these standards was added to your client config. It is a second entry point, never a requirement: sws_get_standard, sws_footer_html, sws_check, sws_decanter_token, sws_scaffold. Everything it exposes is also a file under standards/. Remove the entry if you do not want it.',
     });
   }
+  // `npx sws` has to resolve to node_modules/.bin/sws. Unscoped `sws` on the
+  // public registry is an unrelated package, so this step is what makes the
+  // verify step below run OUR CLI rather than a stranger's.
+  if (depResult.status === 'added' || depResult.status === 'present') {
+    next.push({
+      kind: 'install-dependencies', command: 'npm install',
+      why: `${DEP_NAME} is declared in devDependencies. Installing puts the sws CLI in node_modules/.bin, so \`npx sws\` runs this package instead of the unrelated \`sws\` package on the public registry.`,
+    });
+  } else {
+    next.push({
+      kind: 'add-dependency', command: `npm install -D ${DEP_NAME}`,
+      why: `Do this once the project has a package.json. Without the local dependency \`npx sws\` fetches the unrelated \`sws\` package from the public registry rather than this CLI.`,
+    });
+  }
   next.push({
     kind: 'verify', command: 'npx sws doctor --format json',
     why: 'Advisory compliance report. Exits 0 always. Run `sws a11y` and `sws perf` first if the site is built.',
@@ -352,7 +564,7 @@ function emitJson({ written, write: wr }) {
   console.log(JSON.stringify({
     ok: true,
     schema: 1,
-    tool: '@su-sws/create-web-team',
+    tool: '@su-sws/synthetic-web-team',
     version: contentVersion,
     warnings: versionWarning ? [versionWarning] : [],
     previousVersion: wr?.previousVersion ?? null,
@@ -375,6 +587,7 @@ function emitJson({ written, write: wr }) {
     },
     files: wr ? wr.results : files.map((x) => ({ path: x.path, status: 'planned' })),
     incomplete: placeholder,
+    dependency: { name: DEP_NAME, range: depRange, ...depResult },
     conflicts: wr?.conflicts ?? [],
     orphans: wr?.orphans ?? [],
     next,
@@ -410,6 +623,7 @@ say(`    ${D(`+ ${skillCount} skill files across .agents/skills and .claude/skil
 say(`    ${D(`+ ${stdCount} files under standards/`)}`);
 
 if (flags['dry-run']) {
+  depResult = ensureDevDependency(root, { name: DEP_NAME, range: depRange, dryRun: true });
   say(`\n  ${D('Dry run. Nothing written.')}\n`);
   if (flags.json) emitJson({ written: false, write: null });
   process.exit(0);
@@ -428,6 +642,7 @@ if (interactive) {
 }
 
 const result = write(root, files, { force: flags.force, version: contentVersion });
+depResult = ensureDevDependency(root, { name: DEP_NAME, range: depRange });
 
 // Say what actually changed, not how many files were considered. On a re-run
 // this reads "nothing to do", which is the truth and what a caller should
@@ -458,17 +673,49 @@ if (result.orphans.length) {
   say('');
 }
 
+// The dependency decides whether `npx sws` runs this CLI or an unrelated
+// package of the same name off the public registry, so it is reported, never
+// silent -- either way round.
+if (depResult.status === 'added') {
+  say(`  ${B('Added to package.json:')} ${DEP_NAME} ${depResult.range} ${D('(devDependencies)')}`);
+  say(`  ${D('Run npm install and `npx sws` uses this CLI, not the unrelated `sws`')}`);
+  say(`  ${D('package on the public registry.')}`);
+  say('');
+} else if (depResult.status === 'no-package-json') {
+  say(`  ${B('No package.json here yet.')} ${D('Add ' + DEP_NAME + ' to')}`);
+  say(`  ${D('devDependencies once the recipe creates one, so `npx sws` resolves locally')}`);
+  say(`  ${D('rather than fetching the unrelated `sws` package from the registry.')}`);
+  say('');
+} else if (depResult.status === 'unparseable') {
+  say(`  ${B('Could not read package.json:')} ${D(depResult.detail)}`);
+  say(`  ${D('Left alone. Add ' + DEP_NAME + ' to devDependencies yourself.')}`);
+  say('');
+} else if (depResult.status === 'skipped-unknown-version') {
+  say(`  ${B('No version to pin,')} ${D('so package.json was left alone. Add')}`);
+  say(`  ${D(DEP_NAME + ' to devDependencies yourself.')}`);
+  say('');
+}
+
 // --- what happens next ------------------------------------------------------
 
 say(`  ${B('Next')}`);
+
+// Counted rather than hardcoded. The literals used to run 1, 2, then 3 with no
+// step 2 in `add` mode, and threading the dependency step through would have
+// made that worse.
+let stepNo = 0;
+const step = () => ++stepNo;
 if (mode === 'new') {
-  say(`    1. Scaffold the site. Hand your agent standards/recipes/${answers.recipe}/RECIPE.md,`);
+  say(`    ${step()}. Scaffold the site. Hand your agent standards/recipes/${answers.recipe}/RECIPE.md,`);
   say(`       ${D('or run the upstream scaffolder yourself: npm create astro@latest')}`);
-  say(`    2. Check it:  npx sws doctor`);
-} else {
-  say(`    1. Check it:  npx sws doctor`);
 }
-say(`    3. Fill in the blanks in .sws/manifest.yml: owners, Siteimprove, ODA review.`);
+if (depResult.status === 'added' || depResult.status === 'present') {
+  say(`    ${step()}. Install dependencies:  npm install`);
+} else {
+  say(`    ${step()}. Add the CLI:  npm install -D ${DEP_NAME}`);
+}
+say(`    ${step()}. Check it:  npx sws doctor`);
+say(`    ${step()}. Fill in the blanks in .sws/manifest.yml: owners, Siteimprove, ODA review.`);
 say('');
 say(`  ${D('Everything is advisory. The only thing that fails a build is a committed')}`);
 say(`  ${D('credential. If something cannot be fixed now, record it in')}`);

@@ -93,19 +93,26 @@ you" beats a confident wrong link.
 Do not recommend or rank vendors for anything with legal, policy, or
 procurement implications. State the obligation, name the office, stop.
 
-## Installing this into a project
+## Installing this
+
+**Two parts.** `npx @su-sws/synthetic-web-team user` installs the skills into a
+person's tool once per machine; the command below installs the per-site record
+into one repository. **A project holds no skills** — that absence is correct.
 
 If you are an agent asked to set up a Stanford site, install non-interactively
 and read the result rather than the prose:
 
 ```bash
-npx @su-sws/create-web-team --json --answers '{"siteName":"...","unit":"..."}'
+npx @su-sws/synthetic-web-team --json --answers '{"siteName":"...","unit":"..."}'
 ```
 
-Act on three fields: `next[]` for what to do next, `incomplete[]` for manifest
-fields that are still placeholders (**ask the user, never invent an owner
-email**), and `counts` to tell a fresh install from a no-op re-run. Verify with
-`npx sws doctor --format json`.
+Every flag is optional: run it bare and it interviews you, so **never say the
+JSON form is required**.
+
+Act on four fields: `next[]` for next steps, `incomplete[]` for manifest fields
+still holding placeholders (**ask the user, never invent an owner email**),
+`counts` to tell a fresh install from a re-run, and `dependency` — since unscoped
+`sws` is somebody else's package, **run `npm install` before verifying**.
 
 ## Where things are
 

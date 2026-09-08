@@ -39,11 +39,11 @@ import { scaffold } from './scaffold.mjs';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
-// Standards ship inside @su-sws/sws. Resolve that package, then fall back to the
+// Standards ship inside @su-sws/synthetic-web-team. Resolve that package, then fall back to the
 // repository layout so this works from a checkout with no install.
 const bundledStandards = (() => {
   try {
-    const p = createRequire(import.meta.url).resolve('@su-sws/sws/package.json');
+    const p = createRequire(import.meta.url).resolve('@su-sws/synthetic-web-team/package.json');
     const c = join(dirname(p), 'standards');
     if (existsSync(c)) return c;
   } catch { /* not installed */ }
@@ -147,11 +147,13 @@ export function build({ root = process.cwd(), standards = bundledStandards } = {
   server.registerTool('sws_scaffold', {
     title: 'Install the Stanford agent team into a project',
     description:
-      'Install the behavioral contract, the role skills, and the standards into a project, ' +
+      'Install the behavioral contract, the standards, and the per-site record into a project, ' +
       'and derive its compliance tier. DEFAULTS TO A DRY RUN: pass write=true to actually ' +
       'write files. Re-running is safe — .sws/manifest.yml and .sws/acknowledged.yml are ' +
       'project state and are preserved. Supply answers so the manifest records real values ' +
-      'instead of placeholders.',
+      'instead of placeholders. This is PROJECT scope only: the role skills install once per ' +
+      'machine via `npx @su-sws/synthetic-web-team user`, so a project holding no skills is ' +
+      'correct rather than a failed install.',
     inputSchema: {
       path: z.string().optional().describe('Target project directory. Defaults to the server working directory.'),
       write: z.boolean().optional().describe('false (default) reports the plan; true writes the files.'),

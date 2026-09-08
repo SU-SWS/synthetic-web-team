@@ -1,0 +1,19 @@
+{
+  "name": "@su-sws/wizard",
+  "version": "0.1.0",
+  "description": "Install the Stanford Web Services agent team into any AI coding tool. Internal: published as part of @su-sws/synthetic-web-team.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "bin": {
+    "synthetic-web-team": "./bin/wizard.mjs"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "dependencies": {},
+  "exports": {
+    "./bin/wizard.mjs": "./bin/wizard.mjs",
+    "./src/*": "./src/*"
+  },
+  "private": true
+}

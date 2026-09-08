@@ -8,9 +8,9 @@
 //    precedence and merge order are not uniform across editors and layering
 //    cannot be relied on.
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, rmSync, rmdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join, dirname } from 'node:path';
+import { join, dirname, sep } from 'node:path';
 
 const POINTER = (target) => `<!--
   Stanford Web Services agent team.
@@ -24,22 +24,45 @@ const POINTER = (target) => `<!--
 @${target}
 `;
 
-export function plan({ root, source, editors, answers, tier }) {
+// The two paths skills are read from. Neither is read by every editor, so two
+// copies is the floor rather than a design flaw -- see docs/skill-paths.md.
+export const SKILL_TARGETS = ['.agents/skills', '.claude/skills'];
+
+const skillNames = (source) => readdirSync(join(source, 'skills'))
+  .filter((d) => existsSync(join(source, 'skills', d, 'SKILL.md')));
+
+export function plan({ root, source, editors, answers, tier, scope = 'project' }) {
   const files = [];
   const add = (path, contents, note, opts = {}) => files.push({ path, contents, note, ...opts });
 
-  // ---- universal core -----------------------------------------------------
+  // ---- user scope: the skills, and nothing else ---------------------------
+  //
+  // Paths stay RELATIVE. The only thing separating a user install from a project
+  // one is the `root` they are written under -- a home directory or a repository
+  // -- so every hash, verdict and record mechanism below serves both with no
+  // second implementation.
+  //
+  // Nothing per-site is emitted here, because at this point there is no site.
+  if (scope === 'user') {
+    for (const target of SKILL_TARGETS) {
+      for (const name of skillNames(source)) {
+        add(`${target}/${name}/SKILL.md`,
+          readFileSync(join(source, 'skills', name, 'SKILL.md'), 'utf8'), null);
+      }
+    }
+    return files;
+  }
+
+  // ---- project scope: the contract, the standards, the per-site record ----
+  //
+  // NO SKILLS HERE. They install once into the person's tool instead, because
+  // they are byte-identical in every repository and referencing them in place is
+  // not available: most editors that read .agents/skills offer no configurable
+  // path to redirect. See docs/skill-paths.md and docs/two-part-install.md.
   add('AGENTS.md', readFileSync(join(source, 'AGENTS.md'), 'utf8'),
     'behavioral contract, read by every tool');
 
-  const skills = readdirSync(join(source, 'skills'))
-    .filter((d) => existsSync(join(source, 'skills', d, 'SKILL.md')));
-  for (const target of ['.agents/skills', '.claude/skills']) {
-    for (const name of skills) {
-      add(`${target}/${name}/SKILL.md`,
-        readFileSync(join(source, 'skills', name, 'SKILL.md'), 'utf8'), null);
-    }
-  }
+  const skills = skillNames(source);
 
   // Standards, vendored so the project is self-contained and reviewable.
   const walk = (d, base) => {
@@ -210,7 +233,11 @@ accessibility:
 editors:
 ${editors.map((e) => `  - ${e.id}`).join('\n') || '  []'}
 
-skills_installed: ${skills}
+# Skills are installed at USER scope (~/.claude/skills, ~/.agents/skills), once
+# per machine, not into this project. This is the count that was available when
+# this project was set up, recorded as provenance -- it is not a count of files
+# in this repository, and nothing reads it as one.
+skills_available_at_install: ${skills}
 
 # What actually resolved at install time. Recorded, never enforced: recipes
 # install latest and pin nothing, so this is provenance rather than a gate.
@@ -283,7 +310,7 @@ const ACKNOWLEDGED_TEMPLATE = `# Accepted risks.
  * Comparison is by content, never mtime: re-running the same version must be
  * `unchanged` even though the source files have newer timestamps.
  */
-export function write(root, files, { force = false, version = null } = {}) {
+export function write(root, files, { force = false, version = null, scope = 'project' } = {}) {
   const prev = readInstalled(root);
   const planned = new Set(files.map((f) => f.path));
   const results = [];
@@ -314,9 +341,21 @@ export function write(root, files, { force = false, version = null } = {}) {
       writeFileSync(p, f.contents);
       nextHashes[f.path] = newHash;
     } else if (status === 'conflict') {
-      // Record what is actually on disk, so the next run compares against
-      // reality and does not report the same conflict forever.
-      nextHashes[f.path] = hash(readFileSync(p, 'utf8'));
+      // Keep the hash of what we LAST WROTE, never what is on disk now.
+      //
+      // Recording the edited file as though we had written it made the conflict
+      // disappear on the following run -- and the protection with it, so the run
+      // after that reported `updated` and overwrote the edit. Verified before
+      // this change: an edited 7356-byte skill came back as the canonical 7355
+      // bytes on run three, silently. That contradicted this function's own
+      // contract, which is that an edited file is never silently overwritten.
+      //
+      // So a conflict is sticky until the file matches what we ship again. That
+      // is already how orphans behave a few lines below, for the same stated
+      // reason: a one-shot warning is easy to miss, and an agent discards the
+      // output entirely. It is also what makes `remove()` safe, since the record
+      // stays a description of OUR content rather than drifting onto theirs.
+      nextHashes[f.path] = prev?.files?.[f.path] ?? newHash;
     } else {
       nextHashes[f.path] = existsSync(p) ? hash(readFileSync(p, 'utf8')) : newHash;
     }
@@ -333,7 +372,7 @@ export function write(root, files, { force = false, version = null } = {}) {
   // when it has been seen once.
   for (const x of orphans) nextHashes[x] = prev.files[x];
 
-  writeInstalled(root, { version, files: nextHashes });
+  writeInstalled(root, { version, files: nextHashes, scope });
 
   const count = (s) => results.filter((r) => r.status === s).length;
   return {
@@ -371,15 +410,144 @@ export function readInstalled(root) {
   }
 }
 
-function writeInstalled(root, { version, files }) {
+function writeInstalled(root, { version, files, scope = 'project' }) {
+  // The advice differs by scope, and getting it wrong matters: "commit this" is
+  // right in a repository and nonsense in a home directory.
+  const advice = scope === 'user'
+    ? 'Do not delete while the skills are installed: `user --remove` reads this to '
+      + 'know which files are ours, and without it an uninstall cannot tell your '
+      + 'skills from ours and so removes nothing.'
+    : 'Commit this. Safe to delete: you lose conflict detection until the next install.';
+
   mkdirSync(join(root, '.sws'), { recursive: true });
   writeFileSync(join(root, INSTALLED_PATH), `${JSON.stringify({
-    _comment: 'Written by @su-sws/create-web-team. Records what was installed so a '
-      + 're-install can tell an update from a local edit. Commit this. Safe to delete: '
-      + 'you lose conflict detection until the next install.',
-    tool: '@su-sws/create-web-team',
+    _comment: 'Written by @su-sws/synthetic-web-team. Records what was installed so a '
+      + `re-install can tell an update from a local edit. ${advice}`,
+    tool: '@su-sws/synthetic-web-team',
+    scope,
     version,
     at: new Date().toISOString(),
     files,
   }, null, 2)}\n`);
+}
+
+/**
+ * Uninstall, driven entirely by the install record.
+ *
+ * WHY THE RECORD IS THE ONLY INPUT. A user-scope install writes into a home
+ * directory that already holds other people's work -- 584 unrelated skills on
+ * the machine this was developed on. Deleting `~/.claude/skills` wholesale, or
+ * anything matched by pattern, would take those with it. So the ONLY files
+ * eligible for removal are ones `.sws/installed.json` says we wrote, and the
+ * hash has to still match.
+ *
+ * Three verdicts, mirroring the install:
+ *
+ *   removed   we wrote it, it is unchanged, it is gone
+ *   kept      we wrote it and it was EDITED since. Their edit is their work, so
+ *             it stays and is reported. `force` overrides.
+ *   missing   already gone. Not an error; someone tidied up before us.
+ *
+ * Empty directories we created are pruned, deepest first, and only when empty
+ * -- so a skills directory that still holds anything else survives.
+ */
+export function remove(root, { dryRun = false, force = false } = {}) {
+  const prev = readInstalled(root);
+  if (!prev) return { status: 'no-record', removed: [], kept: [], missing: [] };
+
+  const removed = [];
+  const kept = [];
+  const missing = [];
+
+  for (const [rel, recorded] of Object.entries(prev.files ?? {})) {
+    const p = join(root, rel);
+    if (!existsSync(p)) { missing.push(rel); continue; }
+    if (!force && hash(readFileSync(p, 'utf8')) !== recorded) { kept.push(rel); continue; }
+    if (!dryRun) rmSync(p);
+    removed.push(rel);
+  }
+
+  if (!dryRun) {
+    // Deepest first, so `.claude/skills/x` is emptied before `.claude/skills`.
+    // rmdirSync fails on a non-empty directory, which is exactly the guard
+    // wanted here, so the error is the check and is meant to be swallowed.
+    const dirs = [...new Set(removed.map((rel) => dirname(join(root, rel))))]
+      .sort((a, b) => b.split(sep).length - a.split(sep).length);
+    for (const d of dirs) {
+      let cur = d;
+      while (cur.startsWith(root) && cur !== root) {
+        try { rmdirSync(cur); } catch { break; }
+        cur = dirname(cur);
+      }
+    }
+
+    // Keep a record only while something of ours is still on disk, so a second
+    // run can still tell our files from theirs.
+    const recordPath = join(root, INSTALLED_PATH);
+    if (kept.length) {
+      writeInstalled(root, {
+        version: prev.version ?? null,
+        scope: prev.scope ?? 'project',
+        files: Object.fromEntries(kept.map((k) => [k, prev.files[k]])),
+      });
+    } else if (existsSync(recordPath)) {
+      rmSync(recordPath);
+      try { rmdirSync(join(root, '.sws')); } catch { /* other state lives there */ }
+    }
+  }
+
+  return { status: 'ok', removed, kept, missing, scope: prev.scope ?? 'project' };
+}
+
+// --- the project's dependency on this package ------------------------------
+//
+// WHY THIS EXISTS. Every verify step this tool documents is spelled
+// `npx sws ...`, and unscoped `sws` is an UNRELATED package on the public
+// registry (sws@0.0.2, not ours). With no local dependency there is no
+// node_modules/.bin/sws to shadow it, so `npx sws doctor` in a fresh project
+// fetches a stranger's code. Declaring the dependency makes `npx sws` resolve
+// locally, and it is also how `sws doctor` can tell that a project is behind.
+//
+// package.json is NOT ours, so this is a targeted merge and never a rewrite:
+// one key added, the file's own indentation kept, an existing declaration left
+// alone, and NO entry in installed.json -- a file the user edits constantly
+// must not be under conflict detection.
+//
+// Caveat, stated because it is the one real cost: the JSON round-trip
+// normalises formatting, so an unusual layout will reformat. This is the same
+// thing `npm install --save` does to the same file.
+export function ensureDevDependency(root, { name, range, dryRun = false } = {}) {
+  const p = join(root, 'package.json');
+  if (!existsSync(p)) return { status: 'no-package-json' };
+
+  // No resolved version means no honest range to write. Writing `*` or a
+  // dist-tag to dodge that is the placeholder problem this file avoids
+  // everywhere else, so it reports instead.
+  if (!range) return { status: 'skipped-unknown-version' };
+
+  let raw;
+  let json;
+  try {
+    raw = readFileSync(p, 'utf8');
+    json = JSON.parse(raw);
+    if (!json || typeof json !== 'object' || Array.isArray(json)) throw new Error('not a JSON object');
+  } catch (err) {
+    return { status: 'unparseable', detail: err.message };
+  }
+
+  // An existing declaration wins, in either block. A pin someone chose is a
+  // decision, and quietly "upgrading" it is the same data loss this module
+  // guards against for .sws/manifest.yml.
+  const existing = json.devDependencies?.[name] ?? json.dependencies?.[name];
+  if (existing) return { status: 'present', range: existing };
+
+  if (dryRun) return { status: 'would-add', range };
+
+  const indent = raw.match(/\n(\s+)"/)?.[1] ?? '  ';
+  json.devDependencies = Object.fromEntries(
+    Object.entries({ ...(json.devDependencies ?? {}), [name]: range })
+      .sort(([a], [b]) => a.localeCompare(b)));
+  const out = JSON.stringify(json, null, indent);
+  writeFileSync(p, raw.endsWith('\n') ? `${out}\n` : out);
+  return { status: 'added', range };
 }

@@ -10,27 +10,37 @@ const REPO = 'https://github.com/SU-SWS/synthetic-web-team';
 // The paste-into-your-agent prompts. These are the easiest install path and the
 // one most people will use, so they are the first thing in the hero.
 //
-// Each one names BOTH routes on purpose. Nothing is published to npm yet, so a
-// prompt that only said `npx @su-sws/create-web-team` would send every agent
-// into a 404 — verified, not assumed. The clone route works today and the npx
-// route works the day it ships, so the prompt stays correct across that change
-// without anyone editing it.
+// Each one names BOTH routes on purpose. The npx route is the normal one; the
+// clone route is what still works from behind a proxy that blocks the registry,
+// on a fork, or against an unreleased change. Naming both means the prompt does
+// not go stale the first time someone is in one of those situations.
+//
+// The flags shown here are for AGENTS specifically. Every one of them is
+// optional — a person runs the bare command and gets an interview — but an
+// agent has no TTY, so the JSON form is the one that cannot hang.
 //
 // They also encode the two safety properties that matter: never invent an owner
 // email (MinWeb requires real ones), and stop on a conflict rather than
 // overwriting someone's edit.
 // ---------------------------------------------------------------------------
 
-const promptInstall = `Set up the Stanford Web Services agent team in this project.
+const promptInstall = `Set up the Stanford Web Services agent team.
 
-Install it:
+It installs in two parts. First into my tools, once for this machine:
 
-  npx @su-sws/create-web-team --json --answers '{"siteName":"...","unit":"..."}'
+  npx @su-sws/synthetic-web-team user --json
 
-If that 404s it is not published yet, so use the repository instead:
+That writes the skills to ~/.claude/skills and ~/.agents/skills and nothing
+else. Skip it if the sws-* skills are already available to you.
+
+Then into this project:
+
+  npx @su-sws/synthetic-web-team --json --answers '{"siteName":"...","unit":"..."}'
+
+If npx cannot reach the registry, use the repository instead:
 
   git clone --depth 1 https://github.com/SU-SWS/synthetic-web-team /tmp/swt
-  node /tmp/swt/packages/create-web-team/bin/create-web-team.mjs --json \\
+  node /tmp/swt/packages/wizard/bin/wizard.mjs --json \\
     --answers '{"siteName":"...","unit":"..."}'
 
 Fill in siteName and unit from this repository. Ask me if it is not obvious.
@@ -49,7 +59,7 @@ Do not change any of my existing code.`;
 const promptReview = `Review this project against Stanford Web Services standards. Change nothing.
 
   git clone --depth 1 https://github.com/SU-SWS/synthetic-web-team /tmp/swt
-  node /tmp/swt/packages/create-web-team/bin/create-web-team.mjs add . --json
+  node /tmp/swt/packages/wizard/bin/wizard.mjs add . --json
   node /tmp/swt/packages/cli/bin/sws.mjs doctor --format json
 
 Give me the score out of 100, then the three findings most worth fixing: one
@@ -57,13 +67,22 @@ sentence each, naming the Stanford policy behind it. Fix nothing yet.`;
 
 const promptUpdate = `Update the Stanford Web Services standards in this project.
 
-  npx @su-sws/create-web-team add . --json
+  npx @su-sws/synthetic-web-team add . --json
 
 Report "previousVersion" against "version", and the "counts" object. If anything
 comes back as a conflict, list those files and stop: they are ones I edited and
 I will decide. If anything is an orphan, list it and do not delete it.`;
 
-const installCmd = `npx @su-sws/create-web-team --json --answers '{
+// The human path, and the whole of it: every flag is optional and the interview
+// asks the rest. It sits beside the agent form because the two callers want
+// opposite things, and this page used to document only the robot.
+//
+// Both halves are shown together because the second one is useless without the
+// first having happened at some point, and the ordering is not guessable.
+const humanCmd = `npx @su-sws/synthetic-web-team user    # once per machine
+npx @su-sws/synthetic-web-team         # once per project`;
+
+const installCmd = `npx @su-sws/synthetic-web-team --json --answers '{
   "siteName": "Stanford Bioengineering",
   "unit": "Bioengineering",
   "businessOwnerEmail": "owner@stanford.edu",
@@ -75,10 +94,12 @@ const resultShape = `{
   "version": "0.1.0",
   "counts": { "created": 81, "updated": 0, "unchanged": 0, "preserved": 0 },
   "incomplete": ["site.url"],
+  "dependency": { "name": "@su-sws/synthetic-web-team", "status": "no-package-json" },
   "next": [
     { "kind": "read-contract",  "path": "AGENTS.md" },
     { "kind": "orient",         "skill": "sws-onboard" },
     { "kind": "follow-recipe",  "path": "standards/recipes/astro-static/RECIPE.md" },
+    { "kind": "add-dependency", "command": "npm install -D @su-sws/synthetic-web-team" },
     { "kind": "verify",         "command": "npx sws doctor --format json" }
   ]
 }`;
@@ -94,7 +115,7 @@ const mcpConfig = `{
   }
 }`;
 
-const updateCmd = `npx @su-sws/create-web-team add .`;
+const updateCmd = `npx @su-sws/synthetic-web-team add .`;
 
 const checkModules = [
   ['footer', 'Global Footer link set, order, and nothing added'],
@@ -116,7 +137,7 @@ const mcpTools = [
 ];
 
 const updateVerdicts = [
-  ['preserved', '.sws/manifest.yml and acknowledged.yml. Your owners and accepted risks are never overwritten'],
+  ['preserved', '.sws/manifest.yml and .sws/acknowledged.yml. Your owners and accepted risks are never overwritten'],
   ['conflict', 'A file you edited. Reported and left alone unless you pass --force'],
   ['orphan', 'A file we no longer ship. Reported every run, never deleted'],
 ];
@@ -124,7 +145,7 @@ const updateVerdicts = [
 const inside = [
   ['8 policy files', 'MinSec, MinWeb, accessibility, privacy, brand, identity, procurement, escalation. Each dated with a reviewed: field'],
   ['7 pattern files', 'Decanter 8, components, content, IA, forms, motion, discoverability'],
-  ['25 skills', '8 built roles, 11 honest stubs, 6 shared. Two frontmatter keys, read natively by nine tools'],
+  ['30 skills', '8 built roles, 11 honest stubs, 11 shared. Two frontmatter keys, read natively by nine tools'],
   ['2 recipes', 'astro-static and next-netlify, with 63 machine-checkable criteria between them'],
   ['1 fragment', 'The Global Footer, byte-exact, extracted from the upstream component'],
 ];
@@ -132,7 +153,7 @@ const inside = [
 
 <Base
   title="Synthetic Web Team | Stanford Web Services"
-  description="Stanford compliance wired into your coding agent. 25 skills, 8 policy files, a 13-module compliance CLI, and an MCP server. No templates, no design system fork."
+  description="Stanford compliance wired into your coding agent. 30 skills, 8 policy files, a 13-module compliance CLI, and an MCP server. No templates, no design system fork."
 >
   <!-- ===================================================== hero -->
   <div class="relative overflow-hidden border-b border-black-90 bg-black">
@@ -170,7 +191,7 @@ const inside = [
               class="rounded-full bg-digital-red px-14 py-4 text-13 font-semibold tracking-wide text-white"
               >v0.1.0 EARLY</span
             >
-            <span class="text-16 text-black-30">MCP server · CLI · 25 skills</span>
+            <span class="text-16 text-black-30">MCP server · CLI · 30 skills</span>
           </p>
           <h1 class="mb-28 max-w-[24ch] text-56 font-bold leading-[1.05] tracking-tight md:text-72">
             Stanford compliance, wired into your agent.
@@ -267,7 +288,7 @@ const inside = [
             else runs to completion and reports.
           </p>
           <p class="mb-0 max-w-[54ch] text-19 leading-relaxed text-black-20">
-            Three fields in the result are the ones to act on.
+            Four fields in the result are the ones to act on.
           </p>
           <dl class="mt-24 mb-0 grid gap-16">
             <div class="border-l-2 border-poppy-light pl-20">
@@ -292,10 +313,21 @@ const inside = [
                 unchanged, so "already installed" is a truthful answer.
               </dd>
             </div>
+            <div class="border-l-2 border-poppy-light pl-20">
+              <dt class="mb-4 font-mono text-17 font-semibold text-white">dependency</dt>
+              <dd class="mb-0 ml-0 text-17 text-black-20">
+                Whether the project now declares this package. It has to, because
+                unscoped <code>sws</code> on the registry is somebody else's
+                package and <code>npx sws</code> would run that instead.
+              </dd>
+            </div>
           </dl>
         </div>
         <div data-animate data-animate-delay="0.15">
-          <CodeCard label="Terminal" tag="CLI" lang="bash" code={installCmd} id="install-cmd" />
+          <CodeCard label="Terminal, with a person" tag="INTERACTIVE" lang="bash" code={humanCmd} id="human-cmd" />
+          <div class="mt-24">
+            <CodeCard label="Terminal, from an agent" tag="CLI" lang="bash" code={installCmd} id="install-cmd" />
+          </div>
           <div class="mt-24">
             <CodeCard label="stdout" lang="json" code={resultShape} id="result-shape" />
           </div>

@@ -1,11 +1,11 @@
 // sws_scaffold: drives the wizard programmatically.
 //
 // WHY IT DEFAULTS TO A DRY RUN. This is the only tool here that writes to disk,
-// and it writes about 83 files. A model that calls it speculatively while
+// and it writes about 46 files. A model that calls it speculatively while
 // exploring should get a plan back, not a modified project. So `write` is opt-in
 // and the description says so.
 //
-// It shells out to the create-web-team binary for the same reason sws_check
+// It shells out to the wizard binary for the same reason sws_check
 // shells out to the CLI: one implementation, so the MCP path and the terminal
 // path cannot diverge. The wizard is already agent-shaped -- non-interactive off
 // a TTY, `--json`, `--answers`, and it preserves project state on a re-run.
@@ -19,16 +19,16 @@ const problem = (text) => ({ content: [{ type: 'text', text }], isError: true })
 
 function wizardPath() {
   try {
-    return createRequire(import.meta.url).resolve('@su-sws/create-web-team/bin/create-web-team.mjs');
+    return createRequire(import.meta.url).resolve('@su-sws/wizard/bin/wizard.mjs');
   } catch {
-    const guess = new URL('../../create-web-team/bin/create-web-team.mjs', import.meta.url).pathname;
+    const guess = new URL('../../wizard/bin/wizard.mjs', import.meta.url).pathname;
     return existsSync(guess) ? guess : null;
   }
 }
 
 export function scaffold(defaultRoot, { path, answers, editors, write = false, mode = 'new' } = {}) {
   const bin = wizardPath();
-  if (!bin) return problem('Could not locate the wizard. Install @su-sws/create-web-team.');
+  if (!bin) return problem('Could not locate the wizard. Install @su-sws/synthetic-web-team.');
 
   const root = path || defaultRoot;
   if (!existsSync(root)) return problem(`Path does not exist: ${root}`);

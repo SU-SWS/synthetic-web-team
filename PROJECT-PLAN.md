@@ -225,7 +225,7 @@ Five layers, each independently useful, each degrading gracefully if the layer a
 │     enforcement     Nag ladder. Secrets are the one gate.    │
 │                     Also: recipe canary vs current-latest.   │
 ├─────────────────────────────────────────────────────────────┤
-│ L2  Wizard          npx @su-sws/create-web-team              │
+│ L2  Wizard          npx @su-sws/synthetic-web-team           │
 │                     Detects editors, emits native files,     │
 │                     runs the upstream scaffolder + recipe    │
 │                     Optional: @su-sws/mcp for in-agent use   │
@@ -299,7 +299,8 @@ synthetic-web-team/                        pnpm workspace, Node 24
 ├── AGENTS.md                              L1: the behavioral contract (100 lines)
 ├── CLAUDE.md                              thin pointer: @AGENTS.md
 ├── skills/<name>/SKILL.md                 L1: source of truth for all skills
-│                                          copied to .agents/skills + .claude/skills
+│                                          copied to ~/.agents/skills + ~/.claude/skills
+│                                          at USER scope, not into a project
 ├── packages/                              npm workspaces, NOT pnpm: see the note below
 │   ├── standards/                         @su-sws/standards  (ships L0 + L1 content)
 │   ├── cli/                               @su-sws/sws-cli    → binary `sws`
@@ -318,13 +319,15 @@ synthetic-web-team/                        pnpm workspace, Node 24
 
 **Consolidated to two published packages, 1 September 2026.** The layout above lists four. Publishing four turned out to be machinery without a payer: `@su-sws/standards` and `@su-sws/create-web-team` have **no external dependencies**, and the standards get *vendored into the consumer's project* by the wizard anyway — so that package was a courier for files that end up copied regardless, and its cost was a prepack/postpack staging script and a package directory that looked empty in the working tree.
 
-What ships now is `@su-sws/sws` (content + CLI + wizard, published from the repository root, so no staging) and `@su-sws/mcp` (the server). The split that survives is the one with a reason: CI runs `sws check` on every push and should not download an MCP SDK to do it. `packages/cli` and `packages/create-web-team` remain as private workspace packages for development linking.
+What ships now is `@su-sws/synthetic-web-team` (content + CLI + wizard, published from the repository root, so no staging) and `@su-sws/mcp` (the server). The split that survives is the one with a reason: CI runs `sws check` on every push and should not download an MCP SDK to do it. `packages/cli` and `packages/wizard` remain as private workspace packages for development linking.
+
+**Renamed to `@su-sws/synthetic-web-team`, 8 September 2026.** The published package was `@su-sws/sws` and the wizard directory was `packages/create-web-team/`. Three reasons to change both. The npx invocation is the artefact people actually paste, so it should name the repository they are being sent to rather than an abbreviation that appears nowhere else. `create-web-team` also described the *act* of scaffolding, which stopped being the whole job once re-running became the update mechanism and `add` became a first-class mode. And nothing had been published, so the rename cost nothing: no dependents, no deprecation, no alias to carry. The bins are now `synthetic-web-team` (the wizard, and the one npx resolves by default) and `sws` (the CLI). The internal CLI workspace package keeps the name `@su-sws/sws-cli`, because the binary is still `sws` and that name is correct.
 
 Two things fell out of this that were not the goal. **One version number** now covers content and tools, which is what makes `sws doctor`'s staleness nag possible with no network call — the CLI's version *is* the standards version. And the cross-package `@su-sws/standards` import disappeared from both the CLI and the wizard: the existing `resolve(HERE, '..', '..', '..')` walk finds the content in the published layout and the repository alike, so the version skew that split could have produced is gone rather than managed.
 
 **The update path, which the plan had not specified.** Content is vendored, so a re-install is the update. `.sws/installed.json` records a hash of every file written, which is what lets a re-install distinguish three cases that must not be conflated: project state is **preserved**, a file the user edited is a **conflict** and is left alone unless `--force`, and a file we no longer ship is an **orphan** that is reported every run and never deleted. Deleting files in someone else's repository on the strength of a version bump is not a risk worth taking for tidiness.
 
-**One consequence of the old `packages/standards` worth remembering.** The content lives at the repository root, because that is where `scripts/validate-skills.mjs`, `scripts/sync-skills.mjs` and the docs site all expect it, and npm cannot pack files from outside a package directory. So the package stages the content in at pack time and removes it afterwards, and its `index.mjs` resolves either layout. That keeps one source of truth and no build step, at the cost of one 60-line script. `advisory.yml` packs for real on every run and asserts the tarball contains 25 skills and 8 policy files, because a wrong `files` list fails silently until the day someone publishes.
+**One consequence of the old `packages/standards` worth remembering.** The content lives at the repository root, because that is where `scripts/validate-skills.mjs`, `scripts/sync-skills.mjs` and the docs site all expect it, and npm cannot pack files from outside a package directory. So the package stages the content in at pack time and removes it afterwards, and its `index.mjs` resolves either layout. That keeps one source of truth and no build step, at the cost of one 60-line script. `advisory.yml` packs for real on every run and asserts the tarball contains 30 skills and 8 policy files, because a wrong `files` list fails silently until the day someone publishes.
 
 ## 5a. What a recipe is
 
@@ -447,7 +450,7 @@ Two notes on the stubs. The **compliance officer's** checks ship in v1 inside L3
 
 ## 7. The wizard
 
-`npx @su-sws/create-web-team` in a new directory, or `npx @su-sws/create-web-team add` in an existing one.
+`npx @su-sws/synthetic-web-team` in a new directory, or `npx @su-sws/synthetic-web-team add` in an existing one. Every flag is optional: with a TTY on both ends it interviews, and without one it runs to completion and reports.
 
 ### Interview flow
 
@@ -493,21 +496,36 @@ Step 9 is the recipe decision made concrete. The wizard **shells out to `npm cre
 
 ### What gets emitted, per editor
 
-Universal, always written:
+**Split into two scopes on 8 September 2026.** This section originally listed one
+universal set written into a project. Skills moved to a once-per-machine install,
+because they are byte-identical in every repository and no editor that reads
+`.agents/skills` offers a configurable path to reference them in place. Full
+reasoning and the as-built record in `docs/two-part-install.md`.
+
+User scope, written once per machine by `synthetic-web-team user`:
+
+```
+~/.agents/skills/<30 skills>/      the portable skill set
+~/.claude/skills/<30 skills>/      the same set: no single path is read by all
+~/.sws/installed.json              hashes, so an edit is never overwritten and
+                                   `user --remove` can uninstall precisely
+```
+
+Project scope, written once per repository:
 
 ```
 AGENTS.md                          ≤150 lines, the behavioral contract
-.agents/skills/<19 skills>/        the portable skill set
 .sws/manifest.yml                  standards version, editors, tier, stack
 .sws/acknowledged.yml              risk acceptances and divergences, starts empty
 standards/                         vendored L0 subset relevant to this project
 ```
 
-Then, only for editors actually present:
+Then, only for editors actually present. The skill paths named below still
+resolve, but the copy they resolve to now lives in the home directory:
 
 | Editor detected | Emitted |
 |---|---|
-| Claude Code | `CLAUDE.md` (thin, `@AGENTS.md`), `.claude/skills/` (copy), `.mcp.json` |
+| Claude Code | `CLAUDE.md` (thin, `@AGENTS.md`), `.mcp.json`. Skills resolve from `~/.claude/skills` |
 | VS Code + Copilot | `.github/copilot-instructions.md` (thin), `.vscode/mcp.json`. Skills already resolve from `.claude/skills` |
 | Cursor | `.cursor/rules/sws.mdc` (thin, `alwaysApply: true`), `.cursor/mcp.json`. Skills resolve from `.agents/skills` |
 | Antigravity | `GEMINI.md` (thin, because Antigravity ranks it above `AGENTS.md`), `.agents/mcp_config.json` |
@@ -752,7 +770,7 @@ L0 complete. The 8 built role skills, the 11 stubs, the 5 shared skills. `AGENTS
 *Exit: a developer can copy `.agents/skills/` into a project by hand and the roles work in five tools.*
 
 **Phase 2, Wizard and the Astro recipe (weeks 7 to 10, Sep 28 to Oct 23)**
-`@su-sws/create-web-team` with detection, emission, and scaffolder delegation. `standards/recipes/astro-static/` with its acceptance criteria and normative fragments. GitHub Pages deploy via `actions/upload-pages-artifact` and `actions/deploy-pages`. Compliant footer, identity bar, accessibility statement, and privacy page generated from day one.
+`@su-sws/synthetic-web-team` with detection, emission, and scaffolder delegation. `standards/recipes/astro-static/` with its acceptance criteria and normative fragments. GitHub Pages deploy via `actions/upload-pages-artifact` and `actions/deploy-pages`. Compliant footer, identity bar, accessibility statement, and privacy page generated from day one.
 *Exit: `npx` to a live, compliant GitHub Pages site in under ten minutes, with nothing vendored.*
 
 **Phase 3, Advisory enforcement and the canary (weeks 11 to 13, Oct 26 to Nov 13)**

@@ -23,15 +23,15 @@ import {
 import * as history from '../src/history.mjs';
 import * as gh from '../src/github.mjs';
 import { preflight, summarise } from '../src/preflight.mjs';
-// Sibling directory inside the same published package (@su-sws/sws), so this
+// Sibling directory inside the same published package (@su-sws/synthetic-web-team), so this
 // relative path resolves in the repository and in a tarball alike. One reader
 // of the install record means the CLI and the wizard cannot disagree about what
 // "installed" means.
-import { readInstalled } from '../../create-web-team/src/emit.mjs';
+import { readInstalled } from '../../wizard/src/emit.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-// `standards/` ships in the same package as this file (@su-sws/sws), so the
+// `standards/` ships in the same package as this file (@su-sws/synthetic-web-team), so the
 // relative walk below finds it in both the published layout and this
 // repository. There used to be an `import('@su-sws/standards')` fallback here;
 // consolidating content and tools into one package removed the need for it,
@@ -116,20 +116,30 @@ if (flags.help) { console.log(USAGE); process.exit(0); }
 // A `.sws/manifest.yml` alone is NOT enough evidence, and assuming it was cost a
 // false nag on this project's own docs site: `site/` is hand-built inside this
 // repository and carries a manifest, but nothing was ever vendored into it. The
-// advice "re-run the installer" would have written 81 files of skills and
-// standards into a directory that wants none of them.
+// advice "re-run the installer" would have written 46 files of standards and
+// page furniture into a directory that wants none of them.
 //
 // The real signature of a wizard install is vendored content, so look for that.
+//
+// THE SIGNATURE MOVED when the install split in two. This used to look for
+// `.agents/skills` or `.claude/skills`, which a project install no longer
+// writes -- skills are installed once into the person's tool instead. So it
+// returned false for every correctly installed project, and the caller's "no
+// install record" nag silently stopped firing. Verified: a fresh project with
+// its record deleted reported nothing.
+//
+// `standards/` is the right test now. It is what a project install actually
+// vendors, and `site/` has neither it nor an AGENTS.md, so the original false
+// nag stays fixed.
 function wizardInstalled(dir) {
-  return existsSync(join(dir, 'AGENTS.md'))
-    && (existsSync(join(dir, '.agents', 'skills')) || existsSync(join(dir, '.claude', 'skills')));
+  return existsSync(join(dir, 'AGENTS.md')) && existsSync(join(dir, 'standards'));
 }
 
 // --- locate things ----------------------------------------------------------
 
 // A project normally vendors `standards/` (the wizard copies it in), so the
 // local lookups come first and win. The last entry is the copy that ships
-// alongside this CLI, which covers `npx @su-sws/sws sws doctor` in a project
+// alongside this CLI, which covers `npx -p @su-sws/synthetic-web-team sws doctor` in a project
 // that never vendored them.
 function findStandards() {
   if (flags.standards) return resolve(flags.standards);
@@ -410,7 +420,7 @@ async function run() {
   // with whether it meets Stanford's requirements.
   //
   // The comparison is free because content and tools ship in ONE package
-  // (@su-sws/sws), so the version of this CLI *is* the version of the standards
+  // (@su-sws/synthetic-web-team), so the version of this CLI *is* the version of the standards
   // it carries. No network call, no registry lookup.
   if (cmd === 'doctor') {
     const installed = readInstalled(root);
@@ -420,7 +430,7 @@ async function run() {
     })();
     if (installed?.version && mine && installed.version !== mine) {
       note(`  Standards in this project are v${installed.version}; this tool carries v${mine}.`);
-      note(`  To update:  npx @su-sws/create-web-team add .`);
+      note(`  To update:  npx @su-sws/synthetic-web-team add .`);
       note(`  ${'Content is rewritten, your .sws state is preserved, and files you edited'}`);
       note(`  are reported rather than overwritten.\n`);
     } else if (!installed && wizardInstalled(root)) {

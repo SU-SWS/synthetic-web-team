@@ -24,19 +24,19 @@ Early. The plan is complete and reviewed; the implementation is partway through.
 | `next-ssr` recipe | Written, extends `astro-static`. Renamed from `next-netlify` on 2026-09-03. Not yet executed end to end |
 | Hosting profiles | **New.** `standards/hosting/`: a capability contract plus GitHub Pages, Netlify, and Vercel |
 | Shared skills | **8 of 8 done**, including `sws-github` (provisions a repo and Pages deploy through `gh`) and `sws-preflight` (is this machine equipped?) |
-| Role skills | **8 of 8 built, 11 of 11 stubs.** 27 skills total, all validated |
-| Documentation site | **Working.** [`site/`](site/), built by our own recipe, scores 91/100 with zero failures |
+| Role skills | **8 of 8 built, 11 of 11 stubs.** 30 skills total, all validated |
+| Documentation site | **Working.** [`site/`](site/), built by our own recipe, scores 100/100 with zero failures |
 | `sws` CLI | **Working.** `preflight` reports whether the machine has the tools to build at all. `doctor` and `check` run 13 check modules against 68 criteria. `sws a11y` runs axe and an interactive-state audit — hover and focus measured with a real mouse and a real Tab key — and `sws perf` measures a byte budget, all in real Chromium |
 | Report delivery | **Working.** PR comment and a persistent "Site health" issue, both updated in place. Score trend, sparkline, HTML artifact, README badge |
-| Install wizard | **Working, agent-first.** Non-interactive by default off a TTY, `--json` result with machine-readable next steps, `--answers` input, idempotent re-runs that preserve project state |
+| Install wizard | **Working, agent-first, two-part.** `user` scope installs the skills into your tools once per machine and is removable; project scope installs `AGENTS.md`, the standards, and the per-site record. Non-interactive by default off a TTY, `--json` result with machine-readable next steps, `--answers` input, idempotent re-runs that preserve project state |
 | Copy-a-prompt install | **Working.** Three prompts on the site — install, review, update — each carrying an `npx` route and a `git clone` fallback |
-| Publishable packages | **Working, not yet published.** Two packages — `@su-sws/sws` and `@su-sws/mcp` — verified by installing the tarballs into a clean project with no repository present |
+| Publishable packages | **Working, not yet published.** Two packages — `@su-sws/synthetic-web-team` and `@su-sws/mcp` — verified by installing the tarballs into a clean project with no repository present |
 | Updates | **Working.** Re-install is the update: project state preserved, local edits reported as conflicts rather than overwritten, stale files reported not deleted, staleness nag in `sws doctor` |
 | Recipe canary | **Deliberately deferred**, 2026-09-01. Not in production, so nobody is exposed to upstream drift yet. Revisit before the first pilot |
 | Standards freshness CI | Planned, and the priority ahead of the canary. Keeps policy, prior art, and sourced facts from going stale |
 | MCP server | **Working.** [`packages/mcp/`](packages/mcp/). 5 tools, 26 resources, verified over the real stdio protocol |
 
-End to end, verified: `create-web-team` installs, an agent follows the recipe, then `npm run build && sws a11y && sws perf && sws check` reports **100/100 with zero automated failures** — 45 criteria passing, none to fix, 8 unchecked. axe runs in real Chromium against every built route and finds 0 violations at WCAG 2.1 AA; the byte budget passes at 42 KB of 800. **Every one of the 8 unchecked items is genuinely unautomatable** — the manual WCAG checklist, ODA review, subdomain approval, MFA attestation, the DRA question — and each says so with a reason rather than being quietly dropped.
+End to end, verified: `synthetic-web-team` installs, an agent follows the recipe, then `npm run build && sws a11y && sws perf && sws check` reports **100/100 with zero automated failures** — 52 criteria passing, none to fix, 8 unchecked. axe runs in real Chromium against every built route and finds 0 violations at WCAG 2.1 AA; the byte budget passes at 139 KB of 800. **Every one of the 8 unchecked items is genuinely unautomatable** — the manual WCAG checklist, ODA review, subdomain approval, MFA attestation, the DRA question — and each says so with a reason rather than being quietly dropped.
 
 **A green axe run is a floor, not a conformance claim.** It covers roughly 30 percent of accessibility issues per ODA guidance, and this project says so in the report itself.
 
@@ -54,13 +54,42 @@ There are three prompts: install, review an existing site without changing it,
 and update. Each names both the `npx` route and a `git clone` fallback, so it
 stays correct whether or not the package is published yet.
 
+### Or run it yourself and answer the questions
+
+**It installs in two parts.** Once per machine, into whichever AI tools you use:
+
+```bash
+npx @su-sws/synthetic-web-team user
+```
+
+That writes the 30 skills to `~/.claude/skills/` and `~/.agents/skills/` and
+nothing else — no standards, no `AGENTS.md`, nothing per-site, because at that
+point there is no site. It touches no file it did not write, so unrelated skills
+already in those directories are safe, and `user --remove` takes it back out.
+
+Then once per project, in its root:
+
+```bash
+npx @su-sws/synthetic-web-team
+```
+
+**Every flag is optional.** With a terminal attached this asks what the site is,
+what it handles, who owns it, and which AI tools you use, then shows you every
+file before writing anything. **A project gets no skills** — they are already
+installed for every project — so their absence there is correct.
+
+Where a `package.json` is present it also adds `@su-sws/synthetic-web-team` to
+your `devDependencies`, so that `npx sws` afterwards runs this CLI. Unscoped
+`sws` on the public registry is an unrelated package, and without the local
+dependency that is what you would get.
+
 ### Or drive the installer yourself
 
 **The primary caller is an agent, so that is the first-class path.** One command,
 no prompts, one JSON document on stdout, stable exit codes:
 
 ```bash
-npx @su-sws/create-web-team --json --answers '{
+npx @su-sws/synthetic-web-team --json --answers '{
   "siteName": "Stanford Bioengineering",
   "unit": "Bioengineering",
   "purpose": "Help prospective graduate students apply",
@@ -98,7 +127,7 @@ at runtime — so an update is a re-copy, and the only question is what it is
 allowed to touch.
 
 ```bash
-npx @su-sws/create-web-team add .
+npx @su-sws/synthetic-web-team add .
 ```
 
 Three guarantees make that safe to run at any time:
@@ -130,7 +159,7 @@ wizard finds its content beside itself or in the current directory:
 git clone https://github.com/SU-SWS/synthetic-web-team
 cd synthetic-web-team && npm install
 cd /path/to/your/project
-node /path/to/synthetic-web-team/packages/create-web-team/bin/create-web-team.mjs
+node /path/to/synthetic-web-team/packages/wizard/bin/wizard.mjs
 ```
 
 Or copy the files by hand, which is all the wizard is really doing:
@@ -140,8 +169,9 @@ Or copy the files by hand, which is all the wizard is really doing:
 cp -r path/to/synthetic-web-team/AGENTS.md .
 cp -r path/to/synthetic-web-team/standards .
 mkdir -p .agents .claude
-cp -r path/to/synthetic-web-team/skills .agents/skills
-cp -r path/to/synthetic-web-team/skills .claude/skills
+# Skills go in your HOME directory, once, not in the project
+cp -r path/to/synthetic-web-team/skills ~/.agents/skills
+cp -r path/to/synthetic-web-team/skills ~/.claude/skills
 echo '@AGENTS.md' > CLAUDE.md
 ```
 
@@ -165,7 +195,7 @@ node packages/cli/bin/sws.mjs doctor --standards standards
 | Path | What it does |
 |---|---|
 | [`AGENTS.md`](AGENTS.md) | The behavioral contract. 100 lines, read by every tool |
-| [`skills/`](skills/) | The team: 27 skills, each one `SKILL.md` with two frontmatter keys. 8 built roles, 11 honest stubs, 8 shared |
+| [`skills/`](skills/) | The team: 30 skills, each one `SKILL.md` with two frontmatter keys. 8 built roles, 11 honest stubs, 11 shared |
 | [`standards/policy/`](standards/policy/) | Stanford requirements: MinSec, MinWeb, accessibility, privacy, brand, identity, procurement, escalation. Each file carries a `reviewed:` date |
 | [`standards/patterns/`](standards/patterns/) | How SWS actually builds: Decanter, components, content, IA, forms, discoverability, plus conventions derived from reading 11 production repos |
 | [`standards/stack/`](standards/stack/) | `reference-versions.yml`, a dated baseline. Advisory — nothing installs from it. Plus `performance-budget.yml`, the byte budget `sws perf` enforces |
@@ -173,15 +203,15 @@ node packages/cli/bin/sws.mjs doctor --standards standards
 | [`standards/fragments/`](standards/fragments/) | Byte-exact compliance content, like the Global Footer link set |
 | [`standards/prior-art/`](standards/prior-art/) | Existing SWS work, with era, lineage, and judgment attached |
 | [`packages/cli/`](packages/cli/) | The `sws` CLI. 13 check modules, plus axe, interactive-state, and performance runners in real Chromium |
-| [`packages/create-web-team/`](packages/create-web-team/) | The install wizard |
+| [`packages/wizard/`](packages/wizard/) | The install wizard |
 | [`packages/mcp/`](packages/mcp/) | `@su-sws/mcp`. The same standards as MCP tools and resources, for agents that prefer calling a tool to shelling out |
 
-**Two published packages, not four.** `@su-sws/sws` ships the content, the CLI
+**Two published packages, not four.** `@su-sws/synthetic-web-team` ships the content, the CLI
 and the wizard together — one version number, so the CLI always knows which
 standards version it carries. `@su-sws/mcp` is separate only so CI does not
 download an MCP SDK to run `sws check`. `packages/cli` and
-`packages/create-web-team` are internal: they are published *inside*
-`@su-sws/sws`, which is why there is no staging script and no empty-looking
+`packages/wizard` are internal: they are published *inside*
+`@su-sws/synthetic-web-team`, which is why there is no staging script and no empty-looking
 package directory.
 
 ## Five decisions that surprise people

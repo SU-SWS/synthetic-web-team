@@ -1,7 +1,7 @@
 {
-  "name": "@su-sws/sws",
+  "name": "@su-sws/synthetic-web-team",
   "version": "0.1.0",
-  "description": "Stanford Web Services standards and agent team: policy, patterns, recipes, fragments, prior art, 25 role skills, the install wizard, and the advisory compliance CLI.",
+  "description": "Stanford Web Services standards and agent team: policy, patterns, recipes, fragments, prior art, 30 skills, the two-part install wizard, and the advisory compliance CLI.",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
@@ -21,11 +21,15 @@
     "packages/*"
   ],
   "devDependencies": {
+    "@su-sws/synthetic-web-team": "^0.1.0",
     "yaml": "^2.8.1"
   },
   "bin": {
-    "sws": "packages/cli/bin/sws.mjs",
-    "create-web-team": "packages/create-web-team/bin/create-web-team.mjs"
+    "synthetic-web-team": "packages/wizard/bin/wizard.mjs",
+    "sws": "packages/cli/bin/sws.mjs"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "AGENTS.md",
@@ -33,8 +37,8 @@
     "skills",
     "packages/cli/bin",
     "packages/cli/src",
-    "packages/create-web-team/bin",
-    "packages/create-web-team/src"
+    "packages/wizard/bin",
+    "packages/wizard/src"
   ],
   "dependencies": {
     "node-html-parser": "^7.0.1",

@@ -17,7 +17,7 @@
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { plan } from '../packages/create-web-team/src/emit.mjs';
+import { plan } from '../packages/wizard/src/emit.mjs';
 
 const SOURCE = 'skills';
 const TARGETS = ['.agents/skills', '.claude/skills'];
@@ -36,15 +36,21 @@ if (!names.length) fail(`no skills found in ${SOURCE}/`);
 // Minimal but real arguments. No editors: pointer files are not under test
 // here, and an empty list keeps this pinned to the universal core, which is
 // where the skills live.
-const files = plan({
+const args = {
   root: '.',
   source: '.',
   editors: [],
   answers: { recipe: 'astro-static', siteName: 'validate-emit', unit: 'SWS' },
   tier: { id: 'low', label: 'Low' },
-});
+};
 
-const emitted = new Map(files.map((f) => [f.path, f.contents]));
+// Skills are USER scope: installed once into the person's tool rather than
+// copied into every repository. The emitted paths are unchanged -- only the root
+// they are written under differs -- so the target directories below still apply.
+const userFiles = plan({ ...args, scope: 'user' });
+const projectFiles = plan({ ...args, scope: 'project' });
+
+const emitted = new Map(userFiles.map((f) => [f.path, f.contents]));
 
 for (const target of TARGETS) {
   const got = [...emitted.keys()]
@@ -67,9 +73,10 @@ for (const target of TARGETS) {
   }
 }
 
-// The consumer invariant from docs/skill-paths.md: the two committed
-// directories must be identical to each other, because if they diverge that
-// project's Cursor and Claude Code follow different instructions.
+// The invariant from docs/skill-paths.md, which now lives in the home directory
+// rather than in each project: the two directories must be identical to each
+// other, because if they diverge then Cursor and Claude Code follow different
+// instructions with no obvious cause.
 const [a, b] = TARGETS;
 const divergent = names.filter(
   (n) => emitted.get(`${a}/${n}/SKILL.md`) !== emitted.get(`${b}/${n}/SKILL.md`)
@@ -77,7 +84,30 @@ const divergent = names.filter(
 if (divergent.length) fail(`${a} and ${b} disagree on: ${divergent.join(', ')}`);
 else console.log(`OK     ${a} and ${b} are identical`);
 
+// ---- the two-part install: scopes must not overlap, and must cover ---------
+//
+// These three gates are what stop the split from silently collapsing back into
+// one install. The first regression to expect is a skill leaking into project
+// scope, which would put a frozen copy in every repository again.
+const userPaths = new Set(userFiles.map((f) => f.path));
+const projectPaths = new Set(projectFiles.map((f) => f.path));
+
+const overlap = [...userPaths].filter((x) => projectPaths.has(x));
+if (overlap.length) fail(`user and project scope both emit: ${overlap.join(', ')}`);
+else console.log(`OK     scopes are disjoint  ${userPaths.size} user, ${projectPaths.size} project`);
+
+const leaked = [...projectPaths].filter((x) => /skills\/.+\/SKILL\.md$/.test(x));
+if (leaked.length) fail(`project scope emits ${leaked.length} skill file(s), e.g. ${leaked.slice(0, 3).join(', ')}`);
+else console.log('OK     project scope emits no skills');
+
+for (const required of ['AGENTS.md', '.sws/manifest.yml', '.sws/acknowledged.yml']) {
+  if (!projectPaths.has(required)) fail(`project scope is missing ${required}`);
+}
+const stdCount = [...projectPaths].filter((x) => x.startsWith('standards/')).length;
+if (!stdCount) fail('project scope emits no standards/ files');
+else console.log(`OK     project scope  AGENTS.md, .sws state, ${stdCount} standards files`);
+
 const emittedSkillFiles = [...emitted.keys()].filter((p) => /^\.(agents|claude)\/skills\/.+\/SKILL\.md$/.test(p)).length;
-console.log(`\n${names.length} skills in ${SOURCE}/, ${emittedSkillFiles} files emitted across ${TARGETS.length} paths`);
+console.log(`\n${names.length} skills in ${SOURCE}/, ${emittedSkillFiles} files emitted across ${TARGETS.length} paths at USER scope`);
 console.log(failures ? `\n${failures} failure(s)` : '\nAll checks passed.');
 process.exit(failures ? 1 : 0);

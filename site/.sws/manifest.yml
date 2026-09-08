@@ -45,7 +45,11 @@ accessibility:
   oda_review_requested: null
 
 editors: []
-skills_installed: 25
+
+# Hand-built, so the wizard never ran against this directory and no skills were
+# ever installed into it -- see the note in packages/cli/bin/sws.mjs about the
+# false "re-run the installer" nag this site caused. Skills live at user scope.
+skills_available_at_install: null
 
 resolved:
   astro: "7.2.1"
@@ -134,16 +138,17 @@ install_pathways:
       Three copy-a-prompt boxes on the page: install, review an existing project,
       and update. The easiest path, and the one most people will use.
     honesty_note: >
-      Each prompt names BOTH the npx route and a git clone fallback, because
-      nothing is published to npm yet. Verified: `npx @su-sws/create-web-team`
-      returns E404 today, and the clone route installs 87 files. A prompt naming
-      only npx would send every agent into a 404.
+      Each prompt names BOTH the npx route and a git clone fallback. The clone
+      route is what still works from behind a registry proxy, on a fork, or
+      against an unreleased change, so naming both keeps the prompt correct in
+      the situations npx cannot cover. Renamed from `@su-sws/create-web-team` on
+      2026-09-08 so the published name matches the repository.
     encodes: >
       Never invent an owner name or email (MinWeb requires real ones), stop on a
       conflict rather than overwriting an edit, and read AGENTS.md as an ongoing
       contract rather than a setup step.
   - kind: cli
-    what: "npx @su-sws/create-web-team --json --answers '{...}'"
+    what: "npx @su-sws/synthetic-web-team --json --answers '{...}'"
   - kind: mcp
     what: sws_scaffold, for an agent that already has the server configured
 

@@ -12,7 +12,7 @@ server will not start, nothing else stops working.
 { "mcpServers": { "sws": { "command": "npx", "args": ["-y", "@su-sws/mcp"] } } }
 ```
 
-`npx @su-sws/create-web-team` writes this for you into `.mcp.json` and
+`npx @su-sws/synthetic-web-team` writes this for you into `.mcp.json` and
 `.cursor/mcp.json`.
 
 ## Tools
@@ -23,7 +23,7 @@ server will not start, nothing else stops working.
 | `sws_footer_html` | Correct Stanford Global Footer markup, generated from the byte-exact contract |
 | `sws_check` | The advisory compliance report, structured, with a score out of 100 |
 | `sws_decanter_token` | Resolve a Decanter token from the CSS of the version actually installed |
-| `sws_scaffold` | Install the agent team into a project. **Dry run by default** |
+| `sws_scaffold` | Install the contract, standards and per-site record into a project. **Dry run by default.** Project scope only — the skills install once per machine, outside this tool |
 
 Documents are also exposed as resources at `sws://standard/<path>`, for clients
 that support them. Tools are the portable surface; resources are the idiomatic
@@ -46,7 +46,7 @@ separate service. That is also why this project does not depend on
 ## Design notes
 
 **`sws_check` and `sws_scaffold` shell out** to `@su-sws/sws-cli` and
-`@su-sws/create-web-team` rather than reimplementing them. One implementation
+`@su-sws/synthetic-web-team` rather than reimplementing them. One implementation
 means the MCP result and the terminal result can never disagree, which is the
 drift this project is organised against. The cost is a process spawn.
 

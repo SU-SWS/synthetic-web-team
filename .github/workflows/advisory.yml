@@ -124,7 +124,7 @@ jobs:
           const need = [
             "AGENTS.md",
             "packages/cli/bin/sws.mjs",
-            "packages/create-web-team/bin/create-web-team.mjs",
+            "packages/wizard/bin/wizard.mjs",
             "standards/fragments/global-footer.yml",
             "standards/recipes/astro-static/acceptance.yml",
             "standards/policy/minweb.md",
@@ -136,8 +136,8 @@ jobs:
           const cliSrc = sws.filter((n) => /^packages\/cli\/src\/.+\.mjs$/.test(n)).length;
 
           let bad = 0;
-          if (missing.length) { console.log(`::error::@su-sws/sws tarball missing: ${missing.join(", ")}`); bad++; }
-          if (skills < 25) { console.log(`::error::tarball has ${skills} skills, expected 25`); bad++; }
+          if (missing.length) { console.log(`::error::@su-sws/synthetic-web-team tarball missing: ${missing.join(", ")}`); bad++; }
+          if (skills < 30) { console.log(`::error::tarball has ${skills} skills, expected 30+`); bad++; }
           if (policy < 8) { console.log(`::error::tarball has ${policy} policy files, expected 8`); bad++; }
           if (cliSrc < 7) { console.log(`::error::tarball has ${cliSrc} cli src modules, expected 7+`); bad++; }
           // The plan, the docs site and the MCP package must never ship inside it.
@@ -150,7 +150,7 @@ jobs:
             if (!mcp.includes(m)) { console.log(`::error::mcp tarball missing ${m}`); bad++; }
           }
 
-          console.log(`@su-sws/sws: ${sws.length} files, ${skills} skills, ${policy} policy, ${cliSrc} cli modules`);
+          console.log(`@su-sws/synthetic-web-team: ${sws.length} files, ${skills} skills, ${policy} policy, ${cliSrc} cli modules`);
           console.log(`@su-sws/mcp: ${mcp.length} files`);
           process.exit(bad ? 1 : 0)'
 
