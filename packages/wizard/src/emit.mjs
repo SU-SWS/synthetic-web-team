@@ -414,7 +414,7 @@ function writeInstalled(root, { version, files, scope = 'project' }) {
   // The advice differs by scope, and getting it wrong matters: "commit this" is
   // right in a repository and nonsense in a home directory.
   const advice = scope === 'user'
-    ? 'Do not delete while the skills are installed: `user --remove` reads this to '
+    ? 'Do not delete while the skills are installed: `install --remove` reads this to '
       + 'know which files are ours, and without it an uninstall cannot tell your '
       + 'skills from ours and so removes nothing.'
     : 'Commit this. Safe to delete: you lose conflict detection until the next install.';

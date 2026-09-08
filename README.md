@@ -29,7 +29,7 @@ Early. The plan is complete and reviewed; the implementation is partway through.
 | `sws` CLI | **Working.** `preflight` reports whether the machine has the tools to build at all. `doctor` and `check` run 13 check modules against 68 criteria. `sws a11y` runs axe and an interactive-state audit — hover and focus measured with a real mouse and a real Tab key — and `sws perf` measures a byte budget, all in real Chromium |
 | Report delivery | **Working.** PR comment and a persistent "Site health" issue, both updated in place. Score trend, sparkline, HTML artifact, README badge |
 | Install wizard | **Working, agent-first, two-part.** `user` scope installs the skills into your tools once per machine and is removable; project scope installs `AGENTS.md`, the standards, and the per-site record. Non-interactive by default off a TTY, `--json` result with machine-readable next steps, `--answers` input, idempotent re-runs that preserve project state |
-| Copy-a-prompt install | **Working.** Three prompts on the site — install, review, update — each carrying an `npx` route and a `git clone` fallback |
+| Copy-a-prompt install | **Working.** Five prompts on the site — install into your editor, start a new site, add to an existing project, review, update — each carrying an `npx` route and a `git clone` fallback |
 | Publishable packages | **Working, not yet published.** Two packages — `@su-sws/synthetic-web-team` and `@su-sws/mcp` — verified by installing the tarballs into a clean project with no repository present |
 | Updates | **Working.** Re-install is the update: project state preserved, local edits reported as conflicts rather than overwritten, stale files reported not deleted, staleness nag in `sws doctor` |
 | Recipe canary | **Deliberately deferred**, 2026-09-01. Not in production, so nobody is exposed to upstream drift yet. Revisit before the first pilot |
@@ -50,27 +50,30 @@ can run a command. It tells the agent how to install, what to read first, and
 **to ask you for the owner names and emails rather than inventing them**, because
 MinWeb requires real ones.
 
-There are three prompts: install, review an existing site without changing it,
-and update. Each names both the `npx` route and a `git clone` fallback, so it
-stays correct whether or not the package is published yet.
+There are five, following the two-step shape: **install into your editor**,
+then either **start a new site** or **add to an existing project**, plus review
+an existing site without changing it, and update. Each names both the `npx`
+route and a `git clone` fallback, so it stays correct even where the registry is
+unreachable.
 
 ### Or run it yourself and answer the questions
 
 **It installs in two parts.** Once per machine, into whichever AI tools you use:
 
 ```bash
-npx @su-sws/synthetic-web-team user
+npx @su-sws/synthetic-web-team install
 ```
 
 That writes the 30 skills to `~/.claude/skills/` and `~/.agents/skills/` and
 nothing else — no standards, no `AGENTS.md`, nothing per-site, because at that
 point there is no site. It touches no file it did not write, so unrelated skills
-already in those directories are safe, and `user --remove` takes it back out.
+already in those directories are safe, and `install --remove` takes it back out.
 
 Then once per project, in its root:
 
 ```bash
-npx @su-sws/synthetic-web-team
+npx @su-sws/synthetic-web-team init     # a new site, in an empty directory
+npx @su-sws/synthetic-web-team add .   # a project you already have
 ```
 
 **Every flag is optional.** With a terminal attached this asks what the site is,
@@ -89,7 +92,7 @@ dependency that is what you would get.
 no prompts, one JSON document on stdout, stable exit codes:
 
 ```bash
-npx @su-sws/synthetic-web-team --json --answers '{
+npx @su-sws/synthetic-web-team init --json --answers '{
   "siteName": "Stanford Bioengineering",
   "unit": "Bioengineering",
   "purpose": "Help prospective graduate students apply",

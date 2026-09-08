@@ -152,12 +152,12 @@ export function build({ root = process.cwd(), standards = bundledStandards } = {
       'write files. Re-running is safe — .sws/manifest.yml and .sws/acknowledged.yml are ' +
       'project state and are preserved. Supply answers so the manifest records real values ' +
       'instead of placeholders. This is PROJECT scope only: the role skills install once per ' +
-      'machine via `npx @su-sws/synthetic-web-team user`, so a project holding no skills is ' +
+      'machine via `npx @su-sws/synthetic-web-team install`, so a project holding no skills is ' +
       'correct rather than a failed install.',
     inputSchema: {
       path: z.string().optional().describe('Target project directory. Defaults to the server working directory.'),
       write: z.boolean().optional().describe('false (default) reports the plan; true writes the files.'),
-      mode: z.enum(['new', 'add']).optional().describe('"add" for an existing project.'),
+      mode: z.enum(['init', 'add', 'new']).optional().describe('"init" for a new site (default), "add" for an existing project. "new" is accepted as an alias for "init".'),
       editors: z.array(z.string()).optional().describe('Editor ids, e.g. ["claude-code","cursor"]. Omit to auto-detect.'),
       answers: z.object({
         siteName: z.string().optional(), unit: z.string().optional(),

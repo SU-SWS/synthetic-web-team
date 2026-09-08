@@ -95,15 +95,15 @@ procurement implications. State the obligation, name the office, stop.
 
 ## Installing this
 
-**Two parts.** `npx @su-sws/synthetic-web-team user` installs the skills into a
-person's tool once per machine; the command below installs the per-site record
-into one repository. **A project holds no skills** — that absence is correct.
+**Three named jobs, no default:** `install` puts the skills in a person's tool
+once per machine, `init` starts a new site, `add .` adds to an existing one; no
+job prints help. **A project holds no skills** — correct, not a failed install.
 
 If you are an agent asked to set up a Stanford site, install non-interactively
 and read the result rather than the prose:
 
 ```bash
-npx @su-sws/synthetic-web-team --json --answers '{"siteName":"...","unit":"..."}'
+npx @su-sws/synthetic-web-team init --json --answers '{"siteName":"...","unit":"..."}'
 ```
 
 Every flag is optional: run it bare and it interviews you, so **never say the

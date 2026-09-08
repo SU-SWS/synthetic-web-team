@@ -46,10 +46,26 @@ const { values: flags, positionals } = parseArgs({
 // and worked around there by always passing a mode; the wizard kept the trap.
 // So an unrecognised first positional is now read as the directory, which is
 // what anyone typing it meant.
-const MODES = new Set(['new', 'add', 'user']);
-const modeGiven = positionals[0] !== undefined && MODES.has(positionals[0]);
-const mode = modeGiven && positionals[0] !== 'new' ? positionals[0] : 'new';
-const dirArg = modeGiven ? positionals[1] : positionals[0];
+// Each job is NAMED, and none of them is the default.
+//
+// `install` writes 60 files into a home directory; `init` and `add` write 46
+// into whatever directory you are standing in. Picking one of those on the
+// strength of a guess is not a defensible default, and guessing from the
+// directory cannot work anyway: an empty directory is exactly the `init` case,
+// so "empty means install into the editor" would hijack the commonest flow.
+//
+// `new` is a silent alias for `init`, kept because the MCP scaffolder passes a
+// mode positional and muscle memory is cheap to honour.
+const COMMANDS = new Map([
+  ['install', 'user'],
+  ['init', 'new'],
+  ['initialize', 'new'],
+  ['new', 'new'],
+  ['add', 'add'],
+]);
+const cmdGiven = positionals[0] !== undefined && COMMANDS.has(positionals[0]);
+const mode = cmdGiven ? COMMANDS.get(positionals[0]) : null;
+const dirArg = cmdGiven ? positionals[1] : positionals[0];
 
 // A user install targets the home directory. The optional directory overrides
 // it, which exists so this can be exercised against a scratch directory rather
@@ -58,6 +74,7 @@ const dirArg = modeGiven ? positionals[1] : positionals[0];
 const root = mode === 'user'
   ? resolve(dirArg ?? homedir())
   : resolve(dirArg ?? '.');
+
 
 // ---------------------------------------------------------------------------
 // AGENTS ARE THE PRIMARY CALLER, so non-interactive is the DEFAULT and prompting
@@ -81,33 +98,37 @@ const interactive = flags.interactive || (hasHuman && !flags.yes && !flags.json)
 // stderr, so a caller can pipe stdout straight into a parser.
 const say = (...a) => (flags.json ? console.error(...a) : console.log(...a));
 
-if (flags.help) {
-  console.log(`
-  synthetic-web-team [user|add] [dir]
+const HELP = `
+  synthetic-web-team <install|init|add> [dir]
 
-  Installs the Stanford Web Services agent team. TWO PARTS, run at different
-  times:
+  Installs the Stanford Web Services agent team. THREE JOBS, and no default --
+  each writes to a different place, so it will not guess which you meant:
 
-    npx @su-sws/synthetic-web-team user      once per machine, into your tools
-    npx @su-sws/synthetic-web-team           once per project, in its root
+    install    once per machine, into your editor
+    init       a new site, in an empty directory
+    add        an existing project, in its root
 
-  The first writes the 30 skills into ~/.claude/skills and ~/.agents/skills and
-  nothing else -- no standards, no AGENTS.md, nothing per-site, because at that
-  point there is no site. The second writes AGENTS.md, the standards, and the
-  per-site record (owners, compliance tier, divergences, accepted risks), and no
-  skills, because those are already installed once for every project.
+  'install' writes the 30 skills into ~/.claude/skills and ~/.agents/skills and
+  nothing else: no standards, no AGENTS.md, nothing per-site, because at that
+  point there is no site. Undo it with 'install --remove'.
+
+  'init' and 'add' write AGENTS.md, the standards, and the per-site record
+  (owners, compliance tier, divergences, accepted risks) into one repository,
+  and no skills, because those are installed once for every project. 'init'
+  additionally hands back the recipe to follow to build the pages; 'add' assumes
+  you already have a site and leaves your source alone.
 
   FOR AGENTS. Non-interactive is the first-class path. One command, no prompts,
   parseable output, stable exit codes:
 
-    npx @su-sws/synthetic-web-team --json --answers '{"siteName":"...","unit":"..."}'
+    npx @su-sws/synthetic-web-team init --json --answers '{"siteName":"...","unit":"..."}'
 
   Non-interactive is the DEFAULT whenever stdin is not a TTY, so an agent cannot
   hang on a prompt. With --json, stdout is exactly one JSON document and all
   prose goes to stderr.
 
-  Every flag is optional. With a TTY on both ends the project install interviews
-  you instead.
+  Every flag is optional. With a TTY on both ends each job interviews you
+  instead. Running with no job prints this text and writes nothing.
 
   --json           Emit one JSON document on stdout. Implies non-interactive.
   --answers <json> Answers as JSON, or a path to a .json file. Without this an
@@ -119,7 +140,7 @@ if (flags.help) {
   --interactive    Force prompts even without a TTY.
   --force          Overwrite files you have edited locally. Off by default.
   --dry-run        Report what would be written, write nothing.
-  --remove         Uninstall. Valid with 'user' only. Deletes just the files the
+  --remove         Uninstall. Valid with 'install' only. Deletes just the files the
                    install record lists, so unrelated skills in your skills
                    directories are never touched, and a file you edited is kept
                    and reported rather than deleted.
@@ -135,14 +156,17 @@ if (flags.help) {
   every run until it matches again. .sws/installed.json records what was written
   so an edit can be told from an old version. Pass --force to discard your edits.
 
-  A user install and a project install carry their own versions, so they can
+  An editor install and a project install carry their own versions, so they can
   drift. 'sws doctor' reports the difference as a note rather than a finding:
   being behind is a maintenance fact about the toolchain, not a compliance fact
   about the site.
 
   Exit codes: 0 success or dry run, 2 bad input or no content found,
   3 nothing written because a human declined.
-`);
+`;
+
+if (flags.help) {
+  console.log(HELP);
   process.exit(0);
 }
 
@@ -248,6 +272,20 @@ const DEP_NAME = '@su-sws/synthetic-web-team';
 const depRange = contentVersion ? `^${contentVersion}` : null;
 let depResult = { status: 'not-attempted' };
 
+// No job named means no job done. This is the fix for a real hazard rather than
+// pedantry: the previous default wrote 46 files into the current directory, and
+// `wizard.mjs /some/path` silently did exactly that because the path was read as
+// the mode. Now an unknown first argument says so and writes nothing.
+if (!cmdGiven) {
+  if (positionals[0] !== undefined) {
+    die(2, `unknown command: ${positionals[0]}`,
+      'Expected install (into your editor), init (a new site), or add (an existing project). '
+      + 'A directory goes after the command, not before it.');
+  }
+  console.log(HELP);
+  process.exit(0);
+}
+
 const source = findSource();
 if (source?.badSource) {
   die(2, `--source is not a standards source: ${source.badSource}`,
@@ -290,7 +328,7 @@ if (mode === 'user') {
 
     if (flags.json) {
       console.log(JSON.stringify({
-        ok: true, schema: 1, scope: 'user', mode: 'remove',
+        ok: true, schema: 1, scope: 'user', mode: 'install --remove',
         tool: '@su-sws/synthetic-web-team', version: contentVersion,
         root, written: !flags['dry-run'], ...r,
       }, null, 2));
@@ -330,7 +368,7 @@ if (mode === 'user') {
   }
 
   const emitUserJson = (wr) => console.log(JSON.stringify({
-    ok: true, schema: 1, scope: 'user', mode: 'user',
+    ok: true, schema: 1, scope: 'user', mode: 'install',
     tool: '@su-sws/synthetic-web-team',
     version: contentVersion,
     warnings: versionWarning ? [versionWarning] : [],
@@ -393,10 +431,10 @@ if (mode === 'user') {
 
   say(`  ${B('Next')}`);
   say(`    1. Open a Stanford project and ask your agent to run the sws-install skill,`);
-  say(`       ${D('or: npx @su-sws/synthetic-web-team')}`);
+  say(`       ${D('or: npx @su-sws/synthetic-web-team init  (new site)  /  add .  (existing)')}`);
   say(`    2. ${D('Optional MCP server: ' + userNext[userNext.length - 1].command)}`);
   say('');
-  say(`  ${D('To uninstall:  npx @su-sws/synthetic-web-team user --remove')}`);
+  say(`  ${D('To uninstall:  npx @su-sws/synthetic-web-team install --remove')}`);
   say(`  ${D('It removes only the files this install recorded, so anything else in')}`);
   say(`  ${D('your skills directories is untouched.')}`);
   say('');
@@ -564,11 +602,15 @@ function emitJson({ written, write: wr }) {
   console.log(JSON.stringify({
     ok: true,
     schema: 1,
+    // Symmetrical with the user-scope document, and the value echoes the command
+    // that was run rather than the internal mode name, so a caller can report
+    // back what it did without a lookup table.
+    scope: 'project',
     tool: '@su-sws/synthetic-web-team',
     version: contentVersion,
     warnings: versionWarning ? [versionWarning] : [],
     previousVersion: wr?.previousVersion ?? null,
-    mode,
+    mode: mode === 'add' ? 'add' : 'init',
     written,
     root,
     source,

@@ -33,12 +33,14 @@ export function scaffold(defaultRoot, { path, answers, editors, write = false, m
   const root = path || defaultRoot;
   if (!existsSync(root)) return problem(`Path does not exist: ${root}`);
 
-  // The wizard reads positionals as [mode, dir], so the mode must ALWAYS be
-  // present. Passing only the directory made it the mode -- which fell through
-  // to 'new' -- and left the directory undefined, so it planned against the
-  // server's working directory instead of the target. Caught by a dry run that
+  // The wizard reads positionals as [command, dir], so the command must ALWAYS
+  // be present. Passing only the directory made it the command -- which used to
+  // fall through to 'new' -- and left the directory undefined, so it planned
+  // against the server's working directory instead of the target. The wizard now
+  // refuses an unknown command outright, so this would be an error rather than a
+  // wrong write, but naming it explicitly is still the correct call. Caught by a dry run that
   // reported the wrong path.
-  const args = [bin, mode === 'add' ? 'add' : 'new', root, '--json'];
+  const args = [bin, mode === 'add' ? 'add' : 'init', root, '--json'];
   if (!write) args.push('--dry-run');
   if (editors) args.push('--editors', Array.isArray(editors) ? editors.join(',') : String(editors));
   if (answers) args.push('--answers', typeof answers === 'string' ? answers : JSON.stringify(answers));

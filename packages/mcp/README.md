@@ -12,7 +12,7 @@ server will not start, nothing else stops working.
 { "mcpServers": { "sws": { "command": "npx", "args": ["-y", "@su-sws/mcp"] } } }
 ```
 
-`npx @su-sws/synthetic-web-team` writes this for you into `.mcp.json` and
+`npx @su-sws/synthetic-web-team init` writes this for you into `.mcp.json` and
 `.cursor/mcp.json`.
 
 ## Tools

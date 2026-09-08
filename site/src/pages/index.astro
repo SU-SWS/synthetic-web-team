@@ -24,37 +24,83 @@ const REPO = 'https://github.com/SU-SWS/synthetic-web-team';
 // overwriting someone's edit.
 // ---------------------------------------------------------------------------
 
-const promptInstall = `Set up the Stanford Web Services agent team.
+const promptEditor = `Install the Stanford Web Services agent team into my editor.
 
-It installs in two parts. First into my tools, once for this machine:
-
-  npx @su-sws/synthetic-web-team user --json
-
-That writes the skills to ~/.claude/skills and ~/.agents/skills and nothing
-else. Skip it if the sws-* skills are already available to you.
-
-Then into this project:
-
-  npx @su-sws/synthetic-web-team --json --answers '{"siteName":"...","unit":"..."}'
+  npx @su-sws/synthetic-web-team install --json
 
 If npx cannot reach the registry, use the repository instead:
+
+  git clone --depth 1 https://github.com/SU-SWS/synthetic-web-team /tmp/swt
+  node /tmp/swt/packages/wizard/bin/wizard.mjs install --json
+
+That writes 30 skills to ~/.claude/skills and ~/.agents/skills and nothing
+else: no standards, no AGENTS.md, nothing about any particular site. It never
+touches a file it did not write, so unrelated skills already in those
+directories are safe, and "install --remove" uninstalls it.
+
+Then ask me which of these I need, and do not install into a project until I
+have answered:
+
+  - a NEW Stanford site, in an empty directory
+  - the standards ADDED to a project I already have`;
+
+const promptNew = `Start a new Stanford site here, following Stanford Web Services standards.
+
+This assumes the skills are already installed in my editor. If the sws-*
+skills are not available to you, run this first:
+
+  npx @su-sws/synthetic-web-team install --json
+
+Then, in the empty directory for the new site:
+
+  npx @su-sws/synthetic-web-team init --json --answers '{"siteName":"...","unit":"..."}'
+
+If npx cannot reach the registry, swap it for the repository route:
 
   git clone --depth 1 https://github.com/SU-SWS/synthetic-web-team /tmp/swt
   node /tmp/swt/packages/wizard/bin/wizard.mjs --json \\
     --answers '{"siteName":"...","unit":"..."}'
 
-Fill in siteName and unit from this repository. Ask me if it is not obvious.
+Fill in siteName and unit from what I tell you. Ask me if it is not obvious.
 The installer is non-interactive and prints one JSON document. Then:
 
 1. Read AGENTS.md. That is the behavioural contract for this repository.
    Follow it from now on, not only during setup.
-2. Work through the result's "next" array in order.
+2. Work through the result's "next" array in order. For a new site it names
+   the recipe to follow to actually build the pages.
 3. Ask me about every field in "incomplete". Do not invent owner names or
    email addresses: Stanford's MinWeb standard requires a named business
    owner and technical administrator with real Stanford addresses.
-4. Tell me which compliance tier it derived, and the one-sentence reason.
+4. Run npm install, then verify: npx sws doctor --format json
+5. Tell me which compliance tier it derived, and the one-sentence reason.`;
 
-Do not change any of my existing code.`;
+const promptAdd = `Add the Stanford Web Services standards to this existing project.
+
+This assumes the skills are already installed in my editor. If the sws-*
+skills are not available to you, run this first:
+
+  npx @su-sws/synthetic-web-team install --json
+
+Then, in the root of this repository:
+
+  npx @su-sws/synthetic-web-team add . --json --answers '{"siteName":"...","unit":"..."}'
+
+If npx cannot reach the registry, swap it for the repository route:
+
+  git clone --depth 1 https://github.com/SU-SWS/synthetic-web-team /tmp/swt
+  node /tmp/swt/packages/wizard/bin/wizard.mjs add . --json \\
+    --answers '{"siteName":"...","unit":"..."}'
+
+Fill in siteName and unit from this repository. Ask me if it is not obvious.
+
+Do not change any of my existing code. The installer adds AGENTS.md, the
+standards, and the .sws record; it does not touch my source. If anything comes
+back as a conflict, list those files and stop: they are ones I edited and I
+will decide. If anything is an orphan, list it and do not delete it.
+
+Then read AGENTS.md and follow it from now on, work through "next" in order,
+run npm install before verifying, and ask me about every field in "incomplete"
+rather than inventing an owner name or email.`;
 
 const promptReview = `Review this project against Stanford Web Services standards. Change nothing.
 
@@ -69,20 +115,26 @@ const promptUpdate = `Update the Stanford Web Services standards in this project
 
   npx @su-sws/synthetic-web-team add . --json
 
+If npx cannot reach the registry, swap it for the repository route:
+
+  git clone --depth 1 https://github.com/SU-SWS/synthetic-web-team /tmp/swt
+  node /tmp/swt/packages/wizard/bin/wizard.mjs add . --json
+
 Report "previousVersion" against "version", and the "counts" object. If anything
 comes back as a conflict, list those files and stop: they are ones I edited and
 I will decide. If anything is an orphan, list it and do not delete it.`;
 
-// The human path, and the whole of it: every flag is optional and the interview
-// asks the rest. It sits beside the agent form because the two callers want
-// opposite things, and this page used to document only the robot.
+// The three concrete actions, as separate commands rather than one blob.
 //
-// Both halves are shown together because the second one is useless without the
-// first having happened at some point, and the ordering is not guessable.
-const humanCmd = `npx @su-sws/synthetic-web-team user    # once per machine
-npx @su-sws/synthetic-web-team         # once per project`;
+// Every flag is optional -- with a TTY on both ends each of these interviews
+// you -- so these are the whole command in each case. They are shown as three
+// because the ordering is not guessable and the fork is a real decision: a new
+// site needs a recipe followed afterwards, an existing one must not be touched.
+const editorCmd = 'npx @su-sws/synthetic-web-team install';
+const newCmd = 'npx @su-sws/synthetic-web-team init';
+const addCmd = 'npx @su-sws/synthetic-web-team add .';
 
-const installCmd = `npx @su-sws/synthetic-web-team --json --answers '{
+const installCmd = `npx @su-sws/synthetic-web-team init --json --answers '{
   "siteName": "Stanford Bioengineering",
   "unit": "Bioengineering",
   "businessOwnerEmail": "owner@stanford.edu",
@@ -206,7 +258,7 @@ const inside = [
             <a
               href="#install"
               class="inline-block rounded-md bg-white px-28 py-14 text-18 font-semibold text-black no-underline transition-shadow duration-200 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-              >Other ways to install →</a
+              >Then set up a project →</a
             >
             <a
               href="#inside"
@@ -218,9 +270,9 @@ const inside = [
 
         <div>
           <p class="mb-12 flex items-center gap-10 text-16 font-semibold text-poppy-light">
-            <span aria-hidden="true">↓</span> Paste this into your agent
+            <span aria-hidden="true">↓</span> Step 1 of 2 · paste this into your agent
           </p>
-          <CodeCard label="Install prompt" tag="PROMPT" lang="text" code={promptInstall} id="hero-prompt" />
+          <CodeCard label="Step 1 · install into your editor" tag="PROMPT" lang="text" code={promptEditor} id="hero-prompt" />
           <p class="mt-20 mb-0 flex items-start gap-10 text-17 text-black-20">
             <span class="text-palo-verde-light" aria-hidden="true">✓</span>
             <span
@@ -255,37 +307,55 @@ const inside = [
     <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
       <div class="grid gap-60 lg:grid-cols-2 lg:gap-40">
         <div data-animate>
-          <Eyebrow tone="dark">Three ways in</Eyebrow>
+          <Eyebrow tone="dark">One step, then a fork</Eyebrow>
           <h2 id="install-h" class="mb-24 max-w-[22ch] text-40 font-bold leading-tight md:text-48">
-            Built for an agent, not a human.
+            Install once. Then per project.
           </h2>
-          <ol class="mb-32 grid list-none gap-16 p-0">
+          <ol class="mb-32 grid list-none gap-24 p-0">
             <li class="flex gap-14">
-              <span class="font-mono text-15 font-semibold text-poppy-light" aria-hidden="true">01</span>
+              <span class="font-mono text-15 font-semibold text-poppy-light" aria-hidden="true">1</span>
               <span class="text-18 text-black-20"
-                ><strong class="text-white">Paste the prompt.</strong> Easiest.
-                It is in the hero, and again below for an existing project.</span
+                ><strong class="text-white">Install into your editor.</strong>
+                Once per machine. Puts the 30 skills where your tools already
+                look and writes nothing about any site, because at this point
+                there is no site. Undo with <code>install --remove</code>.</span
               >
             </li>
-            <li class="flex gap-14">
-              <span class="font-mono text-15 font-semibold text-poppy-light" aria-hidden="true">02</span>
-              <span class="text-18 text-black-20"
-                ><strong class="text-white">Run the command.</strong> Same
-                installer, if you would rather drive it yourself.</span
-              >
-            </li>
-            <li class="flex gap-14">
-              <span class="font-mono text-15 font-semibold text-poppy-light" aria-hidden="true">03</span>
-              <span class="text-18 text-black-20"
-                ><strong class="text-white">Call the MCP tool.</strong>
-                <code>sws_scaffold</code>, if your agent already has the server.</span
-              >
+            <li class="flex flex-col gap-14">
+              <span class="flex gap-14">
+                <span class="font-mono text-15 font-semibold text-poppy-light" aria-hidden="true">2</span>
+                <span class="text-18 text-black-20"
+                  ><strong class="text-white">Then, in a project.</strong> Two
+                  different commands, because they are two different jobs.</span
+                >
+              </span>
+              <ul class="ml-28 grid list-none gap-16 p-0">
+                <li class="border-l-2 border-poppy-light pl-20">
+                  <p class="mb-0 text-17 text-black-20">
+                    <strong class="font-mono text-white">2a</strong>
+                    <strong class="text-white">Start a new site.</strong> In an
+                    empty directory. The result names the recipe to follow to
+                    build the pages, so there is work after the install.
+                  </p>
+                </li>
+                <li class="border-l-2 border-poppy-light pl-20">
+                  <p class="mb-0 text-17 text-black-20">
+                    <strong class="font-mono text-white">2b</strong>
+                    <strong class="text-white">Add to what you have.</strong>
+                    Adds the contract, the standards and the record.
+                    <strong class="text-white">Touches none of your source</strong>,
+                    and a file you edited is reported rather than overwritten.
+                  </p>
+                </li>
+              </ul>
             </li>
           </ol>
           <p class="mb-24 max-w-[54ch] text-19 leading-relaxed text-black-20">
-            The primary caller is a robot, so that is the first-class path.
-            Prompts appear only when stdin and stdout are both a TTY. Everything
-            else runs to completion and reports.
+            Every flag is optional: with a terminal on both ends each of these
+            interviews you. Prompts appear only when stdin and stdout are both a
+            TTY, so an agent runs the same commands to completion and reports
+            instead of hanging. There is also <code>sws_scaffold</code> over MCP
+            for step 2, if your agent already has the server.
           </p>
           <p class="mb-0 max-w-[54ch] text-19 leading-relaxed text-black-20">
             Four fields in the result are the ones to act on.
@@ -324,9 +394,39 @@ const inside = [
           </dl>
         </div>
         <div data-animate data-animate-delay="0.15">
-          <CodeCard label="Terminal, with a person" tag="INTERACTIVE" lang="bash" code={humanCmd} id="human-cmd" />
+          <CodeCard label="Step 1 · once per machine" tag="EDITOR" lang="bash" code={editorCmd} id="editor-cmd" />
           <div class="mt-24">
-            <CodeCard label="Terminal, from an agent" tag="CLI" lang="bash" code={installCmd} id="install-cmd" />
+            <CodeCard label="Step 2a · new site, empty directory" tag="NEW" lang="bash" code={newCmd} id="new-cmd" />
+          </div>
+          <div class="mt-24">
+            <CodeCard label="Step 2b · existing project, in its root" tag="ADD" lang="bash" code={addCmd} id="add-cmd" />
+          </div>
+
+          <details class="mt-32 rounded-md border border-black-90 bg-black-90/30 p-24">
+            <summary
+              class="cursor-pointer text-18 font-semibold text-white hover:text-poppy-light hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >Paste-a-prompt versions of step 2</summary
+            >
+            <div class="mt-24 grid gap-24">
+              <div>
+                <p class="mb-12 text-17 text-black-20">
+                  <strong class="text-white">2a · a new site.</strong> Installs,
+                  then follows the recipe to build it.
+                </p>
+                <CodeCard label="New site prompt" tag="PROMPT" lang="text" code={promptNew} id="prompt-new" />
+              </div>
+              <div>
+                <p class="mb-12 text-17 text-black-20">
+                  <strong class="text-white">2b · a project you already have.</strong>
+                  Adds the standards and changes none of your code.
+                </p>
+                <CodeCard label="Existing project prompt" tag="PROMPT" lang="text" code={promptAdd} id="prompt-add" />
+              </div>
+            </div>
+          </details>
+
+          <div class="mt-24">
+            <CodeCard label="Step 2, non-interactive, for an agent" tag="CLI" lang="bash" code={installCmd} id="install-cmd" />
           </div>
           <div class="mt-24">
             <CodeCard label="stdout" lang="json" code={resultShape} id="result-shape" />

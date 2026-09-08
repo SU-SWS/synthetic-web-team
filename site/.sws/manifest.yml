@@ -135,8 +135,10 @@ design:
 install_pathways:
   - kind: prompt
     what: >
-      Three copy-a-prompt boxes on the page: install, review an existing project,
-      and update. The easiest path, and the one most people will use.
+      Five copy-a-prompt boxes on the page, following the two-step install:
+      install into the editor, then start a new site or add to an existing
+      project, plus review an existing project, and update. The easiest path,
+      and the one most people will use.
     honesty_note: >
       Each prompt names BOTH the npx route and a git clone fallback. The clone
       route is what still works from behind a registry proxy, on a fork, or
@@ -148,7 +150,7 @@ install_pathways:
       conflict rather than overwriting an edit, and read AGENTS.md as an ongoing
       contract rather than a setup step.
   - kind: cli
-    what: "npx @su-sws/synthetic-web-team --json --answers '{...}'"
+    what: "npx @su-sws/synthetic-web-team install, then init or add . --json --answers '{...}'"
   - kind: mcp
     what: sws_scaffold, for an agent that already has the server configured
 

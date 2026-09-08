@@ -70,10 +70,18 @@ with the same "verified, not assumed" standard the rest of this repo holds to.
   project-only. This is the one tool with no home directory in `detect.mjs`, so
   it is the one most likely to constrain the story.
 
+## A note on two words
+
+The **command** is `install`; the **scope** it writes to is called `user`, and
+that is what the JSON `scope` field and `~/.sws/installed.json` report. They are
+not in conflict: `install` says what the person is doing, `user` says where the
+files land as against `project`. The scope vocabulary is kept because it is the
+pair that makes `sws doctor`'s drift note legible.
+
 ## Part 1: user scope
 
 ```bash
-npx @su-sws/synthetic-web-team user
+npx @su-sws/synthetic-web-team install
 ```
 
 Writes, into the home directory:
@@ -103,7 +111,7 @@ Three rules carry over from the project installer, and one is new:
 ### Uninstall
 
 ```bash
-npx @su-sws/synthetic-web-team user --remove
+npx @su-sws/synthetic-web-team install --remove
 ```
 
 Deletes **only** what `~/.sws/installed.json` records, which is why that record
@@ -120,7 +128,8 @@ itself behind if anything was kept, so a second run still knows what is ours.
 Two entry points, one implementation:
 
 ```bash
-npx @su-sws/synthetic-web-team          # in a project, as today
+npx @su-sws/synthetic-web-team init     # a new site
+npx @su-sws/synthetic-web-team add .   # an existing project
 ```
 
 and a new skill, `sws-install`, so that the agent delivered by Part 1 can do the
@@ -165,7 +174,7 @@ Two independent reasons, either sufficient:
 
 **The divergence risk is real but it is already covered.**
 `~/.sws/installed.json` holds a hash of every skill we wrote, so if someone edits
-one, the next `user` run reports it as a conflict instead of overwriting it. That
+one, the next `install` run reports it as a conflict instead of overwriting it. That
 is the same information, delivered at the moment it can be acted on.
 
 **If a standing check is still wanted, it belongs in `sws preflight`**, which is
@@ -228,7 +237,7 @@ exists.
    Forced by the research already in `docs/skill-paths.md`: most tools that read
    `.agents/skills` offer no configurable path, so there is nothing to point at a
    package directory with. See [Where skills live](#where-skills-live-and-what-compares-them).
-6. **`user --remove` ships with Part 1.** Confirmed by the owner, 2026-09-08.
+6. **`install --remove` ships with Part 1.** Confirmed by the owner, 2026-09-08.
    Writing 60 files into a home directory without a documented way out is bad
    manners, and having one makes Part 1 safe to try.
 7. **`sws doctor` gains no skills comparison.** It has no project-level subject
@@ -317,7 +326,7 @@ silently overwritten.
 Now the record keeps the hash of what we last wrote, so a conflict is **sticky**
 until the file matches what we ship again. Verified after: the edit survives runs
 two, three and four with `conflicts: 1` each time. This is also what makes
-`user --remove` safe, since the record stays a description of our content rather
+`install --remove` safe, since the record stays a description of our content rather
 than drifting onto theirs.
 
 ### Bug found: a directory argument was read as a mode
@@ -354,7 +363,7 @@ is load-bearing rather than theoretical.
   are untouched and unreported.
 - Run against an existing user MCP config with other servers: every one survives,
   and the file is not reformatted beyond the added key.
-- `user --remove` deletes only what the record lists.
+- `install --remove` deletes only what the record lists.
 
 **Part 2**
 

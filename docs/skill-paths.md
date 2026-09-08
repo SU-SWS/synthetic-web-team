@@ -64,7 +64,7 @@ avoid. One source, two disposable copies.
 
 ### On a person's machine
 
-`npx @su-sws/synthetic-web-team user` writes both directories under the home
+`npx @su-sws/synthetic-web-team install` writes both directories under the home
 directory. This is where skills live for a consumer, and it happens **once per
 machine** rather than once per project.
 
@@ -74,7 +74,7 @@ overwritten.
 
 `~/.sws/installed.json` records a hash of every file written. It is what makes
 two things possible: telling an edit from an old version, and uninstalling with
-`user --remove` without touching the other 584 skills someone may have in there.
+`install --remove` without touching the other 584 skills someone may have in there.
 
 ### In a consumer project
 
@@ -112,7 +112,7 @@ What covers the invariant today:
 - `validate-emit.mjs` proves the **emitter** puts identical content at both paths,
   which is where divergence would originate.
 - `~/.sws/installed.json` catches a hand-edited skill as a conflict on the next
-  `user` run, and reports it on every run until it matches again.
+  `install` run, and reports it on every run until it matches again.
 
 If a standing check is still wanted it belongs in `sws preflight`, which is
 already scoped to the machine rather than the site. Deferred until the per-tool
@@ -127,7 +127,7 @@ Easy to conflate, so worth naming. They do not overlap:
 |---|---|---|
 | `sync-skills.mjs --check` | locally, via `npm run check` | the two **local** copies in this repo agree with `skills/`. Both are gitignored, so an absent copy is reported and skipped, not failed |
 | `validate-emit.mjs` | CI, and `npm run validate` | the **wizard** puts every skill in `skills/` into both user-scope paths, byte-identical, with the paths agreeing — and that the two scopes stay disjoint, so no skill leaks back into a project |
-| the install record | on every `user` run | a skill someone edited by hand is reported rather than overwritten |
+| the install record | on every `install` run | a skill someone edited by hand is reported rather than overwritten |
 
 CI runs `validate-emit.mjs` rather than the stale check, because the stale check
 has no subject in a fresh checkout: the copies it compares are gitignored and
@@ -141,6 +141,6 @@ config is simpler and still correct. The installer writes both because it cannot
 know what else you will open later — and at user level that is a safe bet to get
 wrong in the generous direction, since the cost is 30 unread Markdown files.
 
-A deleted directory comes back on the next `user` run, which will report it as
-`created`. If that is not what you want, `user --remove` is the supported way
+A deleted directory comes back on the next `install` run, which will report it as
+`created`. If that is not what you want, `install --remove` is the supported way
 out.

@@ -13,11 +13,17 @@ installed yet.
 This skill does the second half: the per-project record.
 
 ```bash
-npx @su-sws/synthetic-web-team
+npx @su-sws/synthetic-web-team init     # a new site, in an empty directory
+npx @su-sws/synthetic-web-team add .    # a project that already exists
 ```
 
-Run it in the repository root. Every flag is optional — with a terminal attached
-it interviews the person, and without one it runs to completion and reports.
+Run it in the repository root. **Pick deliberately:** `init` hands back a recipe
+to follow afterwards, `add` assumes there is already a site and leaves the source
+alone. There is no default — running with no command prints help and writes
+nothing, so a wrong guess cannot put 46 files in the wrong directory.
+
+Every flag is optional. With a terminal attached each one interviews the person;
+without one it runs to completion and reports.
 
 ## Why two halves
 
@@ -83,9 +89,9 @@ requirements.
 The user-level half:
 
 ```bash
-npx @su-sws/synthetic-web-team user
+npx @su-sws/synthetic-web-team install
 ```
 
 Writes the skills into `~/.claude/skills/` and `~/.agents/skills/` and nothing
-else. Removable with `user --remove`, which deletes only what its own install
+else. Removable with `install --remove`, which deletes only what its own install
 record lists, so unrelated skills in those directories are never touched.

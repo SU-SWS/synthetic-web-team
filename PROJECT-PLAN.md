@@ -225,7 +225,7 @@ Five layers, each independently useful, each degrading gracefully if the layer a
 │     enforcement     Nag ladder. Secrets are the one gate.    │
 │                     Also: recipe canary vs current-latest.   │
 ├─────────────────────────────────────────────────────────────┤
-│ L2  Wizard          npx @su-sws/synthetic-web-team           │
+│ L2  Wizard          install | init | add                     │
 │                     Detects editors, emits native files,     │
 │                     runs the upstream scaffolder + recipe    │
 │                     Optional: @su-sws/mcp for in-agent use   │
@@ -450,7 +450,7 @@ Two notes on the stubs. The **compliance officer's** checks ship in v1 inside L3
 
 ## 7. The wizard
 
-`npx @su-sws/synthetic-web-team` in a new directory, or `npx @su-sws/synthetic-web-team add` in an existing one. Every flag is optional: with a TTY on both ends it interviews, and without one it runs to completion and reports.
+`npx @su-sws/synthetic-web-team init` in a new directory, or `... add .` in an existing one, after `... install` has put the skills in the editor once. Every flag is optional: with a TTY on both ends it interviews, and without one it runs to completion and reports.
 
 ### Interview flow
 
@@ -502,13 +502,13 @@ because they are byte-identical in every repository and no editor that reads
 `.agents/skills` offers a configurable path to reference them in place. Full
 reasoning and the as-built record in `docs/two-part-install.md`.
 
-User scope, written once per machine by `synthetic-web-team user`:
+User scope, written once per machine by `synthetic-web-team install`:
 
 ```
 ~/.agents/skills/<30 skills>/      the portable skill set
 ~/.claude/skills/<30 skills>/      the same set: no single path is read by all
 ~/.sws/installed.json              hashes, so an edit is never overwritten and
-                                   `user --remove` can uninstall precisely
+                                   `install --remove` can uninstall precisely
 ```
 
 Project scope, written once per repository:
