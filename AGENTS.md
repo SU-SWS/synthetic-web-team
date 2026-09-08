@@ -106,8 +106,8 @@ and read the result rather than the prose:
 npx @su-sws/synthetic-web-team init --json --answers '{"siteName":"...","unit":"..."}'
 ```
 
-Every flag is optional: run it bare and it interviews you, so **never say the
-JSON form is required**.
+Every **flag** is optional — with a TTY the job interviews instead — so **never
+say the JSON form is required**. The command itself is not optional.
 
 Act on four fields: `next[]` for next steps, `incomplete[]` for manifest fields
 still holding placeholders (**ask the user, never invent an owner email**),

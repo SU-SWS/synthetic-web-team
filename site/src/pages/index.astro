@@ -16,7 +16,7 @@ const REPO = 'https://github.com/SU-SWS/synthetic-web-team';
 // not go stale the first time someone is in one of those situations.
 //
 // The flags shown here are for AGENTS specifically. Every one of them is
-// optional — a person runs the bare command and gets an interview — but an
+// optional — with a TTY the job interviews you — but an
 // agent has no TTY, so the JSON form is the one that cannot hang.
 //
 // They also encode the two safety properties that matter: never invent an owner
@@ -130,6 +130,21 @@ I will decide. If anything is an orphan, list it and do not delete it.`;
 // you -- so these are the whole command in each case. They are shown as three
 // because the ordering is not guessable and the fork is a real decision: a new
 // site needs a recipe followed afterwards, an existing one must not be touched.
+// Quoted from the real thing, not paraphrased. It is on the page because "no
+// default" is a claim about safety, and showing the refusal is more convincing
+// than asserting it -- particularly to someone deciding whether to run an
+// installer they have not read.
+const noDefault = `$ npx @su-sws/synthetic-web-team
+  synthetic-web-team <install|init|add> [dir]
+  ...prints this help, writes nothing, exits 0
+
+$ npx @su-sws/synthetic-web-team ./my-site
+  unknown command: ./my-site
+  Expected install (into your editor), init (a new site), or add
+  (an existing project). A directory goes after the command, not
+  before it.
+  ...exits 2, writes nothing`;
+
 const editorCmd = 'npx @su-sws/synthetic-web-team install';
 const newCmd = 'npx @su-sws/synthetic-web-team init';
 const addCmd = 'npx @su-sws/synthetic-web-team add .';
@@ -307,7 +322,7 @@ const inside = [
     <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
       <div class="grid gap-60 lg:grid-cols-2 lg:gap-40">
         <div data-animate>
-          <Eyebrow tone="dark">One step, then a fork</Eyebrow>
+          <Eyebrow tone="dark">Two commands, both required</Eyebrow>
           <h2 id="install-h" class="mb-24 max-w-[22ch] text-40 font-bold leading-tight md:text-48">
             Install once. Then per project.
           </h2>
@@ -325,8 +340,9 @@ const inside = [
               <span class="flex gap-14">
                 <span class="font-mono text-15 font-semibold text-poppy-light" aria-hidden="true">2</span>
                 <span class="text-18 text-black-20"
-                  ><strong class="text-white">Then, in a project.</strong> Two
-                  different commands, because they are two different jobs.</span
+                  ><strong class="text-white">Then, in a project.</strong> Pick
+                  one. They are different jobs, so nothing is picked for
+                  you.</span
                 >
               </span>
               <ul class="ml-28 grid list-none gap-16 p-0">
@@ -351,11 +367,27 @@ const inside = [
             </li>
           </ol>
           <p class="mb-24 max-w-[54ch] text-19 leading-relaxed text-black-20">
-            Every flag is optional: with a terminal on both ends each of these
-            interviews you. Prompts appear only when stdin and stdout are both a
-            TTY, so an agent runs the same commands to completion and reports
-            instead of hanging. There is also <code>sws_scaffold</code> over MCP
-            for step 2, if your agent already has the server.
+            <strong class="text-white">The command is not optional.</strong>
+            There is no bare form and no default:
+            <code>install</code> writes to your home directory, while
+            <code>init</code> and <code>add</code> write into whichever
+            directory you are standing in. Those are too different to guess
+            between, so it does not. Run it with no command and it prints its
+            help and writes nothing.
+          </p>
+          <p class="mb-24 max-w-[54ch] text-19 leading-relaxed text-black-20">
+            Guessing from the directory would not work either: an empty
+            directory is exactly the <code>init</code> case, so treating it as
+            "install into my editor" would hijack the commonest way to start a
+            site.
+          </p>
+          <p class="mb-24 max-w-[54ch] text-19 leading-relaxed text-black-20">
+            Every <em>flag</em> is optional. With a terminal on both ends each
+            job interviews you; prompts appear only when stdin and stdout are
+            both a TTY, so an agent runs the same commands to completion and
+            reports instead of hanging. There is also
+            <code>sws_scaffold</code> over MCP for step 2, if your agent already
+            has the server.
           </p>
           <p class="mb-0 max-w-[54ch] text-19 leading-relaxed text-black-20">
             Four fields in the result are the ones to act on.
@@ -400,6 +432,9 @@ const inside = [
           </div>
           <div class="mt-24">
             <CodeCard label="Step 2b · existing project, in its root" tag="ADD" lang="bash" code={addCmd} id="add-cmd" />
+          </div>
+          <div class="mt-24">
+            <CodeCard label="No command · nothing written" tag="SAFE" lang="bash" code={noDefault} id="no-default" />
           </div>
 
           <details class="mt-32 rounded-md border border-black-90 bg-black-90/30 p-24">

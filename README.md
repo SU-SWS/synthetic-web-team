@@ -36,7 +36,7 @@ Early. The plan is complete and reviewed; the implementation is partway through.
 | Standards freshness CI | Planned, and the priority ahead of the canary. Keeps policy, prior art, and sourced facts from going stale |
 | MCP server | **Working.** [`packages/mcp/`](packages/mcp/). 5 tools, 26 resources, verified over the real stdio protocol |
 
-End to end, verified: `synthetic-web-team` installs, an agent follows the recipe, then `npm run build && sws a11y && sws perf && sws check` reports **100/100 with zero automated failures** — 52 criteria passing, none to fix, 8 unchecked. axe runs in real Chromium against every built route and finds 0 violations at WCAG 2.1 AA; the byte budget passes at 139 KB of 800. **Every one of the 8 unchecked items is genuinely unautomatable** — the manual WCAG checklist, ODA review, subdomain approval, MFA attestation, the DRA question — and each says so with a reason rather than being quietly dropped.
+End to end, verified: `synthetic-web-team` installs, an agent follows the recipe, then `npm run build && sws a11y && sws perf && sws check` reports **100/100 with zero automated failures** — 52 criteria passing, none to fix, 8 unchecked. axe runs in real Chromium against every built route and finds 0 violations at WCAG 2.1 AA; the byte budget passes at 154 KB of 800. **Every one of the 8 unchecked items is genuinely unautomatable** — the manual WCAG checklist, ODA review, subdomain approval, MFA attestation, the DRA question — and each says so with a reason rather than being quietly dropped.
 
 **A green axe run is a floor, not a conformance claim.** It covers roughly 30 percent of accessibility issues per ODA guidance, and this project says so in the report itself.
 
@@ -76,10 +76,15 @@ npx @su-sws/synthetic-web-team init     # a new site, in an empty directory
 npx @su-sws/synthetic-web-team add .   # a project you already have
 ```
 
-**Every flag is optional.** With a terminal attached this asks what the site is,
-what it handles, who owns it, and which AI tools you use, then shows you every
-file before writing anything. **A project gets no skills** — they are already
-installed for every project — so their absence there is correct.
+**The command is required; every flag is optional.** There is no bare form and
+no default: `install` writes to your home directory while `init` and `add` write
+into whichever directory you are standing in, and those are too different to
+guess between. Run it with no command and it prints its help and writes nothing.
+
+With a terminal attached each job asks what the site is, what it handles, who
+owns it, and which AI tools you use, then shows you every file before writing
+anything. **A project gets no skills** — they are already installed for every
+project — so their absence there is correct.
 
 Where a `package.json` is present it also adds `@su-sws/synthetic-web-team` to
 your `devDependencies`, so that `npx sws` afterwards runs this CLI. Unscoped

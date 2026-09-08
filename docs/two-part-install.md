@@ -240,7 +240,15 @@ exists.
 6. **`install --remove` ships with Part 1.** Confirmed by the owner, 2026-09-08.
    Writing 60 files into a home directory without a documented way out is bad
    manners, and having one makes Part 1 safe to try.
-7. **`sws doctor` gains no skills comparison.** It has no project-level subject
+7. **Every job is named and there is no default.** Confirmed by the owner,
+   2026-09-08. `install` writes 60 files to a home directory; `init` and `add`
+   write 46 into the current one. Guessing between those is not a default, and
+   guessing from the directory cannot work either, because an empty directory is
+   exactly the `init` case. Running with no command prints help, writes nothing,
+   and exits 0; an unrecognised first argument exits 2. This is also what
+   permanently closes the "directory read as a mode" bug below, rather than
+   merely making it less likely.
+8. **`sws doctor` gains no skills comparison.** It has no project-level subject
    after the split, and home-directory state is not a property of the site being
    audited.
 
