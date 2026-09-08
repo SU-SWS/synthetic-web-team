@@ -54,13 +54,22 @@ jobs:
           # Needed so the tag and version commit can be pushed back.
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # NO registry-url ON PURPOSE, and this is load-bearing.
+      #
+      # `registry-url` makes setup-node write an .npmrc containing
+      #   //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}
+      # and with no NODE_AUTH_TOKEN set that resolves to an EMPTY credential.
+      # npm then believes it already has one and skips the OIDC exchange
+      # entirely, so the publish goes out unauthenticated and the registry
+      # answers 404 -- npm returns 404 rather than 403 for permission failures,
+      # which makes it read like the package does not exist.
+      #
+      # registry.npmjs.org is npm's default anyway, so naming it bought nothing
+      # and cost the whole trusted-publishing flow. Verified the hard way on the
+      # v0.1.1 release, which signed provenance and then 404'd on the PUT.
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-          # Still set, so the publish target is explicit rather than inherited.
-          # NODE_AUTH_TOKEN is deliberately NOT set anywhere in this workflow --
-          # see the publish steps.
-          registry-url: 'https://registry.npmjs.org'
 
       # Trusted publishing needs an npm that can do the OIDC exchange. Latest,
       # not pinned, per the house rule in AGENTS.md -- and then asserted, so the
@@ -78,6 +87,20 @@ jobs:
             process.exit(1);
           }
           console.log("npm " + v + " supports trusted publishing.");' "$V"
+
+      # So the next auth failure names its own cause instead of surfacing as a
+      # 404 eighty lines into a tarball listing.
+      - name: Publishing context
+        run: |
+          echo "npm:  $(npm --version)"
+          echo "node: $(node --version)"
+          echo "OIDC token URL present: ${ACTIONS_ID_TOKEN_REQUEST_URL:+yes}${ACTIONS_ID_TOKEN_REQUEST_URL:-NO — id-token: write is missing}"
+          echo "registry: $(npm config get registry)"
+          echo ".npmrc files npm can see:"
+          npm config ls -l 2>/dev/null | grep -i "^; .*npmrc" || echo "  (none reported)"
+          if [ -f "$HOME/.npmrc" ]; then
+            echo "  HOME/.npmrc keys:"; sed 's/=.*/=<redacted>/' "$HOME/.npmrc" | sed 's/^/    /'
+          fi
 
       # Workspace repo: one lockfile at the root. A per-package install cannot
       # work, because the packages link to each other from packages/.
@@ -146,14 +169,22 @@ jobs:
           # publish, so the registry is untouched and the only cost is a re-run.
           git push origin HEAD:main --follow-tags
 
+      # The `none` path is also the RETRY path: it is how you finish a release
+      # whose tag landed but whose publish failed. So the tag must already be
+      # allowed to exist -- recreating it would abort the run and leave the
+      # release stuck exactly where it was.
       - name: Tag only
         if: steps.bump.outputs.bump == 'none'
         run: |
           V="${{ steps.version.outputs.version }}"
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git tag -a "v$V" -m "v$V"
-          git push origin "v$V"
+          if git rev-parse -q --verify "refs/tags/v$V" >/dev/null; then
+            echo "Tag v$V already exists, leaving it as it is. Retry path."
+          else
+            git tag -a "v$V" -m "v$V"
+            git push origin "v$V"
+          fi
 
       # TRUSTED PUBLISHING. There is no NPM_TOKEN and no secret to rotate: npm
       # authenticates this workflow by its OIDC identity, which is why the job
@@ -185,4 +216,12 @@ jobs:
           # --generate-notes already diffs against the previous tag on its own.
           # An explicit --notes-start-tag would need handling for the very first
           # release, where there is no previous tag to name.
-          gh release create "v$V" --title "v$V" --generate-notes
+          #
+          # Tolerant of an existing release for the same reason the tag step is:
+          # this runs after publishing, so on a retry the publish may be the
+          # only part that was missing.
+          if gh release view "v$V" >/dev/null 2>&1; then
+            echo "Release v$V already exists, leaving it as it is."
+          else
+            gh release create "v$V" --title "v$V" --generate-notes
+          fi
