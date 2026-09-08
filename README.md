@@ -294,10 +294,21 @@ Two rules with teeth:
 | Publish the current version without bumping | Run it by hand with `none` |
 
 [`.github/workflows/release.yml`](.github/workflows/release.yml) validates,
-versions, tags, publishes and drafts release notes, in that order. It needs one
-repository secret, **`NPM_TOKEN`**, an npm automation token with publish rights
-on the `@su-sws` scope. Publishing uses `--provenance`, so releases are
-attested to this repository and this workflow.
+versions, tags, publishes and drafts release notes, in that order.
+
+**There is no npm token in this repository, and nothing to rotate.** Publishing
+uses npm **trusted publishing** over OIDC: npm authenticates the workflow by its
+own short-lived identity, which is why the job asks for `id-token: write`. npm
+caps granular tokens at 90 days and has been retiring the old non-expiring
+automation tokens, so a stored secret would have been a recurring chore and a
+standing liability. This has neither, and provenance comes free.
+
+The trust is configured **per package on npmjs.com**, for
+`@su-sws/synthetic-web-team` and `@su-sws/synthetic-web-team-mcp` separately, and
+it names this repository **and this workflow's filename**. Renaming
+`release.yml` or moving the publish steps elsewhere breaks publishing with an
+authentication error that looks nothing like the cause — change the trusted
+publisher settings first.
 
 **Both packages move together.** `@su-sws/synthetic-web-team-mcp` depends on the root package, and
 a caret range survives a patch bump but not a minor one — `^0.1.0` does not

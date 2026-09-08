@@ -8,9 +8,13 @@ name: release
 #                       the version already in package.json without bumping
 #
 # Two packages ship, in lockstep and in order: @su-sws/synthetic-web-team then
-# @su-sws/synthetic-web-team-mcp, because the second depends on the first. scripts/set-version.mjs
-# owns the version arithmetic and the dependency rewrite -- see the header of
-# that file for why `npm version` cannot do this job.
+# @su-sws/synthetic-web-team-mcp, because the second depends on the first.
+# scripts/set-version.mjs owns the version arithmetic and the dependency
+# rewrite -- see the header of that file for why `npm version` cannot do it.
+#
+# Authentication is TRUSTED PUBLISHING over OIDC, so there is no npm token in
+# this repository and nothing that expires in 90 days. It is configured on
+# npmjs.com per package, against this repository and this filename.
 
 on:
   push:
@@ -53,7 +57,27 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+          # Still set, so the publish target is explicit rather than inherited.
+          # NODE_AUTH_TOKEN is deliberately NOT set anywhere in this workflow --
+          # see the publish steps.
           registry-url: 'https://registry.npmjs.org'
+
+      # Trusted publishing needs an npm that can do the OIDC exchange. Latest,
+      # not pinned, per the house rule in AGENTS.md -- and then asserted, so the
+      # failure is "npm is too old" rather than an opaque 401 three steps later.
+      - name: npm new enough for OIDC
+        run: |
+          npm install -g npm@latest
+          V=$(npm --version)
+          node -e '
+          const v = process.argv[1];
+          const [maj, min, patch] = v.split(".").map(Number);
+          const ok = maj > 11 || (maj === 11 && (min > 5 || (min === 5 && patch >= 1)));
+          if (!ok) {
+            console.log("::error::npm " + v + " cannot do trusted publishing. Needs 11.5.1 or newer.");
+            process.exit(1);
+          }
+          console.log("npm " + v + " supports trusted publishing.");' "$V"
 
       # Workspace repo: one lockfile at the root. A per-package install cannot
       # work, because the packages link to each other from packages/.
@@ -131,17 +155,27 @@ jobs:
           git tag -a "v$V" -m "v$V"
           git push origin "v$V"
 
-      # Root first. @su-sws/synthetic-web-team-mcp declares a dependency on it, so publishing the
-      # server first leaves it briefly uninstallable.
+      # TRUSTED PUBLISHING. There is no NPM_TOKEN and no secret to rotate: npm
+      # authenticates this workflow by its OIDC identity, which is why the job
+      # asks for `id-token: write` above.
+      #
+      # THE TRUST IS CONFIGURED PER PACKAGE ON NPMJS.COM, and it names this
+      # repository AND THE FILENAME OF THIS FILE. Renaming release.yml, or
+      # moving these publish steps into another workflow, breaks publishing with
+      # an authentication error that looks nothing like the cause. Change the
+      # trusted publisher settings first if you ever move this.
+      #
+      # Provenance is generated automatically under trusted publishing; the flag
+      # stays because it makes a missing OIDC context fail loudly here rather
+      # than silently shipping an unattested tarball.
+      #
+      # Root first. @su-sws/synthetic-web-team-mcp declares a dependency on it,
+      # so publishing the server first leaves it briefly uninstallable.
       - name: Publish @su-sws/synthetic-web-team
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @su-sws/synthetic-web-team-mcp
         run: npm publish -w @su-sws/synthetic-web-team-mcp --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: GitHub release
         env:
