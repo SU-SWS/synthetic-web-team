@@ -1,6 +1,6 @@
 {
   "name": "@su-sws/synthetic-web-team-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server exposing Stanford Web Services standards, the Global Footer contract, Decanter tokens, and the advisory compliance report to any MCP client.",
   "license": "GPL-3.0-or-later",
   "type": "module",
@@ -16,7 +16,7 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@su-sws/synthetic-web-team": "^0.1.0",
+    "@su-sws/synthetic-web-team": "^0.1.1",
     "yaml": "^2.8.1",
     "zod": "^4.1.13"
   },

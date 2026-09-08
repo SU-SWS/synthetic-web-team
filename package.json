@@ -1,6 +1,6 @@
 {
   "name": "@su-sws/synthetic-web-team",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Stanford Web Services standards and agent team: policy, patterns, recipes, fragments, prior art, 30 skills, the two-part install wizard, and the advisory compliance CLI.",
   "license": "GPL-3.0-or-later",
   "repository": {

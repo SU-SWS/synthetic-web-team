@@ -1,6 +1,6 @@
 {
   "name": "@su-sws/wizard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Install the Stanford Web Services agent team into any AI coding tool. Internal: published as part of @su-sws/synthetic-web-team.",
   "license": "GPL-3.0-or-later",
   "type": "module",
