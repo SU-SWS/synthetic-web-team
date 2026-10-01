@@ -21,6 +21,16 @@ cannot see.
   Content still comes from the repo.
 - **All hosts in `standards/hosting/`.** GitHub Pages, Netlify, Vercel.
 
+**Stubs are not in scope yet.** `jekyll-static`, `quarto-static`, `html-static`,
+and `add-to-existing` exist as placeholders with no acceptance criteria and no
+end-to-end run. They are static and content-in-the-repo, so they fit this scope
+in shape; they move into it once they have been executed. Each stub says what to
+do in the meantime. The same goes for `standards/patterns/bolt-ons.md` and the
+connectors in `standards/connectors/`. A connector brings content from outside
+the repo, so whether its proposed shape (snapshot into the repo at build time)
+counts as in scope is an open question for SWS, recorded in
+`standards/connectors/README.md`.
+
 **Note that "static content" is about the content SOURCE, not the build output.**
 `astro-ssr` and `next-ssr` render at request time and are fully in scope. What is
 out of scope is content that arrives from somewhere other than the repo.

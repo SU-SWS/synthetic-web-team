@@ -6,6 +6,20 @@ interface Props { title: string; description: string; }
 const { title, description } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 
+const HOME = '/synthetic-web-team/';
+const nav = [
+  [`${HOME}#install`, 'Install'],
+  [`${HOME}prompts/`, 'Starter prompts'],
+  [`${HOME}connectors/`, 'Connectors'],
+  [`${HOME}#verify`, 'Verify'],
+  [`${HOME}#inside`, 'What is inside'],
+];
+// "page" on the page itself, "true" inside its section (a connector's detail
+// page is inside Connectors but is not the Connectors page).
+const path = Astro.url.pathname.replace(/\/?$/, '/');
+const current = (href: string) =>
+  href.includes('#') ? undefined : path === href ? 'page' : path.startsWith(href) ? 'true' : undefined;
+
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareSourceCode',
@@ -106,17 +120,15 @@ const jsonLd = {
             >EARLY</span
           >
         </a>
-        <nav aria-label="Sections" class="ml-auto hidden gap-24 md:flex">
+        <!-- Absolute, not bare `#install`: on an interior page a bare fragment
+             points at that page, where the section does not exist. -->
+        <nav aria-label="Main" class="ml-auto hidden gap-20 lg:flex">
           {
-            [
-              ['#install', 'Install'],
-              ['#verify', 'Verify'],
-              ['#entrypoints', 'Entry points'],
-              ['#inside', 'What is inside'],
-            ].map(([href, label]) => (
+            nav.map(([href, label]) => (
               <a
                 href={href}
-                class="text-17 text-black-20 no-underline hover:text-white hover:underline focus-visible:text-white"
+                aria-current={current(href)}
+                class="text-17 text-black-20 no-underline hover:text-white hover:underline focus-visible:text-white [&[aria-current]]:text-white [&[aria-current]]:underline"
                 >{label}</a
               >
             ))

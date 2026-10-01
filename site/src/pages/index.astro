@@ -3,6 +3,10 @@ import Base from '../layouts/Base.astro';
 import CodeCard from '../components/CodeCard.astro';
 import Eyebrow from '../components/Eyebrow.astro';
 import { contractExtracted } from '../lib/footer';
+import { starters } from '../lib/starters';
+import { getCollection } from 'astro:content';
+
+const connectors = (await getCollection('connectors')).sort((a, b) => a.data.name.localeCompare(b.data.name));
 
 const REPO = 'https://github.com/SU-SWS/synthetic-web-team';
 
@@ -58,7 +62,7 @@ Then, in the empty directory for the new site:
 If npx cannot reach the registry, swap it for the repository route:
 
   git clone --depth 1 https://github.com/SU-SWS/synthetic-web-team /tmp/swt
-  node /tmp/swt/packages/wizard/bin/wizard.mjs --json \\
+  node /tmp/swt/packages/wizard/bin/wizard.mjs init --json \\
     --answers '{"siteName":"...","unit":"..."}'
 
 Fill in siteName and unit from what I tell you. Ask me if it is not obvious.
@@ -318,7 +322,7 @@ const inside = [
   </div>
 
   <!-- ===================================================== install -->
-  <section aria-labelledby="install-h" class="border-b border-black-90 bg-black">
+  <section id="install" aria-labelledby="install-h" class="border-b border-black-90 bg-black">
     <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
       <div class="grid gap-60 lg:grid-cols-2 lg:gap-40">
         <div data-animate>
@@ -330,7 +334,7 @@ const inside = [
             <li class="flex gap-14">
               <span class="font-mono text-15 font-semibold text-poppy-light" aria-hidden="true">1</span>
               <span class="text-18 text-black-20"
-                ><strong class="text-white">Install into your editor.</strong>
+                ><strong class="text-white">Install into your editor.</strong>{' '}
                 Once per machine. Puts the 30 skills where your tools already
                 look and writes nothing about any site, because at this point
                 there is no site. Undo with <code>install --remove</code>.</span
@@ -357,7 +361,7 @@ const inside = [
                 <li class="border-l-2 border-poppy-light pl-20">
                   <p class="mb-0 text-17 text-black-20">
                     <strong class="font-mono text-white">2b</strong>
-                    <strong class="text-white">Add to what you have.</strong>
+                    <strong class="text-white">Add to what you have.</strong>{' '}
                     Adds the contract, the standards and the record.
                     <strong class="text-white">Touches none of your source</strong>,
                     and a file you edited is reported rather than overwritten.
@@ -367,7 +371,7 @@ const inside = [
             </li>
           </ol>
           <p class="mb-24 max-w-[54ch] text-19 leading-relaxed text-black-20">
-            <strong class="text-white">The command is not optional.</strong>
+            <strong class="text-white">The command is not optional.</strong>{' '}
             There is no bare form and no default:
             <code>install</code> writes to your home directory, while
             <code>init</code> and <code>add</code> write into whichever
@@ -452,7 +456,7 @@ const inside = [
               </div>
               <div>
                 <p class="mb-12 text-17 text-black-20">
-                  <strong class="text-white">2b · a project you already have.</strong>
+                  <strong class="text-white">2b · a project you already have.</strong>{' '}
                   Adds the standards and changes none of your code.
                 </p>
                 <CodeCard label="Existing project prompt" tag="PROMPT" lang="text" code={promptAdd} id="prompt-add" />
@@ -482,7 +486,7 @@ const inside = [
               </div>
               <div>
                 <p class="mb-12 text-17 text-black-20">
-                  <strong class="text-white">Already installed?</strong>
+                  <strong class="text-white">Already installed?</strong>{' '}
                   Re-installing is the update, and it stops on anything you
                   edited.
                 </p>
@@ -495,8 +499,50 @@ const inside = [
     </div>
   </section>
 
+  <!-- ===================================================== starter prompts -->
+  <!-- White, not fog-light: it sits between a black section and a fog-light
+       one, and two adjacent fog-light sections read as one. -->
+  <section id="starters" aria-labelledby="starters-h" class="border-b border-black-20 bg-white text-black">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <div class="mb-48 max-w-[62ch]" data-animate>
+        <Eyebrow>Starter prompts</Eyebrow>
+        <h2 id="starters-h" class="mb-24 text-40 font-bold leading-tight md:text-48">
+          Know what you are building? Start from a brief.
+        </h2>
+        <p class="mb-0 text-19 leading-relaxed text-black-80">
+          One prompt per kind of site people actually build at Stanford. Each one
+          installs, sets up the project, describes the pages, and names the
+          things that change a site's compliance tier before your agent builds
+          them. Edit the parts in [brackets] and paste.
+        </p>
+      </div>
+
+      <ul class="grid list-none gap-24 p-0 md:grid-cols-2 lg:grid-cols-3">
+        {
+          starters.map((s, i) => (
+            <li data-animate data-animate-delay={(i % 3) * 0.15} class="flex flex-col rounded-md border border-black-20 p-24">
+              <h3 class="mb-10 text-22 font-bold">
+                <a href={`/synthetic-web-team/prompts/#${s.id}`} class="text-black underline hover:text-digital-red hover:no-underline">{s.title}</a>
+              </h3>
+              <p class="mb-0 text-17 leading-relaxed text-black-80">{s.summary}</p>
+              {s.status === 'stub' && (
+                <p class="mt-16 mb-0 text-15 font-semibold text-black-70">Recipe is a stub</p>
+              )}
+            </li>
+          ))
+        }
+      </ul>
+
+      <p class="mt-40 mb-0" data-animate>
+        <a href="/synthetic-web-team/prompts/" class="text-19 font-semibold text-digital-red underline hover:no-underline"
+          >All starter prompts, with what each one watches for →</a
+        >
+      </p>
+    </div>
+  </section>
+
   <!-- ===================================================== verify -->
-  <section aria-labelledby="verify-h" class="border-b border-black-20 bg-fog-light text-black">
+  <section id="verify" aria-labelledby="verify-h" class="border-b border-black-20 bg-fog-light text-black">
     <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
       <div class="mb-48 max-w-[62ch]" data-animate>
         <Eyebrow>Verified, not asserted</Eyebrow>
@@ -604,7 +650,7 @@ const inside = [
   </section>
 
   <!-- ===================================================== entry points -->
-  <section aria-labelledby="entry-h" class="border-b border-black-20 bg-fog-light text-black">
+  <section id="entrypoints" aria-labelledby="entry-h" class="border-b border-black-20 bg-fog-light text-black">
     <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
       <div class="grid gap-60 lg:grid-cols-2 lg:gap-40">
         <div data-animate>
@@ -619,7 +665,7 @@ const inside = [
             working.
           </p>
           <p class="mb-24 max-w-[54ch] text-19 leading-relaxed text-black-80">
-            Five tools and all 26 documents as resources. <code>sws_check</code>
+            Five tools and all 26 documents as resources. <code>sws_check</code>{' '}
             and <code>sws_scaffold</code> shell out to the same binaries a human
             runs, so the MCP answer and the terminal answer cannot disagree.
           </p>
@@ -655,6 +701,44 @@ const inside = [
           </p>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== connectors -->
+  <section id="connectors" aria-labelledby="connectors-h" class="border-b border-black-20 bg-white text-black">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <div class="mb-48 max-w-[62ch]" data-animate>
+        <Eyebrow>Connectors</Eyebrow>
+        <h2 id="connectors-h" class="mb-24 text-40 font-bold leading-tight md:text-48">
+          Pull from the source. Stop retyping it.
+        </h2>
+        <p class="mb-0 text-19 leading-relaxed text-black-80">
+          Events, news, and profiles are already published by the university.
+          A connector brings them into your site at build time, so nobody
+          copies them by hand. <strong>All three are stubs</strong>, and each
+          one says what has been checked and what has not.
+        </p>
+      </div>
+
+      <ul class="grid list-none gap-24 p-0 md:grid-cols-3">
+        {
+          connectors.map((c, i) => (
+            <li data-animate data-animate-delay={i * 0.15} class="flex flex-col rounded-md border border-black-20 p-24">
+              <p class="mb-8 text-15 text-black-70">{c.data.platform}</p>
+              <h3 class="mb-10 text-22 font-bold">
+                <a href={`/synthetic-web-team/connectors/${c.id}/`} class="text-black underline hover:text-digital-red hover:no-underline">{c.data.name}</a>
+              </h3>
+              <p class="mb-0 text-17 leading-relaxed text-black-80">{c.data.summary}</p>
+            </li>
+          ))
+        }
+      </ul>
+
+      <p class="mt-40 mb-0" data-animate>
+        <a href="/synthetic-web-team/connectors/" class="text-19 font-semibold text-digital-red underline hover:no-underline"
+          >Browse all connectors →</a
+        >
+      </p>
     </div>
   </section>
 
@@ -701,7 +785,7 @@ const inside = [
   </section>
 
   <!-- ===================================================== what's inside -->
-  <section aria-labelledby="inside-h" class="border-b border-black-20 bg-fog-light text-black">
+  <section id="inside" aria-labelledby="inside-h" class="border-b border-black-20 bg-fog-light text-black">
     <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
       <div class="mb-48 max-w-[62ch]" data-animate>
         <Eyebrow>What is inside</Eyebrow>
@@ -773,25 +857,4 @@ const inside = [
     import '../scripts/animate-in-view.ts';
   </script>
 
-  <script>
-    // Copy buttons. Progressive enhancement only: without JavaScript every
-    // block is still selectable text in a <pre>, which is why the code lives
-    // there rather than in a canvas or an image.
-    for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
-      btn.addEventListener('click', async () => {
-        const target = document.getElementById(btn.dataset.copy ?? '');
-        if (!target) return;
-        const original = btn.textContent;
-        try {
-          await navigator.clipboard.writeText(target.innerText.trim());
-          btn.textContent = 'Copied';
-        } catch {
-          btn.textContent = 'Press ⌘C';
-        }
-        window.setTimeout(() => {
-          btn.textContent = original;
-        }, 2000);
-      });
-    }
-  </script>
 </Base>

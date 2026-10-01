@@ -1,0 +1,127 @@
+---
+import Base from '../layouts/Base.astro';
+import CodeCard from '../components/CodeCard.astro';
+import Eyebrow from '../components/Eyebrow.astro';
+import { starters } from '../lib/starters';
+
+const REPO = 'https://github.com/SU-SWS/synthetic-web-team';
+
+// Grouped by the reader's situation, not by recipe: "I am starting" versus "I
+// already have one" is the first fork, the same one the install commands make.
+const groups = [
+  {
+    id: 'new',
+    title: 'A new site',
+    intro:
+      'Run these in an empty directory. They set up the project, then describe the pages to build.',
+    items: starters.filter((s) => s.id !== 'retrofit'),
+  },
+  {
+    id: 'existing',
+    title: 'A site you already have',
+    intro:
+      'For a site that is already live and missing the Stanford furniture. It changes the footer and the owner details, and leaves your tools alone.',
+    items: starters.filter((s) => s.id === 'retrofit'),
+  },
+];
+
+const status = {
+  tested: { label: 'Uses astro-static, run end to end', tone: 'text-palo-verde-light' },
+  stub: { label: 'Recipe is a stub, not yet tested', tone: 'text-illuminating-light' },
+} as const;
+---
+
+<Base
+  title="Starter prompts | Synthetic Web Team"
+  description="Paste-ready prompts for the Stanford sites people actually build: lab sites, seminar series, course sites, research data portals, maps, and bringing an existing site up to standard."
+>
+  <div class="border-b border-black-90 bg-black">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <div class="max-w-[62ch]">
+        <Eyebrow tone="dark">Starter prompts</Eyebrow>
+        <h1 class="mb-28 text-48 font-bold leading-[1.05] tracking-tight md:text-64">
+          Start from a brief, not a blank prompt.
+        </h1>
+        <p class="mb-24 text-22 leading-relaxed text-black-20">
+          Pick the one closest to your site, edit the parts in [brackets], and
+          paste it into your agent. Each prompt installs if it needs to, sets up
+          the project, describes the pages, and runs the checks at the end.
+        </p>
+        <p class="mb-0 text-19 leading-relaxed text-black-20">
+          They also stop your agent before anything that changes what the site
+          has to comply with, such as a form, a login, or data that is not
+          public, and tell you what that involves first. Only want the install?
+          The <a href="/synthetic-web-team/#install" class="text-white underline hover:no-underline">install prompts</a>{' '}
+          are on the home page.
+        </p>
+      </div>
+
+      <nav aria-labelledby="toc-h" class="mt-48 max-w-[62ch]">
+        <h2 id="toc-h" class="mb-12 text-17 font-semibold text-white">On this page</h2>
+        <ul class="grid list-none gap-8 p-0 sm:grid-cols-2">
+          {
+            starters.map((s) => (
+              <li>
+                <a href={`#${s.id}`} class="text-17 text-black-20 underline hover:text-white hover:no-underline">{s.title}</a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+    </div>
+  </div>
+
+  {
+    groups.map((g) => (
+      <section aria-labelledby={`${g.id}-h`} class="border-b border-black-90 bg-black">
+        <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+          <div class="mb-48 max-w-[62ch]">
+            <h2 id={`${g.id}-h`} class="mb-16 text-40 font-bold leading-tight md:text-48">{g.title}</h2>
+            <p class="mb-0 text-19 leading-relaxed text-black-20">{g.intro}</p>
+          </div>
+
+          <div class="grid gap-80">
+            {g.items.map((s) => (
+              <article
+                id={s.id}
+                aria-labelledby={`${s.id}-h`}
+                class="grid scroll-mt-100 gap-32 border-t border-black-90 pt-40 lg:grid-cols-[1fr_1.4fr] lg:gap-40"
+              >
+                {/* Sticky so the description stays beside a prompt that is
+                    several screens long. */}
+                <div class="self-start lg:sticky lg:top-100">
+                  <h3 id={`${s.id}-h`} class="mb-12 text-32 font-bold leading-tight">{s.title}</h3>
+                  <p class={`mb-20 text-16 font-semibold ${status[s.status].tone}`}>{status[s.status].label}</p>
+                  <p class="mb-24 text-18 leading-relaxed text-black-20">
+                    <strong class="text-white">Good for:</strong> {s.goodFor}
+                  </p>
+                  <h4 class="mb-12 text-17 font-semibold text-white">What it makes your agent watch for</h4>
+                  <ul class="mb-0 grid gap-10 pl-20 text-17 leading-relaxed text-black-20">
+                    {s.watch.map((w) => <li>{w}</li>)}
+                  </ul>
+                </div>
+                <div>
+                  <CodeCard label={`${s.title} prompt`} tag="PROMPT" lang="text" code={s.prompt} id={`prompt-${s.id}`} />
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+    ))
+  }
+
+  <section aria-labelledby="missing-h" class="bg-black">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <div class="max-w-[62ch]">
+        <h2 id="missing-h" class="mb-16 text-32 font-bold leading-tight">Not here?</h2>
+        <p class="mb-0 text-19 leading-relaxed text-black-20">
+          Use the closest one and change the page list. If you keep needing a
+          prompt that is not here,
+          <a href={`${REPO}/issues`} class="text-white underline hover:no-underline">open an issue</a>{' '}
+          and say what you were building.
+        </p>
+      </div>
+    </div>
+  </section>
+</Base>

@@ -47,6 +47,31 @@ const copyId = id ?? `code-${Math.random().toString(36).slice(2, 9)}`;
   </div>
 </div>
 
+<script>
+  // Copy buttons. Progressive enhancement only: without JavaScript every
+  // block is still selectable text in a <pre>, which is why the code lives
+  // there rather than in a canvas or an image.
+  //
+  // Lives here rather than in a page so every page that shows a card gets it.
+  // Astro bundles a component script once per page however many cards there are.
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
+    btn.addEventListener('click', async () => {
+      const target = document.getElementById(btn.dataset.copy ?? '');
+      if (!target) return;
+      const original = btn.textContent;
+      try {
+        await navigator.clipboard.writeText(target.innerText.trim());
+        btn.textContent = 'Copied';
+      } catch {
+        btn.textContent = 'Press ⌘C';
+      }
+      window.setTimeout(() => {
+        btn.textContent = original;
+      }, 2000);
+    });
+  }
+</script>
+
 <style is:global>
   /* Shiki emits its own background; the card already provides one. */
   .code-card-body pre {

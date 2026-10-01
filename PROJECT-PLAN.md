@@ -806,7 +806,58 @@ Three to five real pilot projects with SWS members and one or two campus units. 
 *Exit: five projects using it, and a feedback loop that is actually running.*
 
 **v2 and beyond (Feb 2027 onward)**
-Drupal and Acquia recipe, which is where `decanter/minimal` genuinely belongs since Drupal themes already own base element styling. Stanford Sites and `stanford_basic` alignment. The remaining 11 roles, prioritized by pilot demand. The identity tier (SAML, OIDC, Duo, workgroups). `html-static` recipe for non-developer units on the full `decanter` entry point. Defer to `decanter-mcp` once it supports v8. Coveo where enterprise search is warranted.
+Drupal and Acquia recipe, which is where `decanter/minimal` genuinely belongs since Drupal themes already own base element styling. Stanford Sites and `stanford_basic` alignment. The remaining 11 roles, prioritized by pilot demand. The identity tier (SAML, OIDC, Duo, workgroups). `html-static` recipe for non-developer units on the full `decanter` entry point (stubbed 30 September 2026, see section 13a). Defer to `decanter-mcp` once it supports v8. Coveo where enterprise search is warranted.
+
+---
+
+## 13a. Expansion: more generators, retrofit, bolt-ons, connectors
+
+*Recorded 30 September 2026.* Plenty of Stanford sites are built outside a web team, by faculty, researchers, and staff, often with an AI coding tool. Most of them are static, and many are hand-written HTML, Jekyll, or Quarto rather than Astro or Next. Many are missing the policy furniture. Two consequences for this package. **The recipes should cover the generators people already use.** Astro stays the right default for a new site with no other constraint, but someone who already writes Jekyll or HTML is not going to switch to get a footer. And **retrofit is a bigger lever than new-site generation**, because those sites are already live.
+
+### Placeholders added to the repository
+
+| Item | Path | Blocked on |
+|---|---|---|
+| `jekyll-static` recipe | `standards/recipes/jekyll-static/RECIPE.md` | Whether `jekyll serve` reloads when the CSS changes; Ruby and Bundler missing from `requirements.yml` |
+| `quarto-static` recipe | `standards/recipes/quarto-static/RECIPE.md` | Quarto's Bootstrap theme vs. Decanter; whether the CSS compile scans `.qmd` sources or rendered HTML, and whether `quarto preview` reloads on the CSS change; where computed content meets `scope.md` |
+| `html-static` recipe, the plain HTML option | `standards/recipes/html-static/RECIPE.md` | Running it end to end. Decanter compiles locally with no Node (verified); the open cost is that a vendored Decanter is a frozen copy. Pulled forward from v2 as a stub |
+| `add-to-existing` recipe, the retrofit | `standards/recipes/add-to-existing/RECIPE.md` | Pilot repos with owner permission |
+| Bolt-on services | `standards/patterns/bolt-ons.md` | UIT Security and the Privacy Office. **No approved entries**, by design |
+| Connectors: Events (Localist), News (Squiz Matrix), Profiles (CAP) | `standards/connectors/` | Each source's owner. Only the Events API has been checked: public, JSON, no authentication. The shared shape (fetch at build time, snapshot into the repo) is a proposal that needs an SWS ruling against `scope.md` |
+| Starter prompts, seven of them | `site/src/lib/starters.ts`, shown at `/prompts/` | Done: lab, seminar series, course, research data portal, map and directory, Jekyll/Quarto/HTML, and retrofit. The two that rely on stub recipes say so in the prompt |
+| Scope note | `standards/scope.md` | Done: stubs are listed as not yet in scope |
+
+**ID choice.** The stubs use `html-static` and `add-to-existing`, the names section 5 has reserved since the first draft, which follow the `<generator>-<mode>` pattern and pair with the wizard's `add .` job.
+
+**None has an `acceptance.yml`, deliberately.** Rule 1 of every acceptance file is that each criterion maps to an implemented check, and a stub cannot meet that. `validate-criteria` only picks up recipes that have one, so the stubs do not move any count. Each stub says what an agent should do in the meantime: run `sws check --recipe astro-static` against the built output, acknowledge the Node-specific criteria, and **not** set `recipe:` to the stub's ID in the manifest, because `sws check` exits when it finds no acceptance file. When written, each will most likely `extends: astro-static` and override the `decanter.*` and `build.*` criteria, the same way `astro-ssr` and `next-ssr` do.
+
+**What already works for these generators, unchanged.** `sws check` auto-detects `_site/`, which is where both Jekyll and Quarto write their output. The footer, Identity Bar, a11y, and SEO checks read built HTML and do not care what produced it.
+
+### Recorded here, not yet stubbed in the repository
+
+| Item | Why it is not a file yet |
+|---|---|
+| Host profile: UIT group web space, static plus SSO | A matching file in `standards/hosting/` makes `hosting.recorded` pass. A placeholder profile would tell the check that an untested host is supported. Add it once automated deploys to that space are confirmed |
+| Host profile: CTSC App Platform, for sites that need a server | Same reason. The deploy action itself belongs to CTSC |
+| Reusable GitHub Action wrapping `sws check`, `sws a11y`, `sws perf` | Real work rather than a stub. The workflows already exist inside the recipes; packaging them is the change |
+| Static page patterns: lab home, people grid, publications, seminar schedule, and the rest | This is Decanter reference markup, which the standing instruction in section 15 says not to author until the Decanter 8 docs site lands |
+| Fragments as Jekyll includes, Quarto partials, Astro components | Each lands with its recipe. The YAML in `standards/fragments/` stays the single source |
+| More connectors: the directory, ORCID, Semantic Scholar | The first three are stubbed under `standards/connectors/`. Add more once one of those has run in a real site |
+| Prompt-to-app tools: Lovable, Bolt.new, v0, Replit | Whether they can load skills or MCP at all is an open question, not an emitter change |
+| `requirements.yml` entries for Ruby, Bundler, Quarto, and the standalone Tailwind CLI | Add when the recipe that needs them is executed. Two snags: `preflight.mjs` understands only `required_when: hosting.provider == ...`, so a per-recipe condition needs a parser change; and `not_required` lists Tailwind as a project dependency, which is no longer true on the no-Node path. `node` is `required: always`, which is also untrue for an author on that path, though CI still needs it |
+
+### Owned elsewhere
+
+Do not build these here, and route rather than improvise when an agent is asked about them: the Decanter 8 docs site, which belongs to the Decanter maintainers; a sanctioned Stanford GitHub org for sites; self-service `stanford.edu` DNS; a deploy action for the CTSC App Platform; and the approved bolt-on list, which belongs to UIT Security and the Privacy Office.
+
+**A coupling to watch for.** If manifests are ever aggregated across repositories into a site registry, `.sws/manifest.yml` gains a downstream consumer, and a field rename stops being free.
+
+### Decisions this raises
+
+1. **First class or steered to Astro?** The stubs as written take a middle position: Astro is the default when nobody has a preference, and Jekyll, Quarto, and plain HTML are legitimate choices an agent should not argue someone out of. That follows "carrot, not stick", but it is SWS's decision, and the stubs do not settle it.
+2. **Timing.** Section 2's "Recipes v1: Astro and Next.js, both" stands. The new recipes come after v1, and the Phase 6 pilot should include at least one retrofit.
+3. **Where bolt-ons stop and CMS starts.** A Google Sheet feeding the people page is a content backend. `scope.md` excludes those. Decide which bolt-ons are features and which are content sources before any bolt-on recipe is written.
+4. **~~A precompiled Decanter CSS file.~~ Decided 30 September 2026: there will not be one, and the compile runs on the author's machine.** Tailwind generates classes on demand from the markup it scans, including responsive variants, state modifiers, and arbitrary values. A file holding every combination would be far too large to serve, so Decanter will not ship one. The Tailwind Play CDN is not an alternative: Tailwind says it is not for production. SWS's direction is that authors must be able to **preview work in progress before shipping**, so the compile runs locally, with **Tailwind's standalone CLI** as the first choice and **GitHub Actions as the fallback**, which ships correctly but loses the local preview. **The standalone route was spiked the same day and works.** Tailwind v4.3.3 with `decanter@8.0.0-beta.2`, in a folder with no Node and no `package.json`, resolved Decanter, ran the forms plugin from the CLI's own bundle, detected classes in `.html`, `.liquid` and `.qmd` files with no `@source` line, and rebuilt in about 5 ms under `--watch`. Only macOS arm64 was run. Full results are in `standards/recipes/html-static/RECIPE.md`. **What it costs:** without npm, Decanter has to be vendored, and a vendored copy is frozen, which cuts against "install latest, pin nothing".
 
 ---
 

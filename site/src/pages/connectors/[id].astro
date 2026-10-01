@@ -1,0 +1,77 @@
+---
+import Base from '../../layouts/Base.astro';
+import Eyebrow from '../../components/Eyebrow.astro';
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const connectors = await getCollection('connectors');
+  return connectors.map((entry) => ({ params: { id: entry.id }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const d = entry.data;
+
+// The standard keeps its own `# Connector: ...` heading for agents reading the
+// raw file. This page's h1 comes from frontmatter, so the body's is removed to
+// leave one h1. Done on the rendered HTML because Astro 7's default markdown
+// processor does not run rehype plugins; hiding it with CSS was tried first,
+// and sws check, which reads the HTML, rightly still counted two.
+const body = (entry.rendered?.html ?? '').replace(/^\s*<h1[^>]*>[\s\S]*?<\/h1>/, '');
+const SOURCE_FILE = `https://github.com/SU-SWS/synthetic-web-team/blob/main/standards/connectors/${entry.id}/CONNECTOR.md`;
+
+const facts = [
+  ['Source', d.source],
+  ['Platform', d.platform],
+  ['Provides', d.provides],
+  ['Access', d.auth],
+  ['Status', d.status === 'stub' ? 'Stub. Not built, not tested in a site' : 'Tested'],
+  ['Reviewed', d.reviewed.toISOString().slice(0, 10)],
+];
+---
+
+<Base title={`${d.name} connector | Synthetic Web Team`} description={d.summary}>
+  <div class="border-b border-black-90 bg-black">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <p class="mb-24 text-17">
+        <a href="/synthetic-web-team/connectors/" class="text-black-20 underline hover:text-white hover:no-underline"
+          >← All connectors</a
+        >
+      </p>
+      <Eyebrow tone="dark">Connector · {d.platform}</Eyebrow>
+      <h1 class="mb-24 max-w-[24ch] text-48 font-bold leading-[1.05] tracking-tight md:text-64">{d.name}</h1>
+      <p class="mb-0 max-w-[62ch] text-22 leading-relaxed text-black-20">{d.summary}</p>
+    </div>
+  </div>
+
+  <div class="bg-black">
+    <div class="mx-auto grid max-w-[144rem] gap-48 px-20 py-80 md:px-30 lg:grid-cols-[1.6fr_1fr]">
+      <!-- The body is the standard itself, rendered from markdown we author. -->
+      <div
+        class="max-w-[68ch] text-18 leading-relaxed text-black-20 [&_a]:text-white [&_a]:underline [&_a:hover]:no-underline [&_code]:text-16 [&_code]:text-white [&_h2]:mt-48 [&_h2]:mb-16 [&_h2]:text-32 [&_h2]:font-bold [&_h2]:text-white [&_li]:mb-8 [&_ol]:mb-24 [&_ol]:pl-24 [&_p]:mb-20 [&_strong]:text-white [&_ul]:mb-24 [&_ul]:pl-24"
+        set:html={body}
+      />
+
+
+      <aside aria-labelledby="facts-h" class="self-start rounded-md border border-black-90 bg-black-90/40 p-28 lg:sticky lg:top-100">
+        <h2 id="facts-h" class="mb-20 text-22 font-bold">At a glance</h2>
+        <dl class="mb-24 grid gap-16">
+          {
+            facts.map(([k, v]) => (
+              <div>
+                <dt class="mb-4 text-15 font-semibold text-white">{k}</dt>
+                <dd class="mb-0 ml-0 text-16 text-black-20">
+                  {k === 'Source' ? <a href={v} class="text-white underline hover:no-underline">{new URL(v).host}</a> : v}
+                </dd>
+              </div>
+            ))
+          }
+        </dl>
+        <p class="mb-0 text-15 leading-relaxed text-black-30">
+          This page is generated from
+          <a href={SOURCE_FILE} class="text-white underline hover:no-underline">the connector's standard</a>,
+          the same file your agent reads.
+        </p>
+      </aside>
+    </div>
+  </div>
+</Base>

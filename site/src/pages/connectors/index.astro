@@ -1,0 +1,112 @@
+---
+import Base from '../../layouts/Base.astro';
+import Eyebrow from '../../components/Eyebrow.astro';
+import { getCollection } from 'astro:content';
+
+// Generated from standards/connectors/*/CONNECTOR.md. Adding a connector is
+// adding a file there; this page needs no edit.
+const connectors = (await getCollection('connectors')).sort((a, b) => a.data.name.localeCompare(b.data.name));
+const host = (url: string) => new URL(url).host;
+---
+
+<Base
+  title="Connectors | Synthetic Web Team"
+  description="Pull Stanford events, news, and profiles into your site at build time instead of retyping them. Every connector is a stub, and says what has been checked."
+>
+  <div class="border-b border-black-90 bg-black">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <div class="max-w-[62ch]">
+        <Eyebrow tone="dark">Connectors</Eyebrow>
+        <h1 class="mb-28 text-48 font-bold leading-[1.05] tracking-tight md:text-64">
+          Pull from the source. Stop retyping it.
+        </h1>
+        <p class="mb-24 text-22 leading-relaxed text-black-20">
+          The university already publishes events, news, and profiles. A
+          connector brings them into your site when it builds, so the content
+          stays current and the source stays the source.
+        </p>
+        <p class="mb-0 text-19 leading-relaxed text-black-20">
+          <strong class="text-white">Every connector here is a stub.</strong>{' '}
+          Each one lists what has actually been checked, what has not, and what
+          your agent should do in the meantime. It will say so, rather than
+          guess at an API.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <section aria-labelledby="catalog-h" class="border-b border-black-20 bg-fog-light text-black">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <h2 id="catalog-h" class="mb-40 text-32 font-bold leading-tight">All connectors</h2>
+      <ul class="grid list-none gap-24 p-0 md:grid-cols-2 lg:grid-cols-3">
+        {
+          connectors.map((c) => (
+            <li class="relative flex flex-col rounded-md border border-black-20 bg-white p-28 transition-shadow duration-200 hover:shadow-lg">
+              <div class="mb-20 flex flex-wrap items-center gap-8">
+                <span class="rounded-sm border border-black-30 px-8 py-2 text-13 font-semibold tracking-wide text-black-80">{c.data.platform}</span>
+                <span class="rounded-sm bg-black-10 px-8 py-2 text-13 font-semibold tracking-wide text-black-80">
+                  {c.data.status === 'stub' ? 'STUB' : 'TESTED'}
+                </span>
+              </div>
+              <h3 class="mb-6 text-24 font-bold">
+                <!-- The whole card is the click target, via the stretched
+                     ::after, but the link text stays the name: one link per
+                     card, with a name a screen reader can announce. -->
+                <a
+                  href={`/synthetic-web-team/connectors/${c.id}/`}
+                  class="text-black underline after:absolute after:inset-0 after:content-[''] hover:text-digital-red hover:no-underline"
+                  >{c.data.name}</a
+                >
+              </h3>
+              <p class="mb-16 text-15 text-black-70">{host(c.data.source)}</p>
+              <p class="mb-24 text-17 leading-relaxed text-black-80">{c.data.summary}</p>
+              <dl class="mt-auto mb-0 grid gap-8 border-t border-black-20 pt-16 text-15">
+                <div>
+                  <dt class="inline font-semibold">Provides: </dt>
+                  <dd class="ml-0 inline text-black-80">{c.data.provides}</dd>
+                </div>
+                <div>
+                  <dt class="inline font-semibold">Access: </dt>
+                  <dd class="ml-0 inline text-black-80">{c.data.auth}</dd>
+                </div>
+              </dl>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section aria-labelledby="shape-h" class="bg-black">
+    <div class="mx-auto max-w-[144rem] px-20 py-80 md:px-30">
+      <div class="max-w-[62ch]">
+        <h2 id="shape-h" class="mb-24 text-32 font-bold leading-tight">How every connector works</h2>
+        <ol class="mb-24 grid gap-16 pl-24 text-18 leading-relaxed text-black-20">
+          <li>
+            <strong class="text-white">At build time, never in the browser.</strong> No key
+            reaches a visitor, a source outage does not break a page, and the
+            accessibility checks see the content.
+          </li>
+          <li>
+            <strong class="text-white">Snapshotted into the repository.</strong> A scheduled
+            job writes a data file and commits it, so every change goes through
+            git and the checks, the same as content you wrote yourself.
+          </li>
+          <li>
+            <strong class="text-white">Credentials in Actions secrets.</strong> Committed
+            credentials are the one check that blocks a build.
+          </li>
+          <li>
+            <strong class="text-white">Linked back to the source.</strong> Each item links to
+            its original page rather than republishing it as yours.
+          </li>
+        </ol>
+        <p class="mb-0 text-17 leading-relaxed text-black-30">
+          This is a proposal to be tested in the first real build. The full
+          version, including the scope question it raises, is in
+          <code>standards/connectors/README.md</code>.
+        </p>
+      </div>
+    </div>
+  </section>
+</Base>
