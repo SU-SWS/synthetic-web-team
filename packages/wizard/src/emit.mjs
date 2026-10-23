@@ -459,10 +459,15 @@ export function write(root, files, { force = false, version = null, scope = 'pro
     let contents = f.contents;
     let target = p;
 
-    if (!resolvesInside(root, p)) {
+    if (scope === 'project' && !resolvesInside(root, p)) {
       // A parent directory that is a link out of the project. The checks below
       // look at the file itself; this one stops a write landing somewhere else
       // entirely, through `.sws/` or `.github/` linked to a shared folder.
+      //
+      // Project scope only. At user scope the root is a home directory, and a
+      // `~/.claude` that links into a dotfiles repository or another volume is
+      // the person's own setup: following it is what they want, and refusing
+      // it left Claude Code with no skills at all.
       status = 'conflict';
       reason = 'outside';
     } else if (f.merge && f.path !== 'AGENTS.md' && sameFile(p, agents)) {
@@ -618,7 +623,9 @@ function migrate(root, prev, planned, { dryRun = false, force = false } = {}) {
   }
 
   if (pending.length && !force) {
-    const references = findReferences(root, pending, planned);
+    // Files the record lists are ours, not the project's code: an orphaned
+    // 0.1.2 pointer that still says `standards/` must not hold the move.
+    const references = findReferences(root, pending, new Set([...planned, ...Object.keys(prev?.files ?? {})]));
     if (references.length) {
       return { moved: [], carried: {}, deferred: { files: pending.length, from: MOVED[0][0], to: MOVED[0][1], references } };
     }
@@ -681,7 +688,8 @@ function findReferences(root, pending, ours) {
   // still counts, and through realpath for one that goes via another link.
   const oldDir = pending[0].from.split('/')[0];
   const intoOld = (p) => {
-    const under = (base, x) => x.startsWith(join(base, oldDir) + sep);
+    // The folder itself counts too, as in `_data/sws -> ../standards`.
+    const under = (base, x) => x === join(base, oldDir) || x.startsWith(join(base, oldDir) + sep);
     try { if (under(root, resolve(dirname(p), readlinkSync(p)))) return true; } catch { /* unreadable */ }
     try { return under(realpathSync(root), realpathSync(p)); } catch { return false; }
   };

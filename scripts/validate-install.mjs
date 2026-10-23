@@ -243,6 +243,26 @@ scenario('an earlier layout whose own code reads the standards at standards/');
     `a Python step, a Makefile and a link into standards/ hold the move too: got ${seen}`);
   check(existsSync(join(other, '_data/global-footer.yml')), 'and the link is not left dangling');
 
+  // A link to the folder itself, not a file in it.
+  const folder = fresh();
+  oldLayout(folder);
+  mkdirSync(join(folder, '_data'), { recursive: true });
+  symlinkSync('../standards', join(folder, '_data/sws'));
+  const fl = run(folder);
+  check(fl.moved.length === 0 && fl.deferred?.references.some((x) => x.file === '_data/sws')
+    && existsSync(join(folder, '_data/sws/fragments/global-footer.yml')), 'a link to standards/ itself holds the move too');
+
+  // Our own 0.1.2 pointer, orphaned because its editor is no longer selected,
+  // still says standards/. It is ours, so it does not hold the move.
+  const stale = fresh();
+  oldLayout(stale);
+  const cursor = '---\nalwaysApply: true\n---\n\nNon-negotiables: (`standards/fragments/global-footer.yml`).\n';
+  put(stale, '.cursor/rules/sws.mdc', cursor);
+  const rec = JSON.parse(get(stale, INSTALLED_PATH));
+  rec.files['.cursor/rules/sws.mdc'] = hash(cursor);
+  put(stale, INSTALLED_PATH, JSON.stringify(rec));
+  check(run(stale).moved.length === standards.length, 'a file the install record lists is ours, and does not hold the move');
+
   // Formatting alone must not get past the scan.
   const multi = fresh();
   oldLayout(multi);
@@ -285,6 +305,16 @@ scenario('a directory that links out of the project');
   check(status(o, '.github/copilot-instructions.md') === 'conflict'
     && o.results.find((x) => x.path === '.github/copilot-instructions.md').reason === 'outside'
     && readdirSync(elsewhere).length === 0, 'a file under a directory that links out is not written');
+
+  // But the per-machine install follows the person's own links: a ~/.claude
+  // kept in a dotfiles repository is theirs to point wherever they like.
+  const home = fresh();
+  const dotfiles = fresh();
+  symlinkSync(dotfiles, join(home, '.claude'));
+  const userFiles = plan({ root: home, source: SOURCE, editors: [], answers: {}, tier: {}, scope: 'user' });
+  const u = write(home, userFiles, { version: 'test', scope: 'user' });
+  check(u.conflicts.length === 0 && existsSync(join(dotfiles, 'skills/sws-code-review/SKILL.md')),
+    `user scope: a linked ~/.claude gets its skills (${u.conflicts.length} conflicts)`);
 }
 
 scenario('moved by hand, with the contract pasted under the project\'s own rules');

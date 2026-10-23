@@ -428,9 +428,20 @@ if (mode === 'user') {
   }
 
   if (wr.conflicts.length) {
-    say(`  ${B('Left alone because you edited them:')}`);
-    for (const c of wr.conflicts) say(`    ${c}`);
-    say(`  ${D('Re-run with --force to take the new versions and discard your edits.')}`);
+    // A link is never written through, and --force does not change that, so it
+    // must not be listed as an edit that --force would discard.
+    const linked = new Set(wr.results.filter((r) => r.reason === 'symlink').map((r) => r.path));
+    const edited = wr.conflicts.filter((c) => !linked.has(c));
+    if (edited.length) {
+      say(`  ${B('Left alone because you edited them:')}`);
+      for (const c of edited) say(`    ${c}`);
+      say(`  ${D('Re-run with --force to take the new versions and discard your edits.')}`);
+    }
+    if (linked.size) {
+      say(`  ${B('Left alone because they are symbolic links:')}`);
+      for (const c of linked) say(`    ${c}`);
+      say(`  ${D('Nothing is written through a link, with or without --force.')}`);
+    }
     say('');
   }
 
