@@ -1,0 +1,100 @@
+name: dependabot-merge
+
+# Merges a Dependabot pull request once every check on its head commit has
+# passed. Nothing else: no approval, no labels, no version filtering, so major
+# bumps merge too if they pass.
+#
+# WHY workflow_run AND NOT GitHub's native auto-merge. `gh pr merge --auto`
+# only waits for REQUIRED status checks, which means branch protection or a
+# ruleset on main. That would also refuse direct pushes to main, and both the
+# house rule ("push to main deploys, pull requests are never required") and
+# release.yml's own version-commit push depend on those. So this workflow does
+# the waiting itself: it runs each time a test workflow finishes, and merges
+# only when the last one has.
+#
+# WHY NOT pull_request. A pull_request run triggered by Dependabot gets no
+# secrets and, by default, a read-only token. workflow_run always runs the copy
+# of this file on main, with this repository's permissions, and it never checks
+# out the pull request's code, so the extra permission is safe here.
+#
+# The merge uses GITHUB_TOKEN, and GitHub raises no push events for those. So a
+# merged bump does NOT cut a release (release.yml) or redeploy the site
+# (static.yml): it rides along with the next human push to main. That is the
+# intent, since one release per bump would be noise. If you ever swap in a PAT
+# here, every bump becomes a patch release.
+#
+# Add a workflow to the list below when it should gate a dependency bump. A
+# workflow left out of the list still counts if it finishes before the last
+# listed one, but nothing waits for it.
+
+on:
+  workflow_run:
+    workflows: [advisory, static]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# advisory and static finish close together on most bumps, so two runs of this
+# can see the same all-green commit. Queue them: the second finds the pull
+# request already merged and stops.
+concurrency:
+  group: dependabot-merge-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    # Cheap filters only. The branch prefix is a hint, not proof: anyone can
+    # name a branch dependabot/..., so the author is checked below.
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      startsWith(github.event.workflow_run.head_branch, 'dependabot/')
+    steps:
+      - name: Merge if every check passed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          pr=$(gh pr view "$BRANCH" -R "$REPO" --json number,state,isDraft,author,headRefOid,commits)
+          num=$(jq -r .number <<<"$pr")
+
+          if [ "$(jq -r .state <<<"$pr")" != OPEN ] || [ "$(jq -r .isDraft <<<"$pr")" = true ]; then
+            echo "#$num is not an open, ready pull request. Nothing to do."; exit 0
+          fi
+          if [ "$(jq -r .author.login <<<"$pr")" != app/dependabot ]; then
+            echo "#$num was not opened by Dependabot. Leaving it alone."; exit 0
+          fi
+          # Dependabot stops managing a branch once a person pushes to it, and
+          # from then on the change is theirs to merge, not this workflow's.
+          if jq -e '[.commits[].authors[].login] | any(. != "dependabot[bot]")' <<<"$pr" >/dev/null; then
+            echo "#$num has commits not made by Dependabot. Leaving it for a person."; exit 0
+          fi
+          # A newer push has its own runs, and they will decide.
+          if [ "$(jq -r .headRefOid <<<"$pr")" != "$SHA" ]; then
+            echo "#$num has moved past $SHA. The newer commit's runs decide."; exit 0
+          fi
+
+          # Every check run on the commit, not just the workflow that woke us,
+          # so a bump that touches site/ waits for static as well as advisory.
+          # skipped counts as a pass: static's deploy job never runs on a PR.
+          runs=$(gh api "repos/$REPO/commits/$SHA/check-runs" --paginate \
+            --jq '.check_runs[] | {name, status, conclusion}' | jq -s .)
+          echo "$runs" | jq -r '.[] | "  \(.name): \(.conclusion // .status)"'
+
+          if jq -e 'any(.status != "completed")' <<<"$runs" >/dev/null; then
+            echo "Checks still running on #$num. The last one to finish will merge it."; exit 0
+          fi
+          if jq -e 'any(.conclusion | IN("success", "skipped", "neutral") | not)' <<<"$runs" >/dev/null; then
+            echo "::notice::#$num has a failing check, so it stays open for a person."; exit 0
+          fi
+
+          # --match-head-commit refuses the merge if the branch moved after the
+          # checks above, so a commit nobody tested can never slip through.
+          gh pr merge "$num" -R "$REPO" --squash --match-head-commit "$SHA"
