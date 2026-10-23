@@ -36,13 +36,13 @@ switched-off tests run in a `checks` job that the deploy job does not `need`
 (`astro-static` step 8). Red there is the nag; the site still deploys. No git
 hooks and no blocking agent hooks.
 
-**When there is a pull request, Copilot reviews it first.** Request it with
+**When there is a pull request, two reviewers go first.** Request Copilot with
 `gh pr edit <pr> --add-reviewer @copilot` (a draft needs the explicit request),
-wait for a review of the head commit, then fix or answer every Copilot thread
-and resolve it. Re-request after pushing fixes, at most twice, and leave threads
-a person started for that person. If the request fails, Copilot review is not
-enabled here: say so and carry on. The commands for each step are in
-`sws-github`.
+and run `sws-code-review` in a separate agent while it works. Then fix or answer
+every thread from either and resolve it. Review again after pushing fixes, at
+most twice each, and leave threads a person started for that person. If the
+Copilot request fails, its review is not enabled here: say so and carry on. The
+commands for each step are in `sws-github`.
 
 ## GitHub Pages
 

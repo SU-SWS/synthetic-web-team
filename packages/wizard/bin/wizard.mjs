@@ -108,7 +108,7 @@ const HELP = `
     init       a new site, in an empty directory
     add        an existing project, in its root
 
-  'install' writes the 30 skills into ~/.claude/skills and ~/.agents/skills and
+  'install' writes the 31 skills into ~/.claude/skills and ~/.agents/skills and
   nothing else: no standards, no AGENTS.md, nothing per-site, because at that
   point there is no site. Undo it with 'install --remove'.
 

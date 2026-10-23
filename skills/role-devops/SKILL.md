@@ -59,12 +59,13 @@ a check that fails on switched-off tests (`.only`, `.skip`, `.fixme`). The
 deploy job does not `need` it, so a failure there is a red check on the commit
 and never a held-back publish. The job is in `astro-static` step 8.
 
-**Pull requests get a Copilot review before a person's.** Request it with
-`gh pr edit <pr> --add-reviewer @copilot`, wait for a review of the head commit,
-then fix or answer each Copilot thread and resolve it. Re-request after fixes,
-at most twice. Threads a person started are theirs. If the request fails,
-Copilot review is not enabled for the repository; say so and carry on. Commands
-for every step are in `sws-github`.
+**Pull requests get two reviews before a person's**: Copilot
+(`gh pr edit <pr> --add-reviewer @copilot`) and an agent running
+`sws-code-review`, which reads the diff cold against SWS standards. Fix or answer
+each thread from either and resolve it. Review again after fixes, at most twice
+each. Threads a person started are theirs. If the Copilot request fails, its
+review is not enabled for the repository; say so and carry on. Commands for
+every step are in `sws-github`.
 
 ## The report has to reach a reader
 

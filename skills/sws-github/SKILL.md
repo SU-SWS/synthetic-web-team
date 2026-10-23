@@ -145,19 +145,23 @@ Two traps worth an afternoon each:
 2. **A subpath deploy needs `base`** set in the framework config, or links work
    locally and break in production. `su-sws.github.io/<repo>/` is a subpath.
 
-## Pull requests: Copilot reviews first
+## Pull requests: two reviews before a person's
 
 Never required. When there is one, opened by you or prepared for a person to
-review, ask Copilot to review it first, then deal with every comment it leaves:
-fix it or answer it, and resolve it either way. An open thread is noise for
-the person who reviews after you.
+review, it gets two automated reviews first: **Copilot**, and **an agent running
+`sws-code-review`**, which knows SWS policy and Copilot does not. Then deal with
+every comment either leaves: fix it or answer it, and resolve it either way. An
+open thread is noise for the person who reviews after you.
 
-1. **Request it.** A draft gets no automatic review, so always ask:
+1. **Start both.** A draft gets no automatic review, so always ask Copilot:
    `gh pr edit <pr> --add-reviewer @copilot`. If that fails, Copilot code review
    is not enabled for this repository, or `gh` is too old to know `@copilot`.
-   Say which, and carry on. Do not go and enable it.
-2. **Wait for a review of the head commit**, then read its body as well as its
-   threads. Give up after ten minutes and say so:
+   Say which, and carry on. Do not go and enable it. While Copilot works (it
+   takes minutes), run `sws-code-review` **in a separate agent** given the pull
+   request and not your account of it. That skill says how, and what to do if
+   your tool cannot start one.
+2. **Wait for Copilot's review of the head commit**, then read its body as well
+   as its threads. Give up after ten minutes and say so:
 
    ```bash
    HEAD=$(gh pr view <pr> --json headRefOid -q .headRefOid)
@@ -167,8 +171,10 @@ the person who reviews after you.
    gh api --paginate "$REVIEWS" --jq "$COPILOT | .body"
    ```
 
-3. **Work through every unresolved Copilot thread.** Paginated, so a long
-   review cannot hide one past the first hundred:
+3. **Work through every unresolved thread from either reviewer.** Copilot's are
+   known by their author, the agent review's by the `<!-- sws-code-review -->`
+   marker, since it posts under your own account. Paginated, so a long review
+   cannot hide one past the first hundred:
 
    ```bash
    gh api graphql --paginate -F owner=<owner> -F repo=<repo> -F pr=<pr> -f query='
@@ -176,14 +182,16 @@ the person who reviews after you.
        pullRequest(number: $pr) { reviewThreads(first: 100, after: $endCursor) { pageInfo { hasNextPage endCursor }
          nodes { id isResolved comments(first: 1) { nodes { author { login } path line body } } } } } } }' \
      --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved | not)
-       | select(.comments.nodes[0].author.login | test("copilot"; "i"))'
+       | select((.comments.nodes[0].author.login | test("copilot"; "i"))
+           or (.comments.nodes[0].body | contains("<!-- sws-code-review -->")))'
    ```
 
    **Fix it** and reply with what changed and the commit, or **reply with why it
    does not apply**, citing the standard or the recorded decision. Copilot does
    not know SWS policy: a suggestion to pin a version, add a cookie banner, or
    touch the Global Footer is answered from `.sws/standards/`, not adopted.
-   Then resolve the thread:
+   An agent review is just as fallible, so check its claim against the code
+   before you act on it. Then resolve the thread:
 
    ```bash
    gh api graphql -f id=<thread-id> -f body='<reply>' -f query='mutation($id: ID!, $body: String!) {
@@ -192,10 +200,12 @@ the person who reviews after you.
      resolveReviewThread(input: {threadId: $id}) { thread { isResolved } } }'
    ```
 
-4. **After pushing fixes, request a review again**, with the same command, **at
-   most twice**. A third round is Copilot arguing with itself; hand over.
-5. **A thread a person started is theirs to resolve.** Reply if you have
-   something to add. Never resolve it for them.
+4. **After pushing fixes, review again**: Copilot with the same command, and the
+   agent review on what changed. **At most twice each.** A third round is a
+   reviewer arguing with itself; hand over.
+5. **A thread a person started is theirs to resolve.** It has neither Copilot's
+   login nor the marker. Reply if you have something to add. Never resolve it
+   for them.
 
 ## Verify, then say what you have not done
 

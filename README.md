@@ -24,7 +24,7 @@ Early. The plan is complete and reviewed; the implementation is partway through.
 | `next-ssr` recipe | Written, extends `astro-static`. Renamed from `next-netlify` on 2026-09-03. Not yet executed end to end |
 | Hosting profiles | **New.** `standards/hosting/`: a capability contract plus GitHub Pages, Netlify, and Vercel |
 | Shared skills | **8 of 8 done**, including `sws-github` (provisions a repo and Pages deploy through `gh`) and `sws-preflight` (is this machine equipped?) |
-| Role skills | **8 of 8 built, 11 of 11 stubs.** 30 skills total, all validated |
+| Role skills | **8 of 8 built, 11 of 11 stubs.** 31 skills total, all validated |
 | Documentation site | **Working.** [`site/`](site/), built by our own recipe, scores 100/100 with zero failures |
 | `sws` CLI | **Working.** `preflight` reports whether the machine has the tools to build at all. `doctor` and `check` run 13 check modules against 68 criteria. `sws a11y` runs axe and an interactive-state audit — hover and focus measured with a real mouse and a real Tab key — and `sws perf` measures a byte budget, all in real Chromium |
 | Report delivery | **Working.** PR comment and a persistent "Site health" issue, both updated in place. Score trend, sparkline, HTML artifact, README badge |
@@ -64,7 +64,7 @@ unreachable.
 npx @su-sws/synthetic-web-team install
 ```
 
-That writes the 30 skills to `~/.claude/skills/` and `~/.agents/skills/` and
+That writes the 31 skills to `~/.claude/skills/` and `~/.agents/skills/` and
 nothing else — no standards, no `AGENTS.md`, nothing per-site, because at that
 point there is no site. It touches no file it did not write, so unrelated skills
 already in those directories are safe, and `install --remove` takes it back out.
@@ -214,7 +214,7 @@ node packages/cli/bin/sws.mjs doctor --standards standards
 | Path | What it does |
 |---|---|
 | [`AGENTS.md`](AGENTS.md) | The behavioral contract: the block between the `sws-agent-contract` markers, at most 150 lines, read by every tool. The rest of the file is about this repository and does not ship |
-| [`skills/`](skills/) | The team: 30 skills, each one `SKILL.md` with two frontmatter keys. 8 built roles, 11 honest stubs, 11 shared |
+| [`skills/`](skills/) | The team: 31 skills, each one `SKILL.md` with two frontmatter keys. 8 built roles, 11 honest stubs, 12 shared |
 | [`standards/policy/`](standards/policy/) | Stanford requirements: MinSec, MinWeb, accessibility, privacy, brand, identity, procurement, escalation. Each file carries a `reviewed:` date |
 | [`standards/patterns/`](standards/patterns/) | How SWS actually builds: Decanter, components, content, IA, forms, discoverability, plus conventions derived from reading 11 production repos |
 | [`standards/stack/`](standards/stack/) | `reference-versions.yml`, a dated baseline. Advisory — nothing installs from it. Plus `performance-budget.yml`, the byte budget `sws perf` enforces |
