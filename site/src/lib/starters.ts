@@ -46,7 +46,7 @@ administrator with Stanford addresses.`;
 const CONTENT = `Keep the content in this repository as Markdown and YAML, so that a change
 is a commit anyone can review. Do not pull it from a spreadsheet, a form, or a
 hosted database. If something below seems to need one, stop and tell me what
-standards/patterns/bolt-ons.md says before building it.`;
+.sws/standards/patterns/bolt-ons.md says before building it.`;
 
 const CLOSE = `When the pages are built:
 
@@ -110,7 +110,7 @@ a name. I will give you the publication list as [BibTeX / a plain list]; do
 not scrape it from a profile page.
 
 Link each person to their Stanford Profiles page if they have one. The
-Profiles connector in standards/connectors/profiles/ is a stub, so keep the
+Profiles connector in .sws/standards/connectors/profiles/ is a stub, so keep the
 people as files for now rather than pulling from it.`,
     ),
   },
@@ -139,7 +139,7 @@ Pages:
 
 One file per talk. Generate an .ics calendar file at build time so people can
 subscribe. If we already post talks to events.stanford.edu, tell me what the
-Events connector in standards/connectors/events/ says. It is a stub, so do not
+Events connector in .sws/standards/connectors/events/ says. It is a stub, so do not
 build against it without asking.
 
 A static site works out "upcoming" when it is built, so a talk will still show
@@ -270,14 +270,14 @@ collects personal data, and I need to know what that involves first.`,
       SKILLS,
       init('Website'),
       `Do not follow the astro-static step in "next". The recipe for my generator
-is standards/recipes/[jekyll-static / quarto-static / html-static]/RECIPE.md.
+is .sws/standards/recipes/[jekyll-static / quarto-static / html-static]/RECIPE.md.
 It is a stub. Read it, tell me plainly that it has not been tested end to end,
 and follow its "What to do now" section. Do not set "recipe" in the manifest to
 the stub's name: sws check would stop, because the stub has no acceptance file.
 
 What I am building: [one or two sentences about the site and its pages].
 
-The Identity Bar and the Global Footer must come from standards/fragments/,
+The Identity Bar and the Global Footer must come from .sws/standards/fragments/,
 exactly. Do not type them from memory. Unit links go in a local footer above
 the Global Footer, never inside it.
 
@@ -326,17 +326,17 @@ conflict, list those files and stop. Read AGENTS.md and follow it from now on.
 Ask me about every field in "incomplete" rather than inventing an owner name or
 email.
 
-Then follow standards/recipes/add-to-existing/RECIPE.md. It is a stub, so tell
+Then follow .sws/standards/recipes/add-to-existing/RECIPE.md. It is a stub, so tell
 me that, and keep to these rules:
 
 - Do not change my generator, my package manager, or my host.
 - Run sws check before changing anything, so I can see the starting score.
 - Replace any hand-built Global Footer and Identity Bar with the ones from
-  standards/fragments/, exactly. Unit links move to a local footer above it.
+  .sws/standards/fragments/, exactly. Unit links move to a local footer above it.
 - Make the business owner and technical administrator visible on the site.
 - Add the checks to CI on push to main. Do not make pull requests required.
 - List any third-party services the site already uses, and what each one
-  handles. Do not remove them; tell me what standards/patterns/bolt-ons.md
+  handles. Do not remove them; tell me what .sws/standards/patterns/bolt-ons.md
   says about each.
 - Do not add Decanter unless I ask.
 

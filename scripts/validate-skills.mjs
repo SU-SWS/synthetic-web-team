@@ -4,6 +4,7 @@
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
+import { contract } from '../packages/wizard/src/emit.mjs';
 
 const SOURCE = 'skills';
 const MAX_BODY_WORDS = 2000;   // Anthropic guidance: 1500-2000, hard ceiling ~5k
@@ -60,16 +61,27 @@ for (const r of rows) {
 }
 
 // --- AGENTS.md --------------------------------------------------------------
+//
+// The line budget is for the contract AS IT SHIPS: the block between the
+// markers, which is what lands in a project next to its own rules. The rest of
+// this repository's AGENTS.md is about the package and stays here. The byte cap
+// is checked on both, because Codex truncates whichever file it is reading.
 const a = readFileSync('AGENTS.md', 'utf8');
-const lines = a.split('\n').length;
-const bytes = Buffer.byteLength(a);
-if (lines > AGENTS_MAX_LINES) fail(`AGENTS.md ${lines} lines exceeds ${AGENTS_MAX_LINES}`);
-if (bytes > AGENTS_MAX_BYTES) fail(`AGENTS.md ${bytes} bytes exceeds Codex's ${AGENTS_MAX_BYTES} cap`);
+const block = contract('.');
+const lines = block.split('\n').length;
+const bytes = Buffer.byteLength(block);
+if (lines > AGENTS_MAX_LINES) fail(`AGENTS.md contract block ${lines} lines exceeds ${AGENTS_MAX_LINES}`);
+for (const [what, n] of [['contract block', bytes], ['file', Buffer.byteLength(a)]]) {
+  if (n > AGENTS_MAX_BYTES) fail(`AGENTS.md ${what} ${n} bytes exceeds Codex's ${AGENTS_MAX_BYTES} cap`);
+}
 
 // --- referenced paths resolve ----------------------------------------------
+//
+// Skills cite `standards/<path>`; the contract cites `.sws/standards/<path>`,
+// which is where a project keeps them. Both resolve against standards/ here.
 const refs = new Set();
 for (const f of [...dirs.map((d) => join(SOURCE, d, 'SKILL.md')), 'AGENTS.md']) {
-  for (const mm of readFileSync(f, 'utf8').matchAll(/`(standards\/[^`<]+?)`/g)) {
+  for (const mm of readFileSync(f, 'utf8').matchAll(/`(?:\.sws\/)?(standards\/[^`<]+?)`/g)) {
     refs.add(mm[1].replace(/\/$/, ''));
   }
 }
@@ -77,7 +89,7 @@ for (const r of [...refs].sort()) {
   if (!existsSync(r)) fail(`referenced path does not exist: ${r}`);
 }
 
-console.log(`\nAGENTS.md: ${lines} lines, ${bytes} bytes`);
+console.log(`\nAGENTS.md contract block: ${lines} lines, ${bytes} bytes`);
 console.log(`${rows.length} skills, ${refs.size} referenced standards paths`);
 console.log(failures ? `\n${failures} failure(s)` : '\nAll checks passed.');
 process.exit(failures ? 1 : 0);

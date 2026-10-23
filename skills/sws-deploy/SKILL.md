@@ -31,6 +31,19 @@ fix a typo.
 If a project already has branch protection, leave it. Someone may have added it
 deliberately. Report, do not remove.
 
+**Checks nag, they never gate.** Lint, typecheck, tests, and a check for
+switched-off tests run in a `checks` job that the deploy job does not `need`
+(`astro-static` step 8). Red there is the nag; the site still deploys. No git
+hooks and no blocking agent hooks.
+
+**When there is a pull request, two reviewers go first.** Request Copilot with
+`gh pr edit <pr> --add-reviewer @copilot` (a draft needs the explicit request),
+and run `sws-code-review` in a separate agent while it works. Then fix or answer
+every thread from either and resolve it. Review again after pushing fixes, at
+most twice each, and leave threads a person started for that person. If the
+Copilot request fails, its review is not enabled here: say so and carry on. The
+commands for each step are in `sws-github`.
+
 ## GitHub Pages
 
 **To provision a repo and turn Pages on, use the `sws-github` skill** — it drives

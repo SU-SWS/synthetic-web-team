@@ -186,7 +186,10 @@ diagnose it is the one holding the problem.
 Replaces `astro-static` step 8. Both hosts deploy from their git integration
 rather than from a Pages workflow:
 
-- **Push to `main` deploys.** Keep the GitHub Actions workflow for checks only.
+- **Push to `main` deploys.** Keep the GitHub Actions workflow for checks only:
+  the build with `sws a11y`, `sws perf` and `sws check`, plus the `checks` job
+  from `astro-static` step 8. Red there is the nag; the host deploys anyway. No
+  git hooks, and no agent hooks that block.
 - **Do not add branch protection or required status checks.** Each quietly
   converts push-to-main into a pull-request requirement, and campus editors
   working through the GitHub web UI cannot open one.

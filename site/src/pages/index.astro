@@ -37,7 +37,7 @@ If npx cannot reach the registry, use the repository instead:
   git clone --depth 1 https://github.com/SU-SWS/synthetic-web-team /tmp/swt
   node /tmp/swt/packages/wizard/bin/wizard.mjs install --json
 
-That writes 30 skills to ~/.claude/skills and ~/.agents/skills and nothing
+That writes 31 skills to ~/.claude/skills and ~/.agents/skills and nothing
 else: no standards, no AGENTS.md, nothing about any particular site. It never
 touches a file it did not write, so unrelated skills already in those
 directories are safe, and "install --remove" uninstalls it.
@@ -97,8 +97,9 @@ If npx cannot reach the registry, swap it for the repository route:
 
 Fill in siteName and unit from this repository. Ask me if it is not obvious.
 
-Do not change any of my existing code. The installer adds AGENTS.md, the
-standards, and the .sws record; it does not touch my source. If anything comes
+Do not change any of my existing code. The installer adds its contract to
+AGENTS.md, keeping anything already there, and puts the standards and the
+record under .sws/; it does not touch my source. If anything comes
 back as a conflict, list those files and stop: they are ones I edited and I
 will decide. If anything is an orphan, list it and do not delete it.
 
@@ -169,7 +170,7 @@ const resultShape = `{
   "next": [
     { "kind": "read-contract",  "path": "AGENTS.md" },
     { "kind": "orient",         "skill": "sws-onboard" },
-    { "kind": "follow-recipe",  "path": "standards/recipes/astro-static/RECIPE.md" },
+    { "kind": "follow-recipe",  "path": ".sws/standards/recipes/astro-static/RECIPE.md" },
     { "kind": "add-dependency", "command": "npm install -D @su-sws/synthetic-web-team" },
     { "kind": "verify",         "command": "npx sws doctor --format json" }
   ]
@@ -216,7 +217,7 @@ const updateVerdicts = [
 const inside = [
   ['8 policy files', 'MinSec, MinWeb, accessibility, privacy, brand, identity, procurement, escalation. Each dated with a reviewed: field'],
   ['7 pattern files', 'Decanter 8, components, content, IA, forms, motion, discoverability'],
-  ['30 skills', '8 built roles, 11 honest stubs, 11 shared. Two frontmatter keys, read natively by nine tools'],
+  ['31 skills', '8 built roles, 11 honest stubs, 12 shared. Two frontmatter keys, read natively by nine tools'],
   ['2 recipes', 'astro-static and next-netlify, with 63 machine-checkable criteria between them'],
   ['1 fragment', 'The Global Footer, byte-exact, extracted from the upstream component'],
 ];
@@ -224,7 +225,7 @@ const inside = [
 
 <Base
   title="Synthetic Web Team | Stanford Web Services"
-  description="Stanford compliance wired into your coding agent. 30 skills, 8 policy files, a 13-module compliance CLI, and an MCP server. No templates, no design system fork."
+  description="Stanford compliance wired into your coding agent. 31 skills, 8 policy files, a 13-module compliance CLI, and an MCP server. No templates, no design system fork."
 >
   <!-- ===================================================== hero -->
   <div class="relative overflow-hidden border-b border-black-90 bg-black">
@@ -262,7 +263,7 @@ const inside = [
               class="rounded-full bg-digital-red px-14 py-4 text-13 font-semibold tracking-wide text-white"
               >v0.1.0 EARLY</span
             >
-            <span class="text-16 text-black-30">MCP server · CLI · 30 skills</span>
+            <span class="text-16 text-black-30">MCP server · CLI · 31 skills</span>
           </p>
           <h1 class="mb-28 max-w-[24ch] text-56 font-bold leading-[1.05] tracking-tight md:text-72">
             Stanford compliance, wired into your agent.
@@ -335,7 +336,7 @@ const inside = [
               <span class="font-mono text-15 font-semibold text-poppy-light" aria-hidden="true">1</span>
               <span class="text-18 text-black-20"
                 ><strong class="text-white">Install into your editor.</strong>{' '}
-                Once per machine. Puts the 30 skills where your tools already
+                Once per machine. Puts the 31 skills where your tools already
                 look and writes nothing about any site, because at this point
                 there is no site. Undo with <code>install --remove</code>.</span
               >
@@ -660,7 +661,7 @@ const inside = [
           </h2>
           <p class="mb-24 max-w-[54ch] text-19 leading-relaxed text-black-80">
             The server is a second entry point, never a requirement. Everything
-            it exposes is also a plain file under <code>standards/</code> that an
+            it exposes is also a plain file under <code>.sws/standards/</code> that an
             agent can read directly, so if it will not start, nothing else stops
             working.
           </p>

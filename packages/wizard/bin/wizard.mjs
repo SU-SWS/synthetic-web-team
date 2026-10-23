@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { createInterface } from 'node:readline/promises';
 import { detect, deriveTier } from '../src/detect.mjs';
-import { plan, write, remove, ensureDevDependency } from '../src/emit.mjs';
+import { plan, write, remove, ensureDevDependency, plannedMigration, STANDARDS_DIR } from '../src/emit.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -108,13 +108,16 @@ const HELP = `
     init       a new site, in an empty directory
     add        an existing project, in its root
 
-  'install' writes the 30 skills into ~/.claude/skills and ~/.agents/skills and
+  'install' writes the 31 skills into ~/.claude/skills and ~/.agents/skills and
   nothing else: no standards, no AGENTS.md, nothing per-site, because at that
   point there is no site. Undo it with 'install --remove'.
 
-  'init' and 'add' write AGENTS.md, the standards, and the per-site record
-  (owners, compliance tier, divergences, accepted risks) into one repository,
-  and no skills, because those are installed once for every project. 'init'
+  'init' and 'add' write the contract into AGENTS.md, and the standards and the
+  per-site record (owners, compliance tier, divergences, accepted risks) into
+  .sws/, and no skills, because those are installed once for every project.
+  An existing AGENTS.md, CLAUDE.md or MCP config keeps its content: the
+  contract goes between markers, CLAUDE.md only needs the line @AGENTS.md, and
+  the sws server is added next to the servers already there. 'init'
   additionally hands back the recipe to follow to build the pages; 'add' assumes
   you already have a site and leaves your source alone.
 
@@ -155,6 +158,8 @@ const HELP = `
   and any file you edited yourself is reported as a conflict and left alone on
   every run until it matches again. .sws/installed.json records what was written
   so an edit can be told from an old version. Pass --force to discard your edits.
+  A project with standards/ at its root from an earlier version has them moved
+  into .sws/standards/, edits and all.
 
   An editor install and a project install carry their own versions, so they can
   drift. 'sws doctor' reports the difference as a note rather than a finding:
@@ -423,9 +428,20 @@ if (mode === 'user') {
   }
 
   if (wr.conflicts.length) {
-    say(`  ${B('Left alone because you edited them:')}`);
-    for (const c of wr.conflicts) say(`    ${c}`);
-    say(`  ${D('Re-run with --force to take the new versions and discard your edits.')}`);
+    // A link is never written through, and --force does not change that, so it
+    // must not be listed as an edit that --force would discard.
+    const linked = new Set(wr.results.filter((r) => r.reason === 'symlink').map((r) => r.path));
+    const edited = wr.conflicts.filter((c) => !linked.has(c));
+    if (edited.length) {
+      say(`  ${B('Left alone because you edited them:')}`);
+      for (const c of edited) say(`    ${c}`);
+      say(`  ${D('Re-run with --force to take the new versions and discard your edits.')}`);
+    }
+    if (linked.size) {
+      say(`  ${B('Left alone because they are symbolic links:')}`);
+      for (const c of linked) say(`    ${c}`);
+      say(`  ${D('Nothing is written through a link, with or without --force.')}`);
+    }
     say('');
   }
 
@@ -525,8 +541,8 @@ if (interactive && !flags.editors) {
 }
 
 if (!chosen.length) {
-  console.log(`\n  ${D('No editors selected. The universal core still works everywhere:')}`);
-  console.log(`  ${D('AGENTS.md plus .agents/skills and .claude/skills.')}`);
+  say(`\n  ${D('No editors selected. AGENTS.md still works in every tool that reads it,')}`);
+  say(`  ${D('and the skills come from the once-per-machine install.')}`);
 }
 
 // --- the machine-readable result --------------------------------------------
@@ -536,7 +552,7 @@ if (!chosen.length) {
 //
 // `next` is DATA, not prose. The caller of this tool is an agent whose whole
 // reason for installing is to then act, and "Hand your agent
-// standards/recipes/astro-static/RECIPE.md" is a sentence a robot has to parse
+// .sws/standards/recipes/astro-static/RECIPE.md" is a sentence a robot has to parse
 // out of decorated terminal output. Each step names a kind, a path or command,
 // and why — so the agent can pick the one it is able to do.
 //
@@ -558,13 +574,22 @@ function emitJson({ written, write: wr }) {
     kind: 'read-contract', path: 'AGENTS.md',
     why: 'The behavioral contract. Read it before doing anything else in this project.',
   });
+  // A move held back because the project's code reads the old path. Early in
+  // the list: until those references change, the layout cannot finish.
+  const held = wr ? wr.deferred : migration.deferred;
+  if (held) {
+    next.push({
+      kind: 'update-references', from: held.from, to: held.to, references: held.references,
+      why: `These read the standards at ${held.from}, so the ${held.files} files there were not moved: moving them would break the next build. Change each to ${held.to} and run add . again; the files move then. --force moves them now regardless.`,
+    });
+  }
   next.push({
     kind: 'orient', skill: 'sws-onboard',
     why: 'Reads .sws/manifest.yml and states the stack, tier, and decisions already made.',
   });
   if (mode === 'new') {
     next.push({
-      kind: 'follow-recipe', path: `standards/recipes/${answers.recipe}/RECIPE.md`,
+      kind: 'follow-recipe', path: `${STANDARDS_DIR}/recipes/${answers.recipe}/RECIPE.md`,
       why: 'The build contract, with acceptance criteria. Follow it rather than improvising.',
     });
   }
@@ -577,7 +602,7 @@ function emitJson({ written, write: wr }) {
   if (chosen.some((e) => e.emits.some((x) => x.endsWith('mcp.json')))) {
     next.push({
       kind: 'optional-mcp', command: 'npx -y @su-sws/synthetic-web-team-mcp --help',
-      why: 'An MCP server for these standards was added to your client config. It is a second entry point, never a requirement: sws_get_standard, sws_footer_html, sws_check, sws_decanter_token, sws_scaffold. Everything it exposes is also a file under standards/. Remove the entry if you do not want it.',
+      why: `An MCP server for these standards was added to your client config. It is a second entry point, never a requirement: sws_get_standard, sws_footer_html, sws_check, sws_decanter_token, sws_scaffold. Everything it exposes is also a file under ${STANDARDS_DIR}/. It was added next to any servers you already had. Remove the entry if you do not want it, and later updates will leave it out.`,
     });
   }
   // `npx sws` has to resolve to node_modules/.bin/sws. Unscoped `sws` on the
@@ -624,7 +649,8 @@ function emitJson({ written, write: wr }) {
       standards: stdCount,
       ...(wr ? {
         created: wr.created, updated: wr.updated, unchanged: wr.unchanged,
-        preserved: wr.preserved, conflicts: wr.conflicts.length,
+        preserved: wr.preserved, merged: wr.merged, moved: wr.moved.length,
+        conflicts: wr.conflicts.length,
       } : {}),
     },
     files: wr ? wr.results : files.map((x) => ({ path: x.path, status: 'planned' })),
@@ -632,6 +658,10 @@ function emitJson({ written, write: wr }) {
     dependency: { name: DEP_NAME, range: depRange, ...depResult },
     conflicts: wr?.conflicts ?? [],
     orphans: wr?.orphans ?? [],
+    // On a dry run, what WOULD move. Always { from, to }.
+    moved: wr ? wr.moved : migration.moved,
+    // A move held back, with the references that hold it. null when there is none.
+    deferred: wr ? wr.deferred : migration.deferred,
     next,
     notes: [
       'Everything is advisory except committed credentials, which are the one blocking check.',
@@ -646,23 +676,33 @@ say(`\n  ${B('Compliance tier: ' + tier.tier.toUpperCase())}  ${D('because ' + t
 for (const a of tier.adds) say(`    ${D('·')} ${a}`);
 if (tier.tier !== 'low') {
   say(`\n  ${B('This is above a basic static site.')} ${D('A Data Risk Assessment may be')}`);
-  say(`  ${D('required before deploy. Route to UIT Security: standards/policy/escalation.md')}`);
+  say(`  ${D(`required before deploy. Route to UIT Security: ${STANDARDS_DIR}/policy/escalation.md`)}`);
 }
 
 // --- review, then write -----------------------------------------------------
 
 const files = plan({ root, source, editors: chosen, answers, tier });
 
+// Always 0 at project scope, and kept in the JSON counts so the schema holds.
+// Not printed: a project holds no skills, and the line that used to be here
+// named .claude/skills, which a project install never writes.
 const skillCount = files.filter((f) => f.path.endsWith('SKILL.md')).length;
-const stdCount = files.filter((f) => f.path.startsWith('standards/')).length;
-const shown = files.filter((f) => !f.path.endsWith('SKILL.md') && !f.path.startsWith('standards/'));
+const stdCount = files.filter((f) => f.path.startsWith(`${STANDARDS_DIR}/`)).length;
+const shown = files.filter((f) => !f.path.endsWith('SKILL.md') && !f.path.startsWith(`${STANDARDS_DIR}/`));
+const migration = plannedMigration(root, files, { force: flags.force });
 
 say(`\n  ${B('Files to write')}  ${D(root)}\n`);
 for (const f of shown) {
   say(`    ${f.path}${f.note ? D('  ' + f.note) : ''}`);
 }
-say(`    ${D(`+ ${skillCount} skill files across .agents/skills and .claude/skills`)}`);
-say(`    ${D(`+ ${stdCount} files under standards/`)}`);
+if (migration.deferred) {
+  say(`    ${D(`+ ${stdCount} files under standards/, where they are now (the move to ${STANDARDS_DIR}/ waits, see below)`)}`);
+} else {
+  say(`    ${D(`+ ${stdCount} files under ${STANDARDS_DIR}/`)}`);
+  if (migration.moved.length) {
+    say(`    ${D(`${migration.moved.length} of them move there from standards/ at the root, where an earlier version put them`)}`);
+  }
+}
 
 if (flags['dry-run']) {
   depResult = ensureDevDependency(root, { name: DEP_NAME, range: depRange, dryRun: true });
@@ -689,23 +729,71 @@ depResult = ensureDevDependency(root, { name: DEP_NAME, range: depRange });
 // Say what actually changed, not how many files were considered. On a re-run
 // this reads "nothing to do", which is the truth and what a caller should
 // report onward.
-if (result.created === 0 && result.updated === 0) {
+if (result.created === 0 && result.updated === 0 && result.merged === 0 && result.moved.length === 0) {
   say(`\n  ${B('Already installed.')} ${result.unchanged + result.preserved} files, nothing to change.\n`);
 } else {
   const parts = [];
   if (result.created) parts.push(`${result.created} created`);
   if (result.updated) parts.push(`${result.updated} updated`);
+  if (result.merged) parts.push(`${result.merged} merged into your own`);
   if (result.unchanged) parts.push(`${result.unchanged} unchanged`);
   if (result.preserved) parts.push(`${result.preserved} preserved`);
   if (result.conflicts.length) parts.push(`${result.conflicts.length} left alone`);
   say(`\n  ${B('Done.')} ${parts.join(', ')}.\n`);
 }
 
+if (result.moved.length) {
+  say(`  ${B(`Moved ${result.moved.length} file(s) from standards/ to ${STANDARDS_DIR}/.`)}`);
+  say(`  ${D('Everything this tool installs now lives under .sws/, so the root of the')}`);
+  say(`  ${D('repository is yours. Edits came along and are still reported below.')}`);
+  say('');
+}
+
+if (result.deferred) {
+  const d = result.deferred;
+  say(`  ${B(`Not moved yet: ${d.files} file(s) stay in ${d.from} this run.`)}`);
+  say(`  ${D('Your project reads them there, and moving them would break its next build:')}`);
+  for (const r of d.references.slice(0, 10)) say(`    ${r.file}${r.line ? `:${r.line}` : ''}  ${D(r.text)}`);
+  if (d.references.length > 10) say(`    ${D(`and ${d.references.length - 10} more, listed in the --json result`)}`);
+  say(`  ${D(`Point these at ${d.to} and run add . again: the files move then.`)}`);
+  say(`  ${D('They are kept current where they are. --force moves them now regardless.')}`);
+  say('');
+}
+
+// Merged files, so nobody is surprised by a diff in a file they think of as theirs.
+const merged = result.results.filter((r) => r.status === 'merged');
+if (merged.length) {
+  const adds = new Map(files.map((f) => [f.path, f.adds]));
+  say(`  ${B('Added to your own file, the rest left as it was:')}`);
+  for (const m of merged) say(`    ${m.path}  ${D(adds.get(m.path) ?? '')}`);
+  say('');
+}
+
 // Conflicts and orphans, before the next steps: they need a decision.
 if (result.conflicts.length) {
-  say(`  ${B('Left alone because you edited them:')}`);
-  for (const c of result.conflicts) say(`    ${c}`);
-  say(`  ${D('Re-run with --force to take the new versions and discard your edits.')}`);
+  const why = new Map(result.results.filter((r) => r.status === 'conflict').map((r) => [r.path, r.reason]));
+  say(`  ${B('Left alone:')}`);
+  for (const c of result.conflicts) {
+    const r = why.get(c);
+    if (r === 'legacy-contract') {
+      say(`    ${c}  ${D('holds an older copy of the contract with no markers, next to other')}`);
+      say(`    ${' '.repeat(c.length)}  ${D('content, so nothing says where ours ends. Delete that copy (from')}`);
+      say(`    ${' '.repeat(c.length)}  ${D('"# Stanford Web Services: agent contract" to the end of it), keep your')}`);
+      say(`    ${' '.repeat(c.length)}  ${D('own rules, and re-run: the contract goes back in between markers.')}`);
+      say(`    ${' '.repeat(c.length)}  ${D('--force replaces from that heading to the next top-level heading.')}`);
+    } else if (r === 'symlink') {
+      say(`    ${c}  ${D('is a symbolic link, and nothing is written through one.')}`);
+    } else if (r === 'outside') {
+      say(`    ${c}  ${D('sits under a directory that links out of the project, so nothing was written.')}`);
+    } else if (r === 'unparseable') {
+      say(`    ${c}  ${D('is not plain JSON (comments, perhaps), so the sws server was not added.')}`);
+      say(`    ${' '.repeat(c.length)}  ${D('Writing it back would strip them. Add the server yourself if you want it.')}`);
+    } else {
+      say(`    ${c}  ${D('you edited it')}`);
+    }
+  }
+  say(`  ${D('--force takes the new versions and discards your edits, for EVERY file listed')}`);
+  say(`  ${D('here at once. Resolve the ones you want to keep first.')}`);
   say('');
 }
 if (result.orphans.length) {
@@ -748,7 +836,7 @@ say(`  ${B('Next')}`);
 let stepNo = 0;
 const step = () => ++stepNo;
 if (mode === 'new') {
-  say(`    ${step()}. Scaffold the site. Hand your agent standards/recipes/${answers.recipe}/RECIPE.md,`);
+  say(`    ${step()}. Scaffold the site. Hand your agent ${STANDARDS_DIR}/recipes/${answers.recipe}/RECIPE.md,`);
   say(`       ${D('or run the upstream scaffolder yourself: npm create astro@latest')}`);
 }
 if (depResult.status === 'added' || depResult.status === 'present') {

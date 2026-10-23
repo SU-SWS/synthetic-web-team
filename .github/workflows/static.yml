@@ -6,6 +6,12 @@ name: static
 # push to main deploys, pull requests get checks but no preview (Pages serves
 # one site), and nothing here fails except a committed credential.
 #
+# One deliberate gap: the recipe's `checks` job (lint, typecheck, tests, and a
+# check for switched-off tests) is not here, because site/ has none of those
+# scripts and the job would be a green no-op that suggests coverage it does
+# not have. Add it from step 8 when site/ gains any of them. The package's own
+# validators run in advisory.yml.
+#
 # ---------------------------------------------------------------------------
 # ONE-TIME REPOSITORY SETUP, REQUIRED. This workflow cannot do it for you.
 #

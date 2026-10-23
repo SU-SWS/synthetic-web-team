@@ -1,7 +1,7 @@
 {
   "name": "@su-sws/synthetic-web-team",
   "version": "0.1.2",
-  "description": "Stanford Web Services standards and agent team: policy, patterns, recipes, fragments, prior art, 30 skills, the two-part install wizard, and the advisory compliance CLI.",
+  "description": "Stanford Web Services standards and agent team: policy, patterns, recipes, fragments, prior art, 31 skills, the two-part install wizard, and the advisory compliance CLI.",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
@@ -9,7 +9,7 @@
   },
   "scripts": {
     "sync-skills": "node scripts/sync-skills.mjs",
-    "validate": "node scripts/validate-skills.mjs && node scripts/validate-emit.mjs && node scripts/validate-criteria.mjs && node scripts/validate-state-classifier.mjs",
+    "validate": "node scripts/validate-skills.mjs && node scripts/validate-emit.mjs && node scripts/validate-install.mjs && node scripts/validate-criteria.mjs && node scripts/validate-state-classifier.mjs && node scripts/validate-hooks.mjs",
     "check": "npm run validate && npm run sync-skills -- --check",
     "pack:all": "mkdir -p .pack && npm pack --pack-destination ./.pack && npm pack -w @su-sws/synthetic-web-team-mcp --pack-destination ./.pack"
   },

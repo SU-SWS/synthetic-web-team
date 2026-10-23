@@ -3,7 +3,7 @@
 MCP server exposing Stanford Web Services standards to any MCP client.
 
 **A second entry point, never a requirement.** Everything this server exposes is
-also a plain file under `standards/` that an agent can read directly. If the
+also a plain file under `.sws/standards/` that an agent can read directly. If the
 server will not start, nothing else stops working.
 
 ## Add it to a client

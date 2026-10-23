@@ -25,17 +25,30 @@ knowledge and they stay project-level anyway, because moving them would break
 every path reference in every skill. Making skills location-independent is a real
 option, and it is deliberately out of scope here — see [Not doing](#not-doing).
 
+*Later, 2026-10-22, after 0.1.2.* The standards stay project-level but moved
+from `standards/` at the root to `.sws/standards/`, because 45 files in a
+top-level folder the team did not ask for is clutter in an existing repository.
+Skill text did not change: the contract tells agents that a skill's
+`standards/<path>` means `.sws/standards/<path>` in a project, and `add .`
+moves an older project's recorded files across. The same release turned the
+contract into a marked block merged into `AGENTS.md`, and `CLAUDE.md` into
+exactly `@AGENTS.md`, so a project's own rules and a Next.js block survive.
+Every other file a project may already own is merged into the same way: the
+`sws` server joins the existing servers in each MCP config, and Copilot's and
+Codex's files get a marked pointer. Only files under our own name are written
+whole.
+
 ## The scope split
 
 | Artifact | Files | Scope | Why |
 |---|---|---|---|
 | 30 skills → `.claude/skills/`, `.agents/skills/` | 60 | **user** | Person-level knowledge, identical in every repo. The single biggest block of per-project noise |
 | MCP server registration | ~4 | **user** | The server already resolves standards from the installed package and works with no project present |
-| `standards/` | 36 | project | Skills reference these by relative path; CI reads them; a reviewer needs them in the diff |
-| `AGENTS.md` | 1 | project | Repo-rooted convention by design. The contract a reviewer and a CI run must be able to see |
+| `.sws/standards/` | 45 | project | Skills reference these by relative path; CI reads them; a reviewer needs them in the diff |
+| `AGENTS.md` | 1 | project | Repo-rooted convention by design. The contract a reviewer and a CI run must be able to see. A block between markers, so the project's own rules share the file |
 | `.sws/manifest.yml`, `.sws/acknowledged.yml` | 2 | project | Per-site record: named owners, derived tier, divergences, accepted risks with review dates |
 | `.sws/installed.json` | 1 | project | Conflict detection for project files |
-| Editor pointers (`CLAUDE.md`, `.cursor/rules/sws.mdc`, `.codex/config.toml`, `GEMINI.md`, `.devin/rules/sws.md`) | ~6 | project | They point at `AGENTS.md`, which is project-rooted |
+| Editor pointers (`CLAUDE.md`, `.cursor/rules/sws.mdc`, `.codex/config.toml`, `GEMINI.md`, `.devin/rules/sws.md`) | ~6 | project | They point at `AGENTS.md`, which is project-rooted. `CLAUDE.md` and `GEMINI.md` are exactly `@AGENTS.md`. None names a `.claude/` path |
 | CI workflow | 1 | project | Runs `sws check` on push, where there is no home directory to read |
 
 **Net effect: a project install drops from ~104 files to ~46.** The 60 skill

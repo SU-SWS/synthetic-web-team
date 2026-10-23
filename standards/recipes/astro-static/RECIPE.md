@@ -192,7 +192,7 @@ Every page uses one layout containing, in this order:
 2. **Stanford Identity Bar.** Use `standards/fragments/identity-bar.yml` verbatim. Nothing may go above it except the skip link.
 3. Local header, navigation, and page content. Unit-specific, design freely within Decanter.
 4. Optional local footer.
-5. **Stanford Global Footer.** Generate it from `standards/fragments/global-footer.yml`.
+5. **Stanford Global Footer.** Generate it from `standards/fragments/global-footer.yml`, which in a project is `.sws/standards/fragments/global-footer.yml`. Read it from there at build time.
 
 **The Identity Bar has a fixed height, and two things decide it.**
 
@@ -359,6 +359,36 @@ on:
 ```
 
 Then gate only the deploy: `if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'`. A pull request gets a build plus `sws check`; a push to `main` gets a build, `sws check`, and a deploy.
+
+**Checks nag; they never gate.** Lint, typecheck, tests, and a check for switched-off tests run in a `checks` job of their own, which the deploy job does **not** list in `needs`. A failure there is a red check on the commit that everyone can see and a person decides about, and the site still deploys. `sws check` stays in the build job, because it reads the build. Put none of this in a git hook (husky, lefthook, pre-commit) or an agent hook that blocks: nothing should refuse a commit, an edit, or a push. `sws check` reports a hook it finds, as advice.
+
+```yaml
+  checks:
+    # Not in deploy's `needs`: red here is the nag, never a held-back publish.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm run typecheck --if-present
+      # Its own build and browser: nothing the build job made is on this
+      # runner, and a test over the built site (step 7) needs both.
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test --if-present
+      - name: No switched-off tests
+        run: |
+          if git grep -nE '(^|[^[:alnum:]_$.])(test|it|describe|context)(\.[a-z]+)*\.(only|skip|fixme)([^[:alnum:]_$]|$)' -- \
+              '*.js' '*.mjs' '*.cjs' '*.ts' '*.mts' '*.cts' '*.jsx' '*.tsx'; then
+            echo "::error::A test is switched off with .only, .skip or .fixme. Turn it back on, or delete it."
+            exit 1
+          fi
+```
+
+`--if-present` runs the scripts the project defines and skips the rest, so add scripts rather than editing steps: `"typecheck": "astro check"` with `@astrojs/check` and `typescript` as dev dependencies, and `lint` and `test` once there is something for them to check. The job builds the site and installs Chromium itself, which repeats work the build job does; that is the price of the deploy never waiting on it. The last step also catches `test.only.each(...)` and a space before the call. A deliberate conditional skip trips it too. That is the nag working: a person looks, and decides.
 
 **Do not set up branch protection, required status checks, or a protected environment beyond `github-pages`.** Each one quietly turns push-to-main into a pull-request requirement, and this recipe's audience includes people editing a page through the GitHub web UI who will not open a pull request to fix a typo.
 

@@ -38,9 +38,10 @@ without being asked.
 3. **`.sws/acknowledged.yml`**. Accepted risks with reasons and review dates. Do
    not re-raise an acknowledged finding as if it were new. If a `review_by` date
    has passed, that is worth mentioning once, kindly.
-4. **The recipe** named in the manifest, at `standards/recipes/<id>/RECIPE.md`,
-   plus its `acceptance.yml`, which is the definition of correct for this
-   project.
+4. **The recipe** named in the manifest, at
+   `.sws/standards/recipes/<id>/RECIPE.md` (`standards/` at the root, in a
+   project an older version installed), plus its `acceptance.yml`, which is the
+   definition of correct for this project.
 
 ## Tier changes the obligations
 
@@ -80,6 +81,8 @@ Then get on with the actual task.
 ## If the manifest is stale
 
 `sws doctor` compares the recorded standards version against what is installed.
-When it is behind, say so once and offer `sws update` to show what changed.
+When it is behind, say so once and offer to run
+`npx @su-sws/synthetic-web-team add .`, which is the update. There is no
+`sws update`.
 **Never update without being asked.** A project pinned to older standards may be
 mid-review, or may have shipped and be under change control.

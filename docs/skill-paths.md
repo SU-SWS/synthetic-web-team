@@ -79,8 +79,10 @@ two things possible: telling an edit from an old version, and uninstalling with
 ### In a consumer project
 
 **No skills at all.** They are identical in every repository, so copying them
-into each one was noise that then had to be kept in sync. A project gets
-`AGENTS.md`, the vendored `standards/`, and the per-site record in `.sws/`.
+into each one was noise that then had to be kept in sync. A project gets the
+contract in `AGENTS.md`, and the vendored standards (`.sws/standards/`) and the
+per-site record in `.sws/`. Nothing goes in a project's `.claude/`, which many
+teams git-ignore.
 
 If you find `.agents/skills/` or `.claude/skills/` inside a project, it predates
 the two-part install. Nothing breaks — the editors still read them, and they take

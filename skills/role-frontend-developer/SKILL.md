@@ -165,3 +165,12 @@ hardcoded hex, a removed focus outline, a hover or focus state that is only a
 colour change, an island that did not need to be one, an image without
 dimensions, and a heading level chosen for its size. That list catches most of
 what actually goes wrong.
+
+On a pull request, let two reviewers go first: Copilot (`gh pr edit <pr>
+--add-reviewer @copilot`), and `sws-code-review` in a separate agent, which
+checks this list among others. Fix or answer each of their threads and resolve
+them, so the person reviewing after you sees only what is left. Answer from the
+standards rather than adopting a suggestion that contradicts them: Copilot does
+not know that the Global Footer is immutable or that Decanter's CSS wins on
+tokens. Leave threads a person started for that person. The full steps, with
+commands, are in `sws-github`.
