@@ -742,7 +742,7 @@ if (result.deferred) {
   const d = result.deferred;
   say(`  ${B(`Not moved yet: ${d.files} file(s) stay in ${d.from} this run.`)}`);
   say(`  ${D('Your project reads them there, and moving them would break its next build:')}`);
-  for (const r of d.references.slice(0, 10)) say(`    ${r.file}:${r.line}  ${D(r.text)}`);
+  for (const r of d.references.slice(0, 10)) say(`    ${r.file}${r.line ? `:${r.line}` : ''}  ${D(r.text)}`);
   if (d.references.length > 10) say(`    ${D(`and ${d.references.length - 10} more, listed in the --json result`)}`);
   say(`  ${D(`Point these at ${d.to} and run add . again: the files move then.`)}`);
   say(`  ${D('They are kept current where they are. --force moves them now regardless.')}`);

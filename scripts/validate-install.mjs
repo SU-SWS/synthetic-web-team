@@ -228,6 +228,19 @@ scenario('an earlier layout whose own code reads the standards at standards/');
   oldLayout(forced);
   put(forced, 'src/lib/footer.ts', READER);
   check(run(forced, { force: true }).moved.length === standards.length, '--force moves them regardless');
+
+  // The routes the Jekyll and Quarto stubs describe: no JavaScript at all.
+  const other = fresh();
+  oldLayout(other);
+  put(other, 'scripts/footer.py', "data = open('standards/fragments/global-footer.yml').read()\n");
+  put(other, 'Makefile', 'footer:\n\tcp standards/fragments/global-footer.yml _data/\n');
+  mkdirSync(join(other, '_data'), { recursive: true });
+  symlinkSync('../standards/fragments/global-footer.yml', join(other, '_data/global-footer.yml'));
+  const o = run(other);
+  const seen = (o.deferred?.references ?? []).map((x) => x.file).sort().join(', ');
+  check(o.moved.length === 0 && seen === 'Makefile, _data/global-footer.yml, scripts/footer.py',
+    `a Python step, a Makefile and a link into standards/ hold the move too: got ${seen}`);
+  check(existsSync(join(other, '_data/global-footer.yml')), 'and the link is not left dangling');
 }
 
 scenario('moved by hand, with the contract pasted under the project\'s own rules');
@@ -282,6 +295,23 @@ scenario('AGENTS.md is a symbolic link to CLAUDE.md');
   check(!/^@AGENTS\.md$/m.test(text) && status(r, 'CLAUDE.md') === 'unchanged', 'and no import that would import itself');
   check(status(run(root), 'AGENTS.md') === 'unchanged', 'a second run is unchanged');
 
+  const copilot = fresh();
+  put(copilot, 'AGENTS.md', own);
+  mkdirSync(join(copilot, '.github'), { recursive: true });
+  symlinkSync('../AGENTS.md', join(copilot, '.github/copilot-instructions.md'));
+  const c = runAll(copilot);
+  const agentsText = get(copilot, 'AGENTS.md');
+  check(status(c, '.github/copilot-instructions.md') === 'unchanged' && !agentsText.includes('BEGIN:sws-pointer')
+    && count(agentsText, CONTRACT_BEGIN) === 1,
+    'copilot-instructions.md -> AGENTS.md: no pointer to AGENTS.md lands inside AGENTS.md');
+
+  const toClaude = fresh();
+  put(toClaude, 'CLAUDE.md', IMPORT);
+  mkdirSync(join(toClaude, '.github'), { recursive: true });
+  symlinkSync('../CLAUDE.md', join(toClaude, '.github/copilot-instructions.md'));
+  check(status(runAll(toClaude), '.github/copilot-instructions.md') === 'conflict' && get(toClaude, 'CLAUDE.md') === IMPORT,
+    'a pointer linked anywhere else is not written through: CLAUDE.md stays @AGENTS.md');
+
   const outside = fresh();
   const elsewhere = fresh();
   put(elsewhere, 'AGENTS.md', '# shared\n');
@@ -304,6 +334,13 @@ scenario('markers inside a fenced example in AGENTS.md');
     check(status(run(root), 'AGENTS.md') === 'unchanged' && get(root, 'AGENTS.md') === text,
       `${fence} fence: a second run finds the real block, not the example`);
   }
+
+  // A code sample missing its closing fence, at the end of the file.
+  const open = fresh();
+  put(open, 'AGENTS.md', '# Rules\n\n```bash\nnpm run lint\n');
+  const runs = [run(open), run(open), run(open)].map((r) => status(r, 'AGENTS.md'));
+  check(runs.join() === 'merged,unchanged,unchanged' && count(get(open, 'AGENTS.md'), CONTRACT_BEGIN) === 1,
+    `an unclosed fence does not hide our own block: ${runs.join(', ')}`);
 }
 
 scenario('the CLI finds the standards');

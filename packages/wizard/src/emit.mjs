@@ -20,10 +20,10 @@
 
 import {
   existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync,
-  lstatSync, realpathSync, renameSync, rmSync, rmdirSync,
+  lstatSync, realpathSync, readlinkSync, renameSync, rmSync, rmdirSync,
 } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join, dirname, sep } from 'node:path';
+import { join, dirname, resolve, sep } from 'node:path';
 
 // Where a project's vendored standards live.
 export const STANDARDS_DIR = '.sws/standards';
@@ -459,15 +459,18 @@ export function write(root, files, { force = false, version = null, scope = 'pro
     let contents = f.contents;
     let target = p;
 
-    if (f.merge === 'import' && sameFile(p, agents)) {
-      // CLAUDE.md and AGENTS.md are one file, linked either way round. It
-      // already holds the contract, and an import there would import itself.
+    if (f.merge && f.path !== 'AGENTS.md' && sameFile(p, agents)) {
+      // This file and AGENTS.md are one file, linked either way round, as with
+      // CLAUDE.md or .github/copilot-instructions.md -> AGENTS.md. It already
+      // holds the contract, and adding our part would put an import, or a
+      // pointer to AGENTS.md, inside AGENTS.md itself.
       status = 'unchanged';
     } else if (st?.isSymbolicLink()) {
-      // Never written through, with one exception: a marked block into a file
+      // Never written through, with one exception: the contract, into a file
       // inside the project, as when AGENTS.md links to CLAUDE.md. A merge only
-      // adds our part, so the contract lands in the file the tools read.
-      const real = f.merge === 'block' ? fileInside(root, p) : null;
+      // adds our part, so it lands in the file the tools read. Pointer blocks
+      // and MCP configs never follow a link.
+      const real = f.path === 'AGENTS.md' ? fileInside(root, p) : null;
       if (real) {
         const m = MERGE.block(readFileSync(real, 'utf8'), f, { recorded, force });
         ({ status, reason } = m);
@@ -632,10 +635,14 @@ function migrate(root, prev, planned, { dryRun = false, force = false } = {}) {
   return { moved, carried, deferred: null };
 }
 
-// Code and config that would break when the files move: source files and
-// workflows, not prose. A README that still says `standards/` is out of date,
-// which is worth fixing, but it fails no build.
-const REFERENCE_FILES = /\.(m?[jt]sx?|c[jt]s|astro|vue|svelte|json|ya?ml|toml|html?|njk|liquid|mdx)$/;
+// Everything that could break when the files move, which is every text file
+// except prose: a build can read the footer from a Python or shell step, a Ruby
+// plugin or a Makefile as easily as from JavaScript, and the Jekyll and Quarto
+// stubs describe exactly those routes. A README that still says `standards/` is
+// out of date, which is worth fixing, but it fails no build. Binaries are
+// skipped by extension, and by a NUL byte for anything the list misses.
+const PROSE_FILES = /\.(md|markdown|txt|rst|adoc)$/i;
+const BINARY_FILES = /\.(png|jpe?g|gif|webp|avif|ico|svgz|woff2?|ttf|otf|eot|pdf|zip|gz|tgz|mp3|mp4|webm|mov|wasm)$/i;
 const SKIP_ANYWHERE = new Set(['node_modules', '.git', 'dist', 'build', 'out', '_site', '.next', '.astro',
   '.netlify', '.vercel', '.turbo', '.cache', 'coverage']);
 const SKIP_AT_ROOT = new Set(['.sws', 'standards']);
@@ -654,6 +661,17 @@ function findReferences(root, pending, ours) {
     /--standards[= ](?:\.\/)?standards(?![\w./-])/,
   ];
 
+  // A link into the files being moved, such as Jekyll's
+  // `_data/global-footer.yml -> ../standards/fragments/global-footer.yml`, is
+  // left dangling by the move. Read as text, so a link that is already dangling
+  // still counts, and through realpath for one that goes via another link.
+  const oldDir = pending[0].from.split('/')[0];
+  const intoOld = (p) => {
+    const under = (base, x) => x.startsWith(join(base, oldDir) + sep);
+    try { if (under(root, resolve(dirname(p), readlinkSync(p)))) return true; } catch { /* unreadable */ }
+    try { return under(realpathSync(root), realpathSync(p)); } catch { return false; }
+  };
+
   const hits = [];
   (function walk(dir, rel) {
     for (const n of readdirSync(dir)) {
@@ -661,10 +679,16 @@ function findReferences(root, pending, ours) {
       const p = join(dir, n);
       const r = rel ? `${rel}/${n}` : n;
       const st = lstatSync(p, { throwIfNoEntry: false });
-      if (!st || st.isSymbolicLink()) continue;
+      if (!st) continue;
+      if (st.isSymbolicLink()) {
+        if (intoOld(p)) hits.push({ file: r, line: null, text: `-> ${readlinkSync(p)}` });
+        continue;
+      }
       if (st.isDirectory()) { walk(p, r); continue; }
-      if (!REFERENCE_FILES.test(n) || ours.has(r) || st.size > 512 * 1024) continue;
-      readFileSync(p, 'utf8').split('\n').forEach((line, i) => {
+      if (PROSE_FILES.test(n) || BINARY_FILES.test(n) || ours.has(r) || st.size > 512 * 1024) continue;
+      const buf = readFileSync(p);
+      if (buf.subarray(0, 8000).includes(0)) continue;
+      buf.toString('utf8').split('\n').forEach((line, i) => {
         if (patterns.some((x) => x.test(line))) hits.push({ file: r, line: i + 1, text: line.trim().slice(0, 160) });
       });
     }
@@ -837,21 +861,41 @@ function mergeImport(local) {
 // someone's AGENTS.md was otherwise taken for the real block, and the contract
 // went inside the fence. TOML has no fences, so .codex/config.toml passes
 // `fences: false` and every standalone line counts.
+//
+// Only a fence that CLOSES hides anything. A file that ends inside an open
+// fence (a code sample missing its closing line) had our appended block read as
+// part of that sample, so it was never found again and every run appended
+// another copy. Our own block after an unmatched opener cannot be an example.
 function findBlock(text, begin = CONTRACT_BEGIN, end = CONTRACT_END, { fences = true } = {}) {
+  const lines = text.split(/(?<=\n)/);
+  const bare = lines.map((l) => l.replace(/\n$/, ''));
+  const hidden = new Set();
+  if (fences) {
+    let open = null;
+    let inside = [];
+    bare.forEach((b, i) => {
+      const f = b.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+      if (!open) {
+        if (f) { open = f[1]; inside = [i]; }
+      } else {
+        inside.push(i);
+        if (f && f[1][0] === open[0] && f[1].length >= open.length && f[2].trim() === '') {
+          inside.forEach((x) => hidden.add(x));
+          open = null;
+        }
+      }
+    });
+  }
+
   let offset = 0;
   let start = -1;
-  let fence = null;
-  for (const line of text.split(/(?<=\n)/)) {
-    const bare = line.replace(/\n$/, '');
-    const f = fences ? bare.match(/^ {0,3}(`{3,}|~{3,})(.*)$/) : null;
-    if (f && !fence) fence = f[1];
-    else if (f && f[1][0] === fence[0] && f[1].length >= fence.length && f[2].trim() === '') fence = null;
-    else if (!fence) {
-      const t = bare.replace(/[ \t]+$/, '');
+  for (let i = 0; i < lines.length; i++) {
+    if (!hidden.has(i)) {
+      const t = bare[i].replace(/[ \t]+$/, '');
       if (start === -1 && t === begin) start = offset;
       else if (start !== -1 && t === end) return { start, end: offset + end.length };
     }
-    offset += line.length;
+    offset += lines[i].length;
   }
   return null;
 }
