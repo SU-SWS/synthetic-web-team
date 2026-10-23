@@ -461,6 +461,15 @@ criteria:
       un-leak it, (2) then clean the history, (3) then push again. A failure
       that only says "secret detected" teaches nothing and gets worked around.
 
+      Every match in every tracked file is reported as a location (path,
+      line, and a digest of the value, never the value). An acknowledgement
+      must name a `path` and covers only the locations it matches, so
+      accepting a false positive in one file never hides a credential in
+      another; an entry with no `path` is ignored and reported. Values that
+      plainly are not credentials are skipped and listed: a hyphenated phrase
+      that names what it stands for (`storyblok-user-access-token`), a single
+      repeated character, or a PEM header with no key body.
+
   - id: minweb.https-only
     requires: >
       No hardcoded http:// URLs to Stanford or first-party resources. Deploy

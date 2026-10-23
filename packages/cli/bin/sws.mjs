@@ -24,6 +24,7 @@ import * as history from '../src/history.mjs';
 import * as gh from '../src/github.mjs';
 import { preflight, summarise } from '../src/preflight.mjs';
 import { findStandards as locateStandards } from '../src/standards.mjs';
+import { loadAcknowledged, applyAcknowledgements } from '../src/acknowledged.mjs';
 // Sibling directory inside the same published package (@su-sws/synthetic-web-team), so this
 // relative path resolves in the repository and in a tarball alike. One reader
 // of the install record means the CLI and the wizard cannot disagree about what
@@ -168,15 +169,6 @@ function loadManifest() {
   try { return YAML.parse(readFileSync(p, 'utf8')) || {}; } catch { return {}; }
 }
 
-function loadAcknowledged() {
-  const p = join(root, '.sws', 'acknowledged.yml');
-  if (!existsSync(p)) return [];
-  try {
-    const y = YAML.parse(readFileSync(p, 'utf8'));
-    return Array.isArray(y) ? y : (y?.accepted ?? []);
-  } catch { return []; }
-}
-
 // Recipes may `extends: <recipeId>`. Only differences live in the child, so the
 // shared criteria cannot drift between recipes, which is the failure this whole
 // project is organised against.
@@ -258,25 +250,27 @@ async function run() {
   // Attach weights and severities from the criteria. A finding with no matching
   // criterion still reports, at weight 0, so a check is never silently dropped.
   const byId = new Map((acceptance.criteria || []).map((c) => [c.id, c]));
-  const ack = loadAcknowledged();
+  const ack = loadAcknowledged(root);
   const now = new Date();
 
+  // An acknowledgement covers what it names, not the whole check: see
+  // src/acknowledged.mjs. Entries a blocking check cannot honour are reported.
   const findings = raw.map((f) => {
     const c = byId.get(f.id) || {};
-    const a = ack.find((x) => x.check === f.id);
-    let state = f.state;
-    let note;
-    if (a && state === 'fail') {
-      state = 'acknowledged';
-      note = `accepted by ${a.accepted_by ?? 'unknown'}${a.reason ? `: ${a.reason}` : ''}`;
-      if (a.review_by && new Date(a.review_by) < now) note += `  [review overdue since ${a.review_by}]`;
+    const blocking = Boolean(f.blocking || c.severity === 'block');
+    const entries = ack.filter((x) => x.check === f.id);
+    const a = entries.length ? applyAcknowledgements(f, entries, { blocking, now }) : null;
+    if (a?.ignored.length) {
+      console.error(`  warning: ${a.ignored.length} acknowledgement(s) for ${f.id} ignored: a blocking check is accepted only for a named path.`);
     }
     return {
-      ...f, state,
-      detail: note ? `${f.detail}  (${note})` : f.detail,
+      ...f,
+      state: a?.state ?? f.state,
+      detail: a?.detail ?? f.detail,
+      ...(a?.locations ? { locations: a.locations } : {}),
       weight: c.weight ?? 0,
       severity: c.severity ?? 'warn',
-      blocking: f.blocking || c.severity === 'block',
+      blocking,
       policy: c.policy ?? null,
     };
   });

@@ -119,6 +119,13 @@ jobs:
       - name: Blocking-hook detection
         run: node scripts/validate-hooks.mjs
 
+      # The one blocking check. Accepting a false positive for it once hid every
+      # real credential in every file, because acknowledgements matched on the
+      # check id alone. This runs the CLI against scratch repositories and
+      # asserts the exit code, since that is what CI acts on.
+      - name: Acknowledgements are scoped to what they name
+        run: node scripts/validate-acknowledged.mjs
+
       # Packing is the only way to learn that a `files` list is wrong or that
       # @su-sws/standards' prepack stopped staging content -- and both fail
       # silently right up until someone publishes. So pack for real, then assert

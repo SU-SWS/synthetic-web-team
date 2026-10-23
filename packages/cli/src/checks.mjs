@@ -19,6 +19,7 @@ import { RESULTS_PATH as AXE_RESULTS_PATH, SCHEMA as AXE_SCHEMA } from './axe.mj
 import { RESULTS_PATH as PERF_RESULTS_PATH, SCHEMA as PERF_SCHEMA } from './perf.mjs';
 import { RESULTS_PATH as STATE_RESULTS_PATH, SCHEMA as STATE_SCHEMA } from './states.mjs';
 import { newestMtime } from './browser.mjs';
+import { describeLocations, digest } from './acknowledged.mjs';
 
 const read = (p) => readFileSync(p, 'utf8');
 const readYaml = (p) => YAML.parse(read(p));
@@ -754,8 +755,29 @@ const SECRET_PATTERNS = [
   [/sk_live_[A-Za-z0-9]{20,}/, 'Stripe live secret key'],
   [/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/, 'private key'],
   [/eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\./, 'JWT'],
-  [/(?:api[_-]?key|secret|password|token)\s*[:=]\s*['"][A-Za-z0-9!@#$%^&*_\-]{16,}['"]/i, 'hardcoded credential'],
+  // The quoted value is captured, so a placeholder can be told from a key.
+  [/(?:api[_-]?key|secret|password|token)\s*[:=]\s*['"]([A-Za-z0-9!@#$%^&*_\-]{16,})['"]/i, 'hardcoded credential'],
 ];
+
+// Values that are plainly not credentials, so a usage example or a test fixture
+// does not block a deploy. Both came from a pilot: `'storyblok-user-access-token'`
+// in a vendored README, and a fixture that wrapped the word `key` in a PEM
+// header. Deliberately narrow. Anything with digits, mixed case or no telling
+// word still counts, because a false pass here is the one irreversible mistake.
+// (A value in angle brackets, `'<management-token>'`, never matched at all.)
+const PLACEHOLDER_WORD = /(token|key|secret|password|passwd|example|placeholder|dummy|sample|fake|your|changeme|redacted)/i;
+
+function isPlaceholder(label, value, body, at) {
+  if (label === 'private key') {
+    // A real key has a base64 body. A header around a word is a fixture.
+    const end = body.indexOf('-----END', at + 20);
+    const inside = body.slice(at + 20, end === -1 ? at + 4000 : end);
+    return (inside.match(/[A-Za-z0-9+/=]/g) ?? []).length < 64;
+  }
+  if (label !== 'hardcoded credential') return false;
+  if (/^(.)\1+$/.test(value)) return true;                       // xxxxxxxxxxxxxxxx
+  return /^[a-z]+(?:[-_][a-z]+)+$/.test(value) && PLACEHOLDER_WORD.test(value);  // storyblok-user-access-token
+}
 
 export function secrets({ root }) {
   let files;
@@ -766,30 +788,45 @@ export function secrets({ root }) {
     return [dunno('minweb.no-secrets', 'not a git repository, or git unavailable; cannot enumerate tracked files')];
   }
 
+  // EVERY match, not the first per file. Stopping at the first meant fixing one
+  // only revealed the next, one doctor run at a time. Each becomes a location,
+  // which is what an acknowledgement is scoped to; the matched value is kept
+  // only as a digest, so no report or CI log ever repeats it.
   const SKIP = /\.(png|jpe?g|gif|webp|avif|ico|woff2?|ttf|otf|eot|pdf|zip|mp4|webm)$/i;
-  const hits = [];
+  const locations = [];
+  const placeholders = [];
   for (const f of files) {
     if (SKIP.test(f) || f.includes('node_modules')) continue;
     const p = join(root, f);
     if (!existsSync(p) || statSync(p).size > 512 * 1024) continue;
     const body = read(p);
+    const seen = new Set();
     for (const [re, label] of SECRET_PATTERNS) {
-      const m = body.match(re);
-      if (m) {
+      for (const m of body.matchAll(new RegExp(re.source, `${re.flags}g`))) {
         const line = body.slice(0, m.index).split('\n').length;
-        hits.push(`${f}:${line} looks like a ${label}`);
-        break;
+        // One report per line: a key inside `api_key: '...'` is one finding.
+        if (seen.has(line)) continue;
+        seen.add(line);
+        const value = m[1] ?? m[0];
+        if (isPlaceholder(label, value, body, m.index)) placeholders.push(`${f}:${line}`);
+        else locations.push({ path: f, line, label, digest: digest(value) });
       }
     }
   }
 
-  if (!hits.length) return [ok('minweb.no-secrets', `${files.length} tracked files scanned, nothing found`)];
+  const skipped = placeholders.length
+    ? ` (${placeholders.length} placeholder${placeholders.length > 1 ? 's' : ''} skipped: ${placeholders.slice(0, 3).join(', ')}${placeholders.length > 3 ? ', ...' : ''})`
+    : '';
+  if (!locations.length) {
+    return [ok('minweb.no-secrets', `${files.length} tracked files scanned, nothing found${skipped}`)];
+  }
 
   return [{
     id: 'minweb.no-secrets',
     state: 'fail',
     blocking: true,
-    detail: hits.slice(0, 5).join('; '),
+    locations,
+    detail: describeLocations(locations) + skipped,
     fix: [
       'ROTATE THE CREDENTIAL NOW. It is already in git history and blocking a deploy does not un-leak it.',
       'Then remove it from history (git filter-repo or BFG), then force-push.',
