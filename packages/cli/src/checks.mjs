@@ -1005,6 +1005,11 @@ export function workflow({ root }) {
 // and so is a .claude/settings.json that git ignores, which many teams do.
 const BLOCKING_AGENT_EVENTS = ['PreToolUse', 'Stop', 'SubagentStop'];
 
+// The client-side git hooks whose failure refuses the operation. A README, a
+// helper script, or a post-* hook in .husky/ cannot stop anything.
+const BLOCKING_GIT_HOOKS = new Set(['applypatch-msg', 'pre-applypatch', 'pre-commit', 'pre-merge-commit',
+  'prepare-commit-msg', 'commit-msg', 'pre-rebase', 'pre-push']);
+
 function hookFinding(root) {
   let repo = root;
   for (let d = root, i = 0; i < 6; i++) {
@@ -1018,7 +1023,7 @@ function hookFinding(root) {
   const husky = join(repo, '.husky');
   if (existsSync(husky) && statSync(husky).isDirectory()) {
     const named = readdirSync(husky)
-      .filter((n) => !n.startsWith('_') && !n.startsWith('.') && statSync(join(husky, n)).isFile());
+      .filter((n) => BLOCKING_GIT_HOOKS.has(n) && statSync(join(husky, n)).isFile());
     if (named.length) found.push(`.husky/ (${named.join(', ')})`);
   }
   for (const n of ['lefthook.yml', 'lefthook.yaml', '.lefthook.yml', '.lefthook.yaml', '.pre-commit-config.yaml']) {

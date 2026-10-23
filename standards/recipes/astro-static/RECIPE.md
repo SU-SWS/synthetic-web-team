@@ -192,7 +192,7 @@ Every page uses one layout containing, in this order:
 2. **Stanford Identity Bar.** Use `standards/fragments/identity-bar.yml` verbatim. Nothing may go above it except the skip link.
 3. Local header, navigation, and page content. Unit-specific, design freely within Decanter.
 4. Optional local footer.
-5. **Stanford Global Footer.** Generate it from `standards/fragments/global-footer.yml`.
+5. **Stanford Global Footer.** Generate it from `standards/fragments/global-footer.yml`, which in a project is `.sws/standards/fragments/global-footer.yml`. Read it from there at build time.
 
 **The Identity Bar has a fixed height, and two things decide it.**
 

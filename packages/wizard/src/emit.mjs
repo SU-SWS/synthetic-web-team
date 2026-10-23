@@ -190,9 +190,9 @@ const OLD_CODEX = `# Stanford Web Services. AGENTS.md and .agents/skills/ are re
 # args = ["-y", "@su-sws/synthetic-web-team-mcp"]
 `;
 
-function pointerBlock([begin, end], body, legacyText) {
+function pointerBlock([begin, end], body, legacyText, { fences = true } = {}) {
   return {
-    contents: `${begin}\n${body}\n${end}`, merge: 'block', markers: [begin, end], legacyText,
+    contents: `${begin}\n${body}\n${end}`, merge: 'block', markers: [begin, end], legacyText, fences,
     adds: 'a pointer to AGENTS.md, between sws-pointer markers',
   };
 }
@@ -222,7 +222,7 @@ Non-negotiables: WCAG 2.1 AA, the Global Footer is immutable
 # Optional: the SWS MCP server, a second entry point to the same standards.
 # [mcp_servers.sws]
 # command = "npx"
-# args = ["-y", "@su-sws/synthetic-web-team-mcp"]`, [OLD_CODEX]),
+# args = ["-y", "@su-sws/synthetic-web-team-mcp"]`, [OLD_CODEX], { fences: false }),
 
   '.mcp.json': mcpServer('mcpServers', SERVER),
   '.cursor/mcp.json': mcpServer('mcpServers', SERVER),
@@ -427,17 +427,25 @@ const ACKNOWLEDGED_TEMPLATE = `# Accepted risks.
  */
 export function write(root, files, { force = false, version = null, scope = 'project' } = {}) {
   const prev = readInstalled(root);
-  const planned = new Set(files.map((f) => f.path));
+  let planned = new Set(files.map((f) => f.path));
 
   // Moves first, so the loop below finds each file where it lives now, with the
   // hash that tells an edit from an old version carried across with it.
-  const { moved, carried } = scope === 'project'
-    ? migrate(root, prev, planned)
-    : { moved: [], carried: {} };
+  const { moved, carried, deferred } = scope === 'project'
+    ? migrate(root, prev, planned, { force })
+    : { moved: [], carried: {}, deferred: null };
+
+  // A move that has to wait: this run updates the standards where they are.
+  if (deferred) {
+    files = files.map((f) => (f.path.startsWith(deferred.to)
+      ? { ...f, path: deferred.from + f.path.slice(deferred.to.length) } : f));
+    planned = new Set(files.map((f) => f.path));
+  }
   const record = { ...carried, ...(prev?.files ?? {}) };
 
   const results = [];
   const nextHashes = {};
+  const agents = join(root, 'AGENTS.md');
 
   for (const f of files) {
     const p = join(root, f.path);
@@ -449,12 +457,26 @@ export function write(root, files, { force = false, version = null, scope = 'pro
     let status;
     let reason;
     let contents = f.contents;
+    let target = p;
 
-    if (st?.isSymbolicLink()) {
-      // A link to AGENTS.md already does what the import does.
-      const same = f.merge === 'import' && pointsAt(p, join(root, 'AGENTS.md'));
-      status = same ? 'unchanged' : 'conflict';
-      if (!same) reason = 'symlink';
+    if (f.merge === 'import' && sameFile(p, agents)) {
+      // CLAUDE.md and AGENTS.md are one file, linked either way round. It
+      // already holds the contract, and an import there would import itself.
+      status = 'unchanged';
+    } else if (st?.isSymbolicLink()) {
+      // Never written through, with one exception: a marked block into a file
+      // inside the project, as when AGENTS.md links to CLAUDE.md. A merge only
+      // adds our part, so the contract lands in the file the tools read.
+      const real = f.merge === 'block' ? fileInside(root, p) : null;
+      if (real) {
+        const m = MERGE.block(readFileSync(real, 'utf8'), f, { recorded, force });
+        ({ status, reason } = m);
+        if (m.text !== undefined) contents = m.text;
+        target = real;
+      } else {
+        status = 'conflict';
+        reason = 'symlink';
+      }
     } else if (f.merge) {
       const m = MERGE[f.merge](st ? readFileSync(p, 'utf8') : null, f, { recorded, force });
       ({ status, reason } = m);
@@ -475,7 +497,7 @@ export function write(root, files, { force = false, version = null, scope = 'pro
 
     if (status === 'created' || status === 'updated' || status === 'merged') {
       mkdirSync(dirname(p), { recursive: true });
-      writeFileSync(p, contents);
+      writeFileSync(target, contents);
       nextHashes[f.path] = newHash;
     } else if (f.merge && status === 'unchanged') {
       // Our part, not the whole file: the rest belongs to the project.
@@ -527,6 +549,7 @@ export function write(root, files, { force = false, version = null, scope = 'pro
     results,
     orphans,
     moved,
+    deferred,
     previousVersion: prev?.version ?? null,
     created: count('created'),
     updated: count('updated'),
@@ -537,9 +560,11 @@ export function write(root, files, { force = false, version = null, scope = 'pro
   };
 }
 
-// What a re-run would move, for a dry run, which writes nothing.
-export function plannedMoves(root, files) {
-  return migrate(root, readInstalled(root), new Set(files.map((f) => f.path)), { dryRun: true }).moved;
+// What a re-run would move, or why it would wait, for a dry run, which writes
+// nothing.
+export function plannedMigration(root, files, { force = false } = {}) {
+  const { moved, deferred } = migrate(root, readInstalled(root), new Set(files.map((f) => f.path)), { dryRun: true, force });
+  return { moved, deferred };
 }
 
 /**
@@ -561,9 +586,18 @@ export function plannedMoves(root, files) {
  *
  * Emptied directories are pruned afterwards, so a `standards/` that held only
  * our files disappears and one that also holds the team's own survives.
+ *
+ * NOT WHILE THE PROJECT'S OWN CODE READS THE OLD PATH. The recipe tells a site
+ * to generate its Global Footer from `standards/fragments/global-footer.yml`,
+ * so moving the file out from under it fails that site's next build, and the
+ * push after that deploys nothing. The sites this would break are exactly the
+ * ones that followed the rule. So references are looked for first, and if any
+ * turn up the whole move waits: this run keeps the standards current where they
+ * are, and reports each reference so it can be pointed at .sws/standards/.
+ * `force` moves them regardless.
  */
-function migrate(root, prev, planned, { dryRun = false } = {}) {
-  const moved = [];
+function migrate(root, prev, planned, { dryRun = false, force = false } = {}) {
+  const pending = [];
   const carried = {};
   for (const [rel, recorded] of Object.entries(prev?.files ?? {})) {
     const rule = MOVED.find(([from]) => rel.startsWith(from));
@@ -571,9 +605,19 @@ function migrate(root, prev, planned, { dryRun = false } = {}) {
     const to = rule[1] + rel.slice(rule[0].length);
     if (!planned.has(to)) continue;
     carried[to] = recorded;
+    if (existsSync(join(root, rel))) pending.push({ from: rel, to, recorded });
+  }
 
-    const src = join(root, rel);
-    if (!existsSync(src)) continue;
+  if (pending.length && !force) {
+    const references = findReferences(root, pending, planned);
+    if (references.length) {
+      return { moved: [], carried: {}, deferred: { files: pending.length, from: MOVED[0][0], to: MOVED[0][1], references } };
+    }
+  }
+
+  const moved = [];
+  for (const { from, to, recorded } of pending) {
+    const src = join(root, from);
     const dest = join(root, to);
     if (existsSync(dest)) {
       if (hash(readFileSync(src, 'utf8')) !== recorded) continue;
@@ -582,10 +626,50 @@ function migrate(root, prev, planned, { dryRun = false } = {}) {
       mkdirSync(dirname(dest), { recursive: true });
       renameSync(src, dest);
     }
-    moved.push({ from: rel, to });
+    moved.push({ from, to });
   }
   if (!dryRun) pruneEmpty(root, moved.map((m) => m.from));
-  return { moved, carried };
+  return { moved, carried, deferred: null };
+}
+
+// Code and config that would break when the files move: source files and
+// workflows, not prose. A README that still says `standards/` is out of date,
+// which is worth fixing, but it fails no build.
+const REFERENCE_FILES = /\.(m?[jt]sx?|c[jt]s|astro|vue|svelte|json|ya?ml|toml|html?|njk|liquid|mdx)$/;
+const SKIP_ANYWHERE = new Set(['node_modules', '.git', 'dist', 'build', 'out', '_site', '.next', '.astro',
+  '.netlify', '.vercel', '.turbo', '.cache', 'coverage']);
+const SKIP_AT_ROOT = new Set(['.sws', 'standards']);
+
+function findReferences(root, pending, ours) {
+  const re = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // The entries actually being moved, `fragments`, `policy`, `scope.md`...,
+  // so an unrelated `standards/` path of the team's own does not count.
+  const entries = [...new Set(pending.map((m) => m.from.split('/')[1]))].map(re).join('|');
+  const patterns = [
+    // standards/fragments/..., ../standards/..., `${root}/standards/...`
+    new RegExp(`(?<!\\.sws[\\\\/])(?<![\\w.-])standards[\\\\/](?:${entries})(?![\\w-])`),
+    // join('standards', 'fragments', ...), the way this package's own site does it
+    new RegExp(`(?<!['"]\\.sws['"]\\s*,\\s*)['"]standards['"]\\s*,\\s*['"](?:${entries})['"\\\\/]`),
+    // sws check --standards standards
+    /--standards[= ](?:\.\/)?standards(?![\w./-])/,
+  ];
+
+  const hits = [];
+  (function walk(dir, rel) {
+    for (const n of readdirSync(dir)) {
+      if (SKIP_ANYWHERE.has(n) || (!rel && SKIP_AT_ROOT.has(n))) continue;
+      const p = join(dir, n);
+      const r = rel ? `${rel}/${n}` : n;
+      const st = lstatSync(p, { throwIfNoEntry: false });
+      if (!st || st.isSymbolicLink()) continue;
+      if (st.isDirectory()) { walk(p, r); continue; }
+      if (!REFERENCE_FILES.test(n) || ours.has(r) || st.size > 512 * 1024) continue;
+      readFileSync(p, 'utf8').split('\n').forEach((line, i) => {
+        if (patterns.some((x) => x.test(line))) hits.push({ file: r, line: i + 1, text: line.trim().slice(0, 160) });
+      });
+    }
+  })(root, '');
+  return hits;
 }
 
 // --- shared files ------------------------------------------------------------
@@ -608,7 +692,7 @@ function mergeBlock(local, f, { recorded, force }) {
   const text = lf(local);
   const out = (s, status) => ({ status, text: withEol(s, eol) });
 
-  const found = findBlock(text, begin, end);
+  const found = findBlock(text, begin, end, { fences: f.fences !== false });
   if (found) {
     const current = text.slice(found.start, found.end);
     if (current === block) return { status: 'unchanged' };
@@ -747,16 +831,29 @@ function mergeImport(local) {
 // A marker counts only on a line of its own. Prose that MENTIONS one, like a
 // README sentence explaining the markers, is never mistaken for the block:
 // treating it as one replaced part of that sentence with the contract.
-function findBlock(text, begin = CONTRACT_BEGIN, end = CONTRACT_END) {
-  const lineAt = (marker, from) => {
-    const re = new RegExp(`^${marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[ \\t]*$`, 'mg');
-    re.lastIndex = from;
-    return re.exec(text)?.index ?? -1;
-  };
-  const start = lineAt(begin, 0);
-  if (start === -1) return null;
-  const stop = lineAt(end, start + begin.length);
-  return stop === -1 ? null : { start, end: stop + end.length };
+//
+// In Markdown, not inside a fenced code example either (``` or ~~~, closed by
+// the same character at least as many times). An example of the markers in
+// someone's AGENTS.md was otherwise taken for the real block, and the contract
+// went inside the fence. TOML has no fences, so .codex/config.toml passes
+// `fences: false` and every standalone line counts.
+function findBlock(text, begin = CONTRACT_BEGIN, end = CONTRACT_END, { fences = true } = {}) {
+  let offset = 0;
+  let start = -1;
+  let fence = null;
+  for (const line of text.split(/(?<=\n)/)) {
+    const bare = line.replace(/\n$/, '');
+    const f = fences ? bare.match(/^ {0,3}(`{3,}|~{3,})(.*)$/) : null;
+    if (f && !fence) fence = f[1];
+    else if (f && f[1][0] === fence[0] && f[1].length >= fence.length && f[2].trim() === '') fence = null;
+    else if (!fence) {
+      const t = bare.replace(/[ \t]+$/, '');
+      if (start === -1 && t === begin) start = offset;
+      else if (start !== -1 && t === end) return { start, end: offset + end.length };
+    }
+    offset += line.length;
+  }
+  return null;
 }
 
 // From the old heading to the next H1 or `<!-- BEGIN:` block outside a code
@@ -781,8 +878,19 @@ const eolOf = (s) => (/\r\n/.test(s) ? '\r\n' : '\n');
 const lf = (s) => s.replace(/\r\n/g, '\n');
 const withEol = (s, eol) => (eol === '\n' ? s : s.replace(/\n/g, eol));
 
-function pointsAt(link, target) {
-  try { return realpathSync(link) === realpathSync(target); } catch { return false; }
+function sameFile(a, b) {
+  try { return realpathSync(a) === realpathSync(b); } catch { return false; }
+}
+
+// Where a link leads, if that is a regular file inside the project; null for
+// anything else, including a dangling link or one that leaves the repository.
+function fileInside(root, link) {
+  try {
+    const real = realpathSync(link);
+    return real.startsWith(realpathSync(root) + sep) && statSync(real).isFile() ? real : null;
+  } catch {
+    return null;
+  }
 }
 
 // Deepest first, so `.claude/skills/x` is emptied before `.claude/skills`.

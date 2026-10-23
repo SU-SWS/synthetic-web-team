@@ -23,6 +23,7 @@ import {
 import * as history from '../src/history.mjs';
 import * as gh from '../src/github.mjs';
 import { preflight, summarise } from '../src/preflight.mjs';
+import { findStandards as locateStandards } from '../src/standards.mjs';
 // Sibling directory inside the same published package (@su-sws/synthetic-web-team), so this
 // relative path resolves in the repository and in a tarball alike. One reader
 // of the install record means the CLI and the wizard cannot disagree about what
@@ -143,23 +144,12 @@ function wizardInstalled(dir) {
 
 // --- locate things ----------------------------------------------------------
 
-// A project vendors the standards (the wizard copies them in), so the local
-// lookups come first and win. The last entry is the copy that ships alongside
-// this CLI, which covers `npx -p @su-sws/synthetic-web-team sws doctor` in a
-// project that never vendored them.
-//
-// `.sws/standards` comes first because a root `standards/` can be the team's
-// own folder with nothing of ours in it. So every candidate must also carry the
-// Global Footer contract, the one file every copy of ours has, before it wins.
-function findStandards() {
-  if (flags.standards) return resolve(flags.standards);
-  for (const c of [
-    join(root, '.sws', 'standards'),
-    join(root, 'standards'),
-    resolve(HERE, '..', '..', '..', 'standards'),
-  ]) if (existsSync(join(c, 'fragments', 'global-footer.yml'))) return c;
-  return null;
-}
+// See src/standards.mjs for the order and why. The bundled copy ships in the
+// same package as this file.
+const findStandards = () => locateStandards(root, {
+  explicit: flags.standards,
+  bundled: resolve(HERE, '..', '..', '..', 'standards'),
+});
 
 const NO_STANDARDS = 'Could not find the standards: looked in .sws/standards/, standards/, '
   + 'and beside this CLI. Pass --standards <dir>.';

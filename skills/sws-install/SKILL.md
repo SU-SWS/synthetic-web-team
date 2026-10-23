@@ -57,7 +57,10 @@ breaks, but the copies there are frozen and the user-level ones are what update.
 **A `standards/` folder at the root** is from an earlier version. The next
 `add .` moves every file the install record lists into `.sws/standards/`, with
 any local edit intact and still reported as a conflict, and says so in `moved`.
-A file the record does not list is the team's, and stays.
+A file the record does not list is the team's, and stays. **If the project's
+code or CI reads them at `standards/`**, as a generated footer does, the move
+waits: `deferred` and an `update-references` step in `next[]` list each file
+and line. Point those at `.sws/standards/` and re-run.
 
 **A conflict on `AGENTS.md` with reason `legacy-contract`** means an older,
 unmarked copy of the contract sits next to the project's own rules, so the

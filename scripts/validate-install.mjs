@@ -23,8 +23,9 @@ import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { plan, write, contract, STANDARDS_DIR, IMPORT, CONTRACT_BEGIN, INSTALLED_PATH } from '../packages/wizard/src/emit.mjs';
+import { plan, write, contract, STANDARDS_DIR, IMPORT, CONTRACT_BEGIN, CONTRACT_END, INSTALLED_PATH } from '../packages/wizard/src/emit.mjs';
 import { EDITORS } from '../packages/wizard/src/detect.mjs';
+import { findStandards } from '../packages/cli/src/standards.mjs';
 
 const SOURCE = resolve('.');
 const WIZARD = resolve('packages/wizard/bin/wizard.mjs');
@@ -192,6 +193,43 @@ scenario('an earlier version\'s layout: standards/ at the root, one of them edit
   check(again.conflicts.length === 1 && again.conflicts[0] === at, 'the edited file is still the one conflict');
 }
 
+scenario('an earlier layout whose own code reads the standards at standards/');
+{
+  // The way this package's own site reads the footer, and the way the recipe
+  // tells a site to: moving the file out from under it fails the next build.
+  const READER = "const REL = join('standards', 'fragments', 'global-footer.yml');\n";
+  const root = fresh();
+  oldLayout(root);
+  put(root, 'src/lib/footer.ts', READER);
+  put(root, '.github/workflows/ci.yml', 'jobs:\n  c:\n    steps:\n      - run: npx sws check --standards standards\n');
+  put(root, 'astro.config.mjs', "import f from './standards/fragments/global-footer.yml';\n");
+  put(root, 'README.md', 'See standards/policy/brand.md.\n');
+
+  const out = wizard(root);
+  const d = out.deferred;
+  const files = (d?.references ?? []).map((x) => x.file).sort().join(', ');
+  check(out.counts.moved === 0 && existsSync(join(root, 'standards/fragments/global-footer.yml')),
+    'the move waits, and the footer stays where the code reads it');
+  check(files === '.github/workflows/ci.yml, astro.config.mjs, src/lib/footer.ts',
+    `every reference is reported, prose is not: got ${files}`);
+  check(out.next.some((n) => n.kind === 'update-references' && n.references.length === 3),
+    'next[] says what to change, as data');
+  check(!existsSync(join(root, STANDARDS_DIR)), 'nothing is written to .sws/standards/ meanwhile');
+  check(out.files.filter((f) => f.path.startsWith('standards/')).every((f) => f.status === 'unchanged'),
+    'and the standards are kept current where they are');
+
+  put(root, 'src/lib/footer.ts', READER.replace("join('standards'", "join('.sws', 'standards'"));
+  put(root, '.github/workflows/ci.yml', 'jobs:\n  c:\n    steps:\n      - run: npx sws check --standards .sws/standards\n');
+  put(root, 'astro.config.mjs', "import f from './.sws/standards/fragments/global-footer.yml';\n");
+  const after = wizard(root);
+  check(after.counts.moved === standards.length && !after.deferred, 'once the references point at .sws/standards/, the files move');
+
+  const forced = fresh();
+  oldLayout(forced);
+  put(forced, 'src/lib/footer.ts', READER);
+  check(run(forced, { force: true }).moved.length === standards.length, '--force moves them regardless');
+}
+
 scenario('moved by hand, with the contract pasted under the project\'s own rules');
 {
   const root = fresh();
@@ -229,6 +267,57 @@ scenario('CLAUDE.md is a symbolic link to AGENTS.md');
   const agents = get(root, 'AGENTS.md');
   check(agents.startsWith(NEXT_AGENTS) && count(agents, CONTRACT_BEGIN) === 1 && !/^@AGENTS\.md$/m.test(agents),
     'AGENTS.md gets the contract and nothing written through the link');
+}
+
+scenario('AGENTS.md is a symbolic link to CLAUDE.md');
+{
+  const root = fresh();
+  const own = '# Team rules\n\nUse the staging API.\n';
+  put(root, 'CLAUDE.md', own);
+  symlinkSync('CLAUDE.md', join(root, 'AGENTS.md'));
+  const r = run(root);
+  const text = get(root, 'CLAUDE.md');
+  check(lstatSync(join(root, 'AGENTS.md')).isSymbolicLink(), 'the link is still a link');
+  check(text.startsWith(own) && count(text, CONTRACT_BEGIN) === 1, 'the contract lands in the file both names share');
+  check(!/^@AGENTS\.md$/m.test(text) && status(r, 'CLAUDE.md') === 'unchanged', 'and no import that would import itself');
+  check(status(run(root), 'AGENTS.md') === 'unchanged', 'a second run is unchanged');
+
+  const outside = fresh();
+  const elsewhere = fresh();
+  put(elsewhere, 'AGENTS.md', '# shared\n');
+  symlinkSync(join(elsewhere, 'AGENTS.md'), join(outside, 'AGENTS.md'));
+  const o = run(outside);
+  check(status(o, 'AGENTS.md') === 'conflict' && get(elsewhere, 'AGENTS.md') === '# shared\n',
+    'a link that leaves the project is not written through');
+}
+
+scenario('markers inside a fenced example in AGENTS.md');
+{
+  for (const fence of ['```', '~~~']) {
+    const root = fresh();
+    const example = `# Our rules\n\nThe install adds a block like this:\n\n${fence}markdown\n${CONTRACT_BEGIN}\n(the contract)\n${CONTRACT_END}\n${fence}\n`;
+    put(root, 'AGENTS.md', example);
+    const r = run(root);
+    const text = get(root, 'AGENTS.md');
+    check(status(r, 'AGENTS.md') === 'merged' && text.startsWith(example) && text.endsWith(`${BLOCK}\n`),
+      `${fence} fence: the example is left alone and the contract appended after it`);
+    check(status(run(root), 'AGENTS.md') === 'unchanged' && get(root, 'AGENTS.md') === text,
+      `${fence} fence: a second run finds the real block, not the example`);
+  }
+}
+
+scenario('the CLI finds the standards');
+{
+  const bundled = resolve('standards');
+  const ours = (root, rel) => put(root, `${rel}/fragments/global-footer.yml`, 'x\n');
+  const a = fresh(); ours(a, '.sws/standards');
+  check(findStandards(a, { bundled }) === join(a, '.sws/standards'), 'a project with .sws/standards/ uses it');
+  const b = fresh(); ours(b, 'standards');
+  check(findStandards(b, { bundled }) === join(b, 'standards'), 'an older project with standards/ at the root uses that');
+  const c = fresh(); ours(c, '.sws/standards'); put(c, 'standards/README.md', 'the team\'s own\n');
+  check(findStandards(c, { bundled }) === join(c, '.sws/standards'), 'a team\'s own standards/ is passed over for ours');
+  const e = fresh(); put(e, 'standards/README.md', 'the team\'s own\n');
+  check(findStandards(e, { bundled }) === bundled, 'with neither, the copy beside the CLI');
 }
 
 scenario('a standards/ folder of the team\'s own, with no install record');

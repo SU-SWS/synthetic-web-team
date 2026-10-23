@@ -154,7 +154,7 @@ Three guarantees make that safe to run at any time:
 | `preserved` | `.sws/manifest.yml` and `.sws/acknowledged.yml` are **never** overwritten. They hold your owners, resolved versions, recorded divergences and accepted risks |
 | `conflict` | A file **you edited** is reported and left alone. `--force` overrides |
 | `merged` | Our part was added to **your own** file: the contract to `AGENTS.md`, the import to `CLAUDE.md`, the `sws` server to `.mcp.json` and the other MCP configs, a marked pointer to `.github/copilot-instructions.md`. The rest of the file is untouched, and a later update replaces only our part. Remove the `sws` server and updates leave it out |
-| `moved` | Files an earlier version put in `standards/` at the root are moved into `.sws/standards/`, edits and all. Only files the install record lists: a `standards/` folder of your own stays put |
+| `moved` | Files an earlier version put in `standards/` at the root are moved into `.sws/standards/`, edits and all. Only files the install record lists: a `standards/` folder of your own stays put. **If your code or CI still reads `standards/`**, as a footer generated from `standards/fragments/global-footer.yml` does, the move waits and `deferred` lists each reference, so the next build does not break. Change them and re-run |
 | `orphan` | A file we shipped before and no longer do is **reported, not deleted**, every run until you remove it |
 
 `.sws/installed.json` records the hash of everything written, which is what lets

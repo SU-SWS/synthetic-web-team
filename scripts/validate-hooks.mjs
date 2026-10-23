@@ -38,6 +38,11 @@ const settings = (hooks) => JSON.stringify({ hooks });
 expect('no hooks at all', {}, 'pass');
 expect('husky pre-commit', { '.husky/pre-commit': 'npx lint-staged\n' }, 'fail');
 expect('husky internals only', { '.husky/_/h': '#!/bin/sh\n' }, 'pass');
+expect('husky with only a README', { '.husky/README.md': '# hooks\n' }, 'pass');
+expect('husky with a helper script and a post-merge hook', {
+  '.husky/install.mjs': 'export {}\n', '.husky/post-merge': 'npm install\n',
+}, 'pass');
+expect('husky pre-push next to a README', { '.husky/README.md': '# hooks\n', '.husky/pre-push': 'npm test\n' }, 'fail');
 expect('lefthook config', { 'lefthook.yml': 'pre-commit:\n  commands: {}\n' }, 'fail');
 expect('pre-commit framework', { '.pre-commit-config.yaml': 'repos: []\n' }, 'fail');
 expect('simple-git-hooks in package.json', { 'package.json': '{"simple-git-hooks":{"pre-commit":"npm test"}}' }, 'fail');

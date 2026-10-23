@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { createInterface } from 'node:readline/promises';
 import { detect, deriveTier } from '../src/detect.mjs';
-import { plan, write, remove, ensureDevDependency, plannedMoves, STANDARDS_DIR } from '../src/emit.mjs';
+import { plan, write, remove, ensureDevDependency, plannedMigration, STANDARDS_DIR } from '../src/emit.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -563,6 +563,15 @@ function emitJson({ written, write: wr }) {
     kind: 'read-contract', path: 'AGENTS.md',
     why: 'The behavioral contract. Read it before doing anything else in this project.',
   });
+  // A move held back because the project's code reads the old path. Early in
+  // the list: until those references change, the layout cannot finish.
+  const held = wr ? wr.deferred : migration.deferred;
+  if (held) {
+    next.push({
+      kind: 'update-references', from: held.from, to: held.to, references: held.references,
+      why: `These read the standards at ${held.from}, so the ${held.files} files there were not moved: moving them would break the next build. Change each to ${held.to} and run add . again; the files move then. --force moves them now regardless.`,
+    });
+  }
   next.push({
     kind: 'orient', skill: 'sws-onboard',
     why: 'Reads .sws/manifest.yml and states the stack, tier, and decisions already made.',
@@ -639,7 +648,9 @@ function emitJson({ written, write: wr }) {
     conflicts: wr?.conflicts ?? [],
     orphans: wr?.orphans ?? [],
     // On a dry run, what WOULD move. Always { from, to }.
-    moved: wr ? wr.moved : moves,
+    moved: wr ? wr.moved : migration.moved,
+    // A move held back, with the references that hold it. null when there is none.
+    deferred: wr ? wr.deferred : migration.deferred,
     next,
     notes: [
       'Everything is advisory except committed credentials, which are the one blocking check.',
@@ -667,15 +678,19 @@ const files = plan({ root, source, editors: chosen, answers, tier });
 const skillCount = files.filter((f) => f.path.endsWith('SKILL.md')).length;
 const stdCount = files.filter((f) => f.path.startsWith(`${STANDARDS_DIR}/`)).length;
 const shown = files.filter((f) => !f.path.endsWith('SKILL.md') && !f.path.startsWith(`${STANDARDS_DIR}/`));
-const moves = plannedMoves(root, files);
+const migration = plannedMigration(root, files, { force: flags.force });
 
 say(`\n  ${B('Files to write')}  ${D(root)}\n`);
 for (const f of shown) {
   say(`    ${f.path}${f.note ? D('  ' + f.note) : ''}`);
 }
-say(`    ${D(`+ ${stdCount} files under ${STANDARDS_DIR}/`)}`);
-if (moves.length) {
-  say(`    ${D(`${moves.length} of them move there from standards/ at the root, where an earlier version put them`)}`);
+if (migration.deferred) {
+  say(`    ${D(`+ ${stdCount} files under standards/, where they are now (the move to ${STANDARDS_DIR}/ waits, see below)`)}`);
+} else {
+  say(`    ${D(`+ ${stdCount} files under ${STANDARDS_DIR}/`)}`);
+  if (migration.moved.length) {
+    say(`    ${D(`${migration.moved.length} of them move there from standards/ at the root, where an earlier version put them`)}`);
+  }
 }
 
 if (flags['dry-run']) {
@@ -720,6 +735,17 @@ if (result.moved.length) {
   say(`  ${B(`Moved ${result.moved.length} file(s) from standards/ to ${STANDARDS_DIR}/.`)}`);
   say(`  ${D('Everything this tool installs now lives under .sws/, so the root of the')}`);
   say(`  ${D('repository is yours. Edits came along and are still reported below.')}`);
+  say('');
+}
+
+if (result.deferred) {
+  const d = result.deferred;
+  say(`  ${B(`Not moved yet: ${d.files} file(s) stay in ${d.from} this run.`)}`);
+  say(`  ${D('Your project reads them there, and moving them would break its next build:')}`);
+  for (const r of d.references.slice(0, 10)) say(`    ${r.file}:${r.line}  ${D(r.text)}`);
+  if (d.references.length > 10) say(`    ${D(`and ${d.references.length - 10} more, listed in the --json result`)}`);
+  say(`  ${D(`Point these at ${d.to} and run add . again: the files move then.`)}`);
+  say(`  ${D('They are kept current where they are. --force moves them now regardless.')}`);
   say('');
 }
 
