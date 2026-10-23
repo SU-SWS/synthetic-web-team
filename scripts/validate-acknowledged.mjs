@@ -149,10 +149,58 @@ scenario('a whole private key or token is one value, and is told from another');
   const ex = sws(repo({ 'keys.js': example }, [entry({ path: 'keys.js', line: 1 })]));
   check(ex.exit === 1 && ex.secrets.detail.includes('keys.js:3'), 'accepting an example header leaves the real key after it failing');
 
-  // A placeholder never hides a real match inside it.
-  const wrapped = `const head = '-----BEGIN ${'PRIVATE'} KEY-----';\n${say('secret', OTHER)}const foot = '-----END ${'PRIVATE'} KEY-----';\n`;
-  const w = sws(repo({ 'fixture.js': wrapped }));
-  check(w.exit === 1 && w.secrets.locations?.length === 1, 'a real credential between a fixture\'s BEGIN and END strings still fails');
+  // Nothing between a BEGIN and an END string is hidden by them, whether the
+  // text there is short (a placeholder span) or long enough to look like a
+  // key: a key block is base64 and nothing else, and only an identical match
+  // is folded.
+  const head = `const pemHeader = '-----BEGIN ${'PRIVATE'} KEY-----';\n`;
+  const foot = `const pemFooter = '-----END ${'PRIVATE'} KEY-----';\n`;
+  const session = ['eyJhbGciOiJIUzI1NiJ9', 'eyJzdWIiOiIxMjM0NTY3ODkwIn0', 'c2lnbmF0dXJlMTIz'].join('.');
+  for (const [name, between] of [
+    ['a real credential', say('secret', OTHER)],
+    ['a credential after a long line of prose', `const doc = '${'Explains how the PEM parser handles headers and footers. '.repeat(3)}';\n${say('secret', OTHER)}`],
+    ['a token inside an object', `const apiConfig = { endpoint: 'https://api.example.com/v1', token: '${OTHER}' };\n`],
+    ['a JWT inside an object', `const apiConfig = { endpoint: 'https://api.example.com/v1', session: '${session}' };\n`],
+  ]) {
+    const files = { 'src/pem.js': head + between + foot };
+    const r = sws(repo(files));
+    const inside = (r.secrets.locations ?? []).filter((l) => l.line > 1 && l.label !== 'private key').length;
+    const accepted = sws(repo(files, [entry({ path: 'src/pem.js', line: 1 })]));
+    check(inside >= 1 && accepted.exit === 1, `${name} between BEGIN and END strings is reported, and accepting the header line leaves it failing`);
+  }
+}
+
+scenario('a prefix match never hides the rest of a value');
+{
+  // `AKIA...` is a prefix of the whole secret. Accepting the prefix by its
+  // sha256 used to accept any value that started with it.
+  const aws = ['AKIA', 'IOSFODNN7', 'EXAMPLE'].join('');
+  const v1 = `${aws}-${['First', 'Value123456'].join('')}`;
+  const v2 = `${aws}-${['Other', 'Value987654'].join('')}`;
+  const accepted = [entry({ path: 'c.js', sha256: hash(aws) }), entry({ path: 'c.js', sha256: hash(v1) })];
+  const before = sws(repo({ 'c.js': say('secret', v1) }, accepted));
+  check(before.exit === 0, 'the prefix and the whole value both accepted: acknowledged');
+  const after = sws(repo({ 'c.js': say('secret', v2) }, accepted));
+  check(after.exit === 1 && after.secrets.detail.includes('c.js:1'), 'changing only the suffix leaves the check failing');
+}
+
+scenario('common key shapes are each one location');
+{
+  const b = 'MIIEvQIBADANBgkqhkiG9w0BAQEFAASC';
+  const H = `-----BEGIN ${'PRIVATE'} KEY-----`;
+  const F = `-----END ${'PRIVATE'} KEY-----`;
+  const shapes = {
+    'a PEM file': ['id.pem', `${H}\n${b}\n${b}\n${b}\n${F}\n`],
+    'a service-account JSON key': ['sa.json', `{\n  "type": "service_account",\n  "private_key": "${H}\\n${b}\\n${b}\\n${b}\\n${F}\\n",\n  "client_email": "x@example.iam.gserviceaccount.com"\n}\n`],
+    'a YAML block': ['deploy.yml', `key: |\n  ${H}\n  ${b}\n  ${b}\n  ${b}\n  ${F}\nnext: 1\n`],
+    'a JS concatenation': ['k.js', `const k = '${H}\\n' +\n  '${b}\\n' +\n  '${b}\\n' +\n  '${b}\\n' +\n  '${F}\\n';\n`],
+    'a Dockerfile continuation': ['Dockerfile', `ENV KEY="${H}\\\n${b}\\\n${b}\\\n${b}\\\n${F}"\n`],
+    'a quoted .env value': ['.env', `KEY="${H}\\n${b}\\n${b}\\n${b}\\n${F}"\n`],
+  };
+  for (const [name, [file, text]] of Object.entries(shapes)) {
+    const locs = sws(repo({ [file]: text })).secrets.locations ?? [];
+    check(locs.length === 1 && locs[0].label === 'private key', `${name}: one private-key location (got ${locs.length})`);
+  }
 }
 
 scenario('narrowing by sha256 keeps credential-shaped text out of acknowledged.yml');
@@ -220,6 +268,8 @@ scenario('paths, globs and what a non-blocking entry covers');
   check(pathMatches('**/README.md', 'README.md') && pathMatches('**/README.md', 'vendor/x/README.md'), '`**/` matches at any depth');
   check(pathMatches('src/*.ts', 'src/a.ts') && !pathMatches('src/*.ts', 'src/a/b.ts'), '`*` stays within one segment');
   check(pathMatches('vendor/', 'vendor/a/b.md') && pathMatches('./a.js', 'a.js'), 'a directory prefix, and a leading ./');
+  check(pathMatches('test/**.json', 'test/fixture.json') && pathMatches('test/**.json', 'test/nested/fixture.json')
+    && !pathMatches('test/**.json', 'other/x.json'), '`**` before a suffix matches file names at any depth, and only there');
 
   const finding = { id: 'manifest.present', state: 'fail', detail: 'no manifest' };
   const a = applyAcknowledgements(finding, [{ check: 'manifest.present', accepted_by: 'x' }], { blocking: false });

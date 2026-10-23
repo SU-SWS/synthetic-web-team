@@ -463,9 +463,10 @@ criteria:
 
       Every match in every tracked file is reported as a location: path and
       line, never the value, and never a hash of it, because a hash of a weak
-      password is a guess-checker. Overlapping matches fold by span, not by
-      line, and a placeholder span never hides a real match. A private key or
-      JWT is hashed whole, and a key whose footer is missing still counts:
+      password is a guess-checker. Only matches with identical spans fold, so
+      no match hides another: not a placeholder, not a BEGIN...END pair, not a
+      prefix. A private key is its base64 block and nothing else, a JWT
+      includes its signature, and a key whose footer is missing still counts:
       anyone holding it can add the footer back. An acknowledgement must
       name a `path` and covers only the locations it matches, so accepting a
       false positive in one file never hides a credential in another; an

@@ -776,13 +776,8 @@ const SECRET_PATTERNS = [
 const PLACEHOLDER_WORDS = new Set(['token', 'key', 'secret', 'password', 'passwd', 'example', 'placeholder',
   'dummy', 'sample', 'fake', 'your', 'changeme', 'redacted']);
 
+// (A private key's placeholder rule is in scanSecrets, which knows its block.)
 function isPlaceholder(label, value) {
-  if (label === 'private key') {
-    // A real key has a base64 body between the header and the footer. A header
-    // around a word is a fixture.
-    const inside = value.replace(/-----[A-Z ]+-----/g, '');
-    return (inside.match(/[A-Za-z0-9+/=]/g) ?? []).length < 64;
-  }
   if (label !== 'hardcoded credential') return false;
   if (/^(.)\1+$/.test(value)) return true;                       // xxxxxxxxxxxxxxxx
   return /^[a-z]+(?:[-_][a-z]+)+$/.test(value)                    // storyblok-user-access-token
@@ -791,45 +786,42 @@ function isPlaceholder(label, value) {
 
 // Every match in one file's text, with the WHOLE credential each one stands for.
 //
-// The span matters twice. Overlapping matches are folded by span, not by line:
-// folding by line let a placeholder earlier on a line hide a real credential
-// after it, and let accepting one value on a line accept every value on it.
-// And the span is what gets hashed: a private key is its whole block, not the
-// header every key of that type shares.
+// The span matters twice. It is what gets hashed, so a private key is its whole
+// block, not the header every key of that type shares, and a quoted value is
+// all of it, not a prefix another pattern happened to match. And matches are
+// folded only when their spans are IDENTICAL (`api_key: 'ghp_...'` is one
+// credential). Folding any overlap let one match hide another three ways: a
+// placeholder hid the real value after it on a line, a BEGIN...END span hid a
+// token written between the two, and an AWS-shaped prefix hid the rest of a
+// longer secret, so accepting the prefix accepted whatever followed it.
 export function scanSecrets(body) {
   const found = [];
   for (const [re, label] of SECRET_PATTERNS) {
     for (const m of body.matchAll(re)) {
       let start = m.index;
       let end = m.index + m[0].length;
-      let unterminated = false;
+      let placeholder;
       if (m[1] !== undefined) {
         // The quoted value sits at the end of the match, before its quote.
         end -= 1;
         start = end - m[1].length;
       } else if (label === 'private key') {
-        // Its own footer: searched to the end of the file, since a large key
-        // can run past any window, but never past the next header, or an
-        // example header would take a real key's footer and that key with it.
+        // Only up to the next header, so one block never takes another's footer.
         const rest = body.slice(end);
         const next = rest.search(/-----BEGIN [A-Z ]*PRIVATE KEY-----/);
-        const own = next === -1 ? rest : rest.slice(0, next);
-        const footer = own.match(/-----END [A-Z ]*PRIVATE KEY-----/);
-        if (footer) end += footer.index + footer[0].length;
-        else {
-          // No footer is still a key: anyone holding it can add the footer
-          // back. Never a placeholder, and its span is the key material that
-          // follows and nothing else, so it cannot swallow unrelated text.
-          unterminated = true;
-          end += keyBody(own);
-        }
+        const k = keyBlock(next === -1 ? rest : rest.slice(0, next));
+        end += k.end;
+        // A placeholder only when the footer directly follows too little
+        // material to be a key: the pilot's header around the word `key`.
+        // Anything else counts, failing closed: a key missing its footer is
+        // still the key, and a header with code after it is reported, as main
+        // always reported every header.
+        placeholder = k.terminated && k.material < 64;
       }
       const value = body.slice(start, end);
-      const placeholder = !unterminated && isPlaceholder(label, value);
-      // A real match is never hidden by a placeholder around it: a fixture's
-      // BEGIN and END strings either side of a real assignment made one
-      // placeholder span, and the assignment vanished inside it.
-      if (found.some((x) => start < x.end && x.start < end && (!x.placeholder || placeholder))) continue;
+      placeholder ??= isPlaceholder(label, value);
+      if (found.some((x) => (x.start === start && x.end === end)
+        || (placeholder && start < x.end && x.start < end))) continue;
       found.push({
         start, end, label, value, placeholder,
         line: body.slice(0, start).split('\n').length,
@@ -839,19 +831,38 @@ export function scanSecrets(body) {
   return found.sort((a, b) => a.start - b.start);
 }
 
-// The key material after a header with no footer: base64, and `\n` escapes in
-// a string literal, on the header's own line, then whole lines of base64 below
-// it. Stops at the first anything else.
-function keyBody(text) {
-  let n = text.match(/^(?:\\[nr]|[A-Za-z0-9+/=\t ])*/)[0].length;
-  const nl = text.slice(n).match(/^\r?\n/);
-  if (!nl) return n;
-  n += nl[0].length;
-  for (const line of text.slice(n).split(/(?<=\n)/)) {
-    if (!/^[\t ]*[A-Za-z0-9+/=]{4,}[\t ]*\r?\n?$/.test(line)) break;
-    n += line.length;
+// What follows a private-key header, up to the next header: its key material,
+// and its footer if that comes straight after.
+//
+// Key material is base64 and nothing else, unit by unit: a unit is a line, or a
+// piece of a string literal between `\n` escapes, with the glue code puts round
+// key material taken off (quotes, `+`, commas, a trailing `\`, indentation).
+// The first unit that is anything else ends it, so a block can never take in
+// code: a constant `'-----BEGIN ...'`, then a token, then `'-----END ...'`, is
+// a header and a separate token, not one key that hides the token.
+const KEY_GLUE = /^[\s'"`+,\\]+|[\s'"`+,\\]+$/g;
+
+function keyBlock(rest) {
+  const units = /\\r\\n|\\n|\r?\n/g;
+  let pos = 0;
+  let end = 0;
+  let material = 0;
+  for (;;) {
+    units.lastIndex = pos;
+    const sep = units.exec(rest);
+    const raw = rest.slice(pos, sep ? sep.index : rest.length);
+    const core = raw.replace(KEY_GLUE, '');
+    const footer = core.match(/^-----END [A-Z ]*PRIVATE KEY-----/);
+    if (footer) return { end: pos + raw.indexOf(footer[0]) + footer[0].length, material, terminated: true };
+    if (core && !/^[A-Za-z0-9+/=]+$/.test(core)) break;
+    if (core) {
+      material += core.length;
+      end = pos + raw.lastIndexOf(core) + core.length;
+    }
+    if (!sep) break;
+    pos = sep.index + sep[0].length;
   }
-  return n;
+  return { end, material, terminated: false };
 }
 
 export function secrets({ root }) {

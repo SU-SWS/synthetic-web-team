@@ -71,17 +71,24 @@ export function describeLocations(locations, max = 5) {
   return shown.join('; ') + (more > 0 ? `; and ${more} more` : '');
 }
 
+// `**/` is any number of directories, including none; any other `**` is
+// anything at all, so `test/**.json` covers `test/a.json` and `test/b/c.json`,
+// and `vendor/**` everything under vendor/. `*` and `?` stay within one segment.
 export function pathMatches(pattern, path) {
-  const p = String(pattern).replace(/^\.\//, '');
-  if (p.endsWith('/')) return path.startsWith(p);
+  let p = String(pattern).replace(/^\.\//, '');
+  if (p.endsWith('/')) {
+    if (!/[*?]/.test(p)) return path.startsWith(p);
+    p += '**';
+  }
   if (!/[*?]/.test(p)) return path === p;
   const re = p.replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*\*\/?/g, '\u0000')
+    .replace(/\*\*\//g, '\u0000')
+    .replace(/\*\*/g, '\u0001')
     .replace(/\*/g, '[^/]*')
     .replace(/\?/g, '[^/]')
-    .replace(/\u0000/g, '(?:.*/)?');
-  // `**` at the end of a pattern means everything under it, file names included.
-  return new RegExp(`^${re.replace(/\(\?:\.\*\/\)\?$/, '.*')}$`).test(path);
+    .replace(/\u0000/g, '(?:.*/)?')
+    .replace(/\u0001/g, '.*');
+  return new RegExp(`^${re}$`).test(path);
 }
 
 function covers(entry, loc) {
