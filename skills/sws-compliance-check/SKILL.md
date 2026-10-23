@@ -126,6 +126,22 @@ It then moves out of the nag and into an "accepted risks" section. This is the
 same shape a MinSec temporary exception takes, so the record is useful beyond
 this tool. Resurface expired `review_by` dates once, kindly, without lecturing.
 
+**An entry covers what it names, not the whole check.** Where a check reports
+locations (`minweb.no-secrets` does), `path` scopes the entry to a file, a
+directory ending in `/`, or a glob, and `line` or `sha256` narrow it further.
+Anything it does not cover still fails. For `minweb.no-secrets` a `path` is
+required, and an entry without one, or with one that matches everything
+(`**`), is ignored and reported: accepting the check everywhere would hide the
+next real credential. **Only ever accept a false positive there.** A real
+credential is rotated, never acknowledged. For a fixture, prefer a value the
+patterns do not match (`'<token>'`) to an entry.
+
+To narrow an entry to one value, run `sws digest <path>:<line>` and copy the
+`sha256` it prints. Never write the value itself into the file: an entry with
+`value:` is ignored and reported, because the text would sit in a tracked file
+that nothing scans it in. No report shows the hash either, because a hash of a
+weak password lets anyone holding the report check guesses.
+
 **Never edit `acceptance.yml` or a fragment to make a project pass.** Fragments
 change when upstream changes, with a date. If a criterion genuinely seems wrong,
 say so and let a person decide.
