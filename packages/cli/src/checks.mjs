@@ -965,16 +965,18 @@ export function workflow({ root }) {
     if (up === d) break;
     d = up;
   }
+  const hooks = hookFinding(root);
   if (!dir) {
     return [
       bad('workflow.push-to-main-deploys', 'no .github/workflows directory',
         'Push to main should deploy. Pull requests are first-class but never required.'),
       dunno('workflow.report-reaches-a-reader', 'no workflows to inspect'),
+      hooks,
     ];
   }
   const files = readdirSync(dir).filter((f) => /\.ya?ml$/.test(f)).map((f) => join(dir, f));
   const all = files.map(read).join('\n---\n');
-  const out = [];
+  const out = [hooks];
 
   out.push(/on:[\s\S]{0,200}push:[\s\S]{0,120}branches:\s*\[?\s*['"]?main/.test(all)
     ? ok('workflow.push-to-main-deploys', 'triggers on push to main')
@@ -990,6 +992,69 @@ export function workflow({ root }) {
     : ok('workflow.report-reaches-a-reader', 'report permissions present'));
 
   return out;
+}
+
+// Checks nag, they never gate. A problem should show up as a failed GitHub
+// Action that everyone can see and a person decides about, not as a refused
+// commit or an agent that will not stop. A pilot added both kinds of hook and
+// then took them all out again. So a hook that can refuse is reported, with the
+// suggestion to run the same check in CI. It is never removed: a team may have
+// chosen it, which is the same reasoning as branch protection.
+//
+// Only what the team shares counts. A developer's own .git/hooks are theirs,
+// and so is a .claude/settings.json that git ignores, which many teams do.
+const BLOCKING_AGENT_EVENTS = ['PreToolUse', 'Stop', 'SubagentStop'];
+
+function hookFinding(root) {
+  let repo = root;
+  for (let d = root, i = 0; i < 6; i++) {
+    if (existsSync(join(d, '.git'))) { repo = d; break; }
+    const up = dirname(d);
+    if (up === d) break;
+    d = up;
+  }
+
+  const found = [];
+  const husky = join(repo, '.husky');
+  if (existsSync(husky) && statSync(husky).isDirectory()) {
+    const named = readdirSync(husky)
+      .filter((n) => !n.startsWith('_') && !n.startsWith('.') && statSync(join(husky, n)).isFile());
+    if (named.length) found.push(`.husky/ (${named.join(', ')})`);
+  }
+  for (const n of ['lefthook.yml', 'lefthook.yaml', '.lefthook.yml', '.lefthook.yaml', '.pre-commit-config.yaml']) {
+    if (existsSync(join(repo, n))) found.push(n);
+  }
+  try {
+    const j = pkg(repo);
+    for (const k of ['simple-git-hooks', 'pre-commit', 'pre-push']) if (j?.[k]) found.push(`package.json "${k}"`);
+    if (j?.husky?.hooks) found.push('package.json "husky.hooks"');
+  } catch { /* an unreadable package.json is the build check's to report */ }
+
+  const settings = join(repo, '.claude', 'settings.json');
+  if (existsSync(settings) && !gitIgnores(repo, '.claude/settings.json')) {
+    try {
+      const events = Object.keys(JSON.parse(read(settings))?.hooks ?? {})
+        .filter((e) => BLOCKING_AGENT_EVENTS.includes(e));
+      if (events.length) found.push(`.claude/settings.json hooks (${events.join(', ')})`);
+    } catch { /* not ours to parse for anything else */ }
+  }
+
+  return found.length
+    ? bad('workflow.no-blocking-hooks', `hooks that can refuse a commit or stop an agent: ${found.join('; ')}`,
+        'Run the same check in CI instead, where a failure is a red check everyone can see and nothing is refused. Leave these in place unless the team agrees to move them: someone may have chosen them.')
+    : ok('workflow.no-blocking-hooks', 'no shared git hooks or blocking agent hooks');
+}
+
+// True only when git says so. Outside a repository, or with no git, the answer
+// is false, so the file counts as shared, which is what .claude/settings.json is
+// for by default.
+function gitIgnores(repo, rel) {
+  try {
+    execFileSync('git', ['check-ignore', '-q', rel], { cwd: repo, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Consent tooling, by package name and by the script hosts these products load

@@ -1,6 +1,6 @@
 ---
 name: sws-github
-description: Put a Stanford site on GitHub and deploy it to GitHub Pages, driven from the terminal. Use when a project needs a git repo, a GitHub remote, an org to own it, or a Pages deployment; when someone asks how to publish or where the code should live; or when they have no GitHub account yet.
+description: Put a Stanford site on GitHub and deploy it to GitHub Pages, driven from the terminal. Use when a project needs a git repo, a GitHub remote, an org to own it, or a Pages deployment; when someone asks how to publish or where the code should live; when they have no GitHub account yet; or when opening or preparing a pull request, which gets a Copilot review whose comments are fixed or answered and resolved.
 ---
 
 # Get it on GitHub, and deployed
@@ -119,6 +119,8 @@ deploys. Many campus editors work through the GitHub web UI, which is
 push-to-main by construction, and they will not open a pull request to fix a
 typo. Pull requests are first-class and never required. If a repo already has
 protection, leave it — someone may have chosen it. Report, do not remove.
+The same goes for git hooks: add none that can refuse a commit or a push.
+A check belongs in CI, where failing is a red mark and stops nothing.
 
 ## The workflow
 
@@ -142,6 +144,57 @@ Two traps worth an afternoon each:
    does not. Verify anything dot-prefixed reaches `dist`.
 2. **A subpath deploy needs `base`** set in the framework config, or links work
    locally and break in production. `su-sws.github.io/<repo>/` is a subpath.
+
+## Pull requests: Copilot reviews first
+
+Never required. When there is one, opened by you or prepared for a person to
+review, ask Copilot to review it first, then deal with every comment it leaves:
+fix it or answer it, and resolve it either way. An open thread is noise for
+the person who reviews after you.
+
+1. **Request it.** A draft gets no automatic review, so always ask:
+   `gh pr edit <pr> --add-reviewer @copilot`. If that fails, Copilot code review
+   is not enabled for this repository, or `gh` is too old to know `@copilot`.
+   Say which, and carry on. Do not go and enable it.
+2. **Wait for a review of the head commit**, then read its body as well as its
+   threads. Give up after ten minutes and say so:
+
+   ```bash
+   HEAD=$(gh pr view <pr> --json headRefOid -q .headRefOid)
+   REVIEWS=repos/<owner>/<repo>/pulls/<pr>/reviews
+   COPILOT=".[] | select((.user.login | test(\"copilot\"; \"i\")) and .commit_id == \"$HEAD\")"
+   for i in $(seq 20); do gh api "$REVIEWS" --jq "$COPILOT | .id" | grep -q . && break; sleep 30; done
+   gh api "$REVIEWS" --jq "$COPILOT | .body"
+   ```
+
+3. **Work through every unresolved Copilot thread:**
+
+   ```bash
+   gh api graphql -F owner=<owner> -F repo=<repo> -F pr=<pr> -f query='
+     query($owner: String!, $repo: String!, $pr: Int!) { repository(owner: $owner, name: $repo) {
+       pullRequest(number: $pr) { reviewThreads(first: 100) { nodes { id isResolved
+         comments(first: 1) { nodes { author { login } path line body } } } } } } }' \
+     --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved | not)
+       | select(.comments.nodes[0].author.login | test("copilot"; "i"))'
+   ```
+
+   **Fix it** and reply with what changed and the commit, or **reply with why it
+   does not apply**, citing the standard or the recorded decision. Copilot does
+   not know SWS policy: a suggestion to pin a version, add a cookie banner, or
+   touch the Global Footer is answered from `.sws/standards/`, not adopted.
+   Then resolve the thread:
+
+   ```bash
+   gh api graphql -f id=<thread-id> -f body='<reply>' -f query='mutation($id: ID!, $body: String!) {
+     addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: $id, body: $body}) { comment { url } } }'
+   gh api graphql -f id=<thread-id> -f query='mutation($id: ID!) {
+     resolveReviewThread(input: {threadId: $id}) { thread { isResolved } } }'
+   ```
+
+4. **After pushing fixes, request a review again**, with the same command, **at
+   most twice**. A third round is Copilot arguing with itself; hand over.
+5. **A thread a person started is theirs to resolve.** Reply if you have
+   something to add. Never resolve it for them.
 
 ## Verify, then say what you have not done
 

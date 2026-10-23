@@ -28,7 +28,7 @@ Early. The plan is complete and reviewed; the implementation is partway through.
 | Documentation site | **Working.** [`site/`](site/), built by our own recipe, scores 100/100 with zero failures |
 | `sws` CLI | **Working.** `preflight` reports whether the machine has the tools to build at all. `doctor` and `check` run 13 check modules against 68 criteria. `sws a11y` runs axe and an interactive-state audit — hover and focus measured with a real mouse and a real Tab key — and `sws perf` measures a byte budget, all in real Chromium |
 | Report delivery | **Working.** PR comment and a persistent "Site health" issue, both updated in place. Score trend, sparkline, HTML artifact, README badge |
-| Install wizard | **Working, agent-first, two-part.** `user` scope installs the skills into your tools once per machine and is removable; project scope installs `AGENTS.md`, the standards, and the per-site record. Non-interactive by default off a TTY, `--json` result with machine-readable next steps, `--answers` input, idempotent re-runs that preserve project state |
+| Install wizard | **Working, agent-first, two-part.** `user` scope installs the skills into your tools once per machine and is removable; project scope merges the contract into `AGENTS.md` and puts the standards and the per-site record under `.sws/`. Non-interactive by default off a TTY, `--json` result with machine-readable next steps, `--answers` input, idempotent re-runs that preserve project state |
 | Copy-a-prompt install | **Working.** Five prompts on the site — install into your editor, start a new site, add to an existing project, review, update — each carrying an `npx` route and a `git clone` fallback |
 | Publishable packages | **Working, not yet published.** Two packages — `@su-sws/synthetic-web-team` and `@su-sws/synthetic-web-team-mcp` — verified by installing the tarballs into a clean project with no repository present |
 | Updates | **Working.** Re-install is the update: project state preserved, local edits reported as conflicts rather than overwritten, stale files reported not deleted, staleness nag in `sws doctor` |
@@ -86,6 +86,15 @@ owns it, and which AI tools you use, then shows you every file before writing
 anything. **A project gets no skills** — they are already installed for every
 project — so their absence there is correct.
 
+**It adds to what your project already has.** The contract goes into `AGENTS.md`
+between `<!-- BEGIN:sws-agent-contract -->` and `<!-- END:sws-agent-contract -->`,
+the way Next.js adds its own block, so your rules and other tools' blocks stay
+where they are. `CLAUDE.md` and `GEMINI.md` are exactly `@AGENTS.md`, and only
+for the tools that do not read `AGENTS.md` themselves. The MCP server is added to
+`.mcp.json` next to the servers you already have. Everything else goes under
+`.sws/`: the standards in `.sws/standards/`, nothing at your root, and nothing in
+`.claude/`, which many teams git-ignore.
+
 Where a `package.json` is present it also adds `@su-sws/synthetic-web-team` to
 your `devDependencies`, so that `npx sws` afterwards runs this CLI. Unscoped
 `sws` on the public registry is an unrelated package, and without the local
@@ -118,7 +127,7 @@ Three fields in the result are the ones an agent should act on:
 |---|---|
 | `next[]` | What to do next, **as data**: `read-contract`, `orient`, `follow-recipe`, `complete-manifest`, `verify`. Each has a path or command and a `why` |
 | `incomplete[]` | Manifest fields that are still placeholders. **Ask the user for these; do not invent them** — MinWeb requires a named business owner and technical administrator with valid Stanford email |
-| `counts` | `created` / `updated` / `unchanged` / `preserved`. A re-run reports `unchanged`, so "already installed" is a truthful answer rather than a second claim of success |
+| `counts` | `created` / `updated` / `merged` / `unchanged` / `preserved` / `moved`. A re-run reports `unchanged`, so "already installed" is a truthful answer rather than a second claim of success |
 
 Exit codes: `0` success or dry run, `2` bad input or no content found, `3` a human
 declined at the confirmation prompt.
@@ -144,6 +153,8 @@ Three guarantees make that safe to run at any time:
 |---|---|
 | `preserved` | `.sws/manifest.yml` and `.sws/acknowledged.yml` are **never** overwritten. They hold your owners, resolved versions, recorded divergences and accepted risks |
 | `conflict` | A file **you edited** is reported and left alone. `--force` overrides |
+| `merged` | Our part was added to **your own** file: the contract to `AGENTS.md`, the import to `CLAUDE.md`, the `sws` server to `.mcp.json` and the other MCP configs, a marked pointer to `.github/copilot-instructions.md`. The rest of the file is untouched, and a later update replaces only our part. Remove the `sws` server and updates leave it out |
+| `moved` | Files an earlier version put in `standards/` at the root are moved into `.sws/standards/`, edits and all. Only files the install record lists: a `standards/` folder of your own stays put |
 | `orphan` | A file we shipped before and no longer do is **reported, not deleted**, every run until you remove it |
 
 `.sws/installed.json` records the hash of everything written, which is what lets
@@ -173,14 +184,14 @@ node /path/to/synthetic-web-team/packages/wizard/bin/wizard.mjs
 Or copy the files by hand, which is all the wizard is really doing:
 
 ```bash
-# From your project root
-cp -r path/to/synthetic-web-team/AGENTS.md .
-cp -r path/to/synthetic-web-team/standards .
-mkdir -p .agents .claude
+# From your project root. The contract is the marked block, appended so any
+# AGENTS.md you already have keeps its content.
+sed -n '/BEGIN:sws-agent-contract/,/END:sws-agent-contract/p' path/to/synthetic-web-team/AGENTS.md >> AGENTS.md
+mkdir -p .sws && cp -r path/to/synthetic-web-team/standards .sws/standards
+grep -qx '@AGENTS.md' CLAUDE.md 2>/dev/null || echo '@AGENTS.md' >> CLAUDE.md
 # Skills go in your HOME directory, once, not in the project
 cp -r path/to/synthetic-web-team/skills ~/.agents/skills
 cp -r path/to/synthetic-web-team/skills ~/.claude/skills
-echo '@AGENTS.md' > CLAUDE.md
 ```
 
 Those two skill paths between them are read natively by Claude Code, VS Code Copilot, Cursor, Codex CLI, Gemini CLI, Zed, Antigravity, and Cline. No build step, no compiler, no plugin to install.
@@ -202,7 +213,7 @@ node packages/cli/bin/sws.mjs doctor --standards standards
 
 | Path | What it does |
 |---|---|
-| [`AGENTS.md`](AGENTS.md) | The behavioral contract. 100 lines, read by every tool |
+| [`AGENTS.md`](AGENTS.md) | The behavioral contract: the block between the `sws-agent-contract` markers, at most 150 lines, read by every tool. The rest of the file is about this repository and does not ship |
 | [`skills/`](skills/) | The team: 30 skills, each one `SKILL.md` with two frontmatter keys. 8 built roles, 11 honest stubs, 11 shared |
 | [`standards/policy/`](standards/policy/) | Stanford requirements: MinSec, MinWeb, accessibility, privacy, brand, identity, procurement, escalation. Each file carries a `reviewed:` date |
 | [`standards/patterns/`](standards/patterns/) | How SWS actually builds: Decanter, components, content, IA, forms, discoverability, plus conventions derived from reading 11 production repos |

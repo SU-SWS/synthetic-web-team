@@ -84,6 +84,13 @@ jobs:
       - name: Every skill reaches both emitted paths
         run: node scripts/validate-emit.mjs
 
+      # plan() describes an install; this runs one, twice, into repositories
+      # that already have things in them: a Next.js AGENTS.md, a CLAUDE.md that
+      # is a symlink, standards/ at the root from an earlier version. Every
+      # data-loss bug the install has had lived there, not in the plan.
+      - name: The install keeps what a project already has
+        run: node scripts/validate-install.mjs
+
       - name: Validate every YAML in standards/
         run: |
           node -e '
@@ -106,6 +113,11 @@ jobs:
       # one check whose whole purpose is catching what axe cannot see.
       - name: Colour-vs-cue classification
         run: node scripts/validate-state-classifier.mjs
+
+      # Advice that fires on a developer's own setup teaches people to ignore
+      # the report, so the quiet cases are tested as hard as the loud ones.
+      - name: Blocking-hook detection
+        run: node scripts/validate-hooks.mjs
 
       # Packing is the only way to learn that a `files` list is wrong or that
       # @su-sws/standards' prepack stopped staging content -- and both fail

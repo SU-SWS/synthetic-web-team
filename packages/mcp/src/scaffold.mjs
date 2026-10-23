@@ -67,19 +67,22 @@ export function scaffold(defaultRoot, { path, answers, editors, write = false, m
 
   const c = r.counts;
   const head = r.written
-    ? (c.created === 0 && c.updated === 0
+    ? (c.created === 0 && c.updated === 0 && !c.merged && !c.moved
       ? `Already installed in ${r.root}. ${c.unchanged + (c.preserved ?? 0)} files, nothing to change.`
       : `Installed into ${r.root}. ${c.created} created, ${c.updated} updated, ${c.unchanged} unchanged` +
-        (c.preserved ? `, ${c.preserved} preserved` : '') + '.')
-    : `DRY RUN. Nothing was written. ${c.files} files would be installed into ${r.root}.`;
+        (c.preserved ? `, ${c.preserved} preserved` : '') +
+        (c.merged ? `, ${c.merged} merged into the project's own file, which kept its content` : '') + '.' +
+        (c.moved ? ` ${c.moved} moved from standards/ to .sws/standards/.` : ''))
+    : `DRY RUN. Nothing was written. ${c.files} files would be installed into ${r.root}.` +
+      (r.moved?.length ? ` ${r.moved.length} would move from standards/ to .sws/standards/.` : '');
 
   const parts = [head, ''];
 
   parts.push(`Compliance tier: **${r.tier.tier}** — ${r.tier.because}`);
   if (r.tier.tier !== 'low') {
     parts.push(`This is above a basic static site. A Data Risk Assessment may be required`,
-      `before deploy. See standards/policy/privacy.md and route via`,
-      `standards/policy/escalation.md.`);
+      `before deploy. See .sws/standards/policy/privacy.md and route via`,
+      `.sws/standards/policy/escalation.md.`);
   }
   parts.push('');
 

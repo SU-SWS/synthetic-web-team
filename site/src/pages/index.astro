@@ -97,8 +97,9 @@ If npx cannot reach the registry, swap it for the repository route:
 
 Fill in siteName and unit from this repository. Ask me if it is not obvious.
 
-Do not change any of my existing code. The installer adds AGENTS.md, the
-standards, and the .sws record; it does not touch my source. If anything comes
+Do not change any of my existing code. The installer adds its contract to
+AGENTS.md, keeping anything already there, and puts the standards and the
+record under .sws/; it does not touch my source. If anything comes
 back as a conflict, list those files and stop: they are ones I edited and I
 will decide. If anything is an orphan, list it and do not delete it.
 
@@ -169,7 +170,7 @@ const resultShape = `{
   "next": [
     { "kind": "read-contract",  "path": "AGENTS.md" },
     { "kind": "orient",         "skill": "sws-onboard" },
-    { "kind": "follow-recipe",  "path": "standards/recipes/astro-static/RECIPE.md" },
+    { "kind": "follow-recipe",  "path": ".sws/standards/recipes/astro-static/RECIPE.md" },
     { "kind": "add-dependency", "command": "npm install -D @su-sws/synthetic-web-team" },
     { "kind": "verify",         "command": "npx sws doctor --format json" }
   ]
@@ -660,7 +661,7 @@ const inside = [
           </h2>
           <p class="mb-24 max-w-[54ch] text-19 leading-relaxed text-black-80">
             The server is a second entry point, never a requirement. Everything
-            it exposes is also a plain file under <code>standards/</code> that an
+            it exposes is also a plain file under <code>.sws/standards/</code> that an
             agent can read directly, so if it will not start, nothing else stops
             working.
           </p>

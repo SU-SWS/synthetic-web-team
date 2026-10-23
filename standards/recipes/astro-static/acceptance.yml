@@ -727,6 +727,28 @@ criteria:
       rather than `pass` when the token cannot see them. Never auto-remove a
       protection rule: a team may have added one deliberately. Report and ask.
 
+  - id: workflow.no-blocking-hooks
+    requires: >
+      Checks run in CI, where a failure is a red check rather than a refused
+      commit. No shared git hook (husky, lefthook, pre-commit,
+      simple-git-hooks) and no agent hook that can block (Claude Code
+      `PreToolUse`, `Stop` or `SubagentStop` in a committed
+      `.claude/settings.json`).
+    check: workflow
+    severity: info
+    weight: 0
+    policy: null
+    mechanism: >
+      At the repository root: hook files in `.husky/`, a lefthook or pre-commit
+      config, hook keys in package.json, and blocking events under `hooks` in
+      `.claude/settings.json` unless git ignores that file, in which case it is
+      one developer's own setup. A developer's `.git/hooks` are never read.
+      Reports and suggests CI. Never removes a hook: a team may have chosen it.
+    note: >
+      Nagging, not gating. Weight 0, like workflow.no-forced-review, because a
+      team's own hook is a choice about how they work, not a fact about whether
+      the site meets Stanford's requirements.
+
   - id: workflow.report-reaches-a-reader
     requires: >
       The advisory report is written to the job summary and a persistent

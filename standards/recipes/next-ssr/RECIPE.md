@@ -352,6 +352,13 @@ reading either baseline.
 is right at flagship scale and wrong for a unit site with a handful of components
 and one consumer. Read it for what thorough looks like, not as a shopping list.
 
+**Run the checks in CI, never in a hook.** Use the `checks` job from
+`astro-static` step 8 unchanged, with Next's scripts: `"lint": "eslint"`, which
+`create-next-app --eslint` writes, and `"typecheck": "tsc --noEmit"`. The deploy
+does not wait on it, so a failure is a red check rather than a held-back
+publish. Next projects often arrive with husky and lint-staged; leave an
+existing hook to the team that chose it, and add none.
+
 ### 10. Secrets
 
 **Not `.env` in production.** SWS uses HashiCorp Vault, via

@@ -128,28 +128,41 @@ if (flags.help) { console.log(USAGE); process.exit(0); }
 // install record" nag silently stopped firing. Verified: a fresh project with
 // its record deleted reported nothing.
 //
-// `standards/` is the right test now. It is what a project install actually
-// vendors, and `site/` has neither it nor an AGENTS.md, so the original false
-// nag stays fixed.
+// The vendored standards are the right test now. They are what a project
+// install actually writes, and `site/` has neither them nor an AGENTS.md, so
+// the original false nag stays fixed.
+//
+// They moved once more, from `standards/` at the root to `.sws/standards/`, so
+// the install stops adding a top-level folder to someone else's repository.
+// Either counts: an older install keeps the root copy until its next `add .`
+// moves it.
 function wizardInstalled(dir) {
-  return existsSync(join(dir, 'AGENTS.md')) && existsSync(join(dir, 'standards'));
+  return existsSync(join(dir, 'AGENTS.md'))
+    && (existsSync(join(dir, '.sws', 'standards')) || existsSync(join(dir, 'standards')));
 }
 
 // --- locate things ----------------------------------------------------------
 
-// A project normally vendors `standards/` (the wizard copies it in), so the
-// local lookups come first and win. The last entry is the copy that ships
-// alongside this CLI, which covers `npx -p @su-sws/synthetic-web-team sws doctor` in a project
-// that never vendored them.
+// A project vendors the standards (the wizard copies them in), so the local
+// lookups come first and win. The last entry is the copy that ships alongside
+// this CLI, which covers `npx -p @su-sws/synthetic-web-team sws doctor` in a
+// project that never vendored them.
+//
+// `.sws/standards` comes first because a root `standards/` can be the team's
+// own folder with nothing of ours in it. So every candidate must also carry the
+// Global Footer contract, the one file every copy of ours has, before it wins.
 function findStandards() {
   if (flags.standards) return resolve(flags.standards);
   for (const c of [
-    join(root, 'standards'),
     join(root, '.sws', 'standards'),
+    join(root, 'standards'),
     resolve(HERE, '..', '..', '..', 'standards'),
-  ]) if (existsSync(c)) return c;
+  ]) if (existsSync(join(c, 'fragments', 'global-footer.yml'))) return c;
   return null;
 }
+
+const NO_STANDARDS = 'Could not find the standards: looked in .sws/standards/, standards/, '
+  + 'and beside this CLI. Pass --standards <dir>.';
 
 function findDist() {
   if (flags.dist) return resolve(flags.dist);
@@ -225,7 +238,7 @@ function loadAcceptance(standards, recipeId, seen = new Set()) {
 async function run() {
   const standards = findStandards();
   if (!standards) {
-    console.error('Could not find a standards/ directory. Pass --standards <dir>.');
+    console.error(NO_STANDARDS);
     process.exit(2);
   }
 
@@ -631,7 +644,7 @@ async function perf() {
 function runPreflight() {
   const standards = findStandards();
   if (!standards) {
-    console.error('Could not find a standards/ directory. Pass --standards <dir>.');
+    console.error(NO_STANDARDS);
     return 2;
   }
 

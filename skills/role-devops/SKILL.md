@@ -19,6 +19,14 @@ page here.
   beyond `github-pages`.** Each of those silently converts push-to-main into a
   pull-request requirement. If a project already has them, leave them and report;
   someone may have added them deliberately.
+- **No blocking hooks.** Not husky, lefthook, or a pre-commit or pre-push hook,
+  and no agent hook that can refuse (Claude Code `PreToolUse` or `Stop`). A check
+  that refuses a commit gets bypassed; a red check in CI gets looked at.
+  `sws check` reports hooks it finds, as advice. Existing ones stay unless the
+  team agrees to move them.
+- **Nothing shared lives in `.claude/`.** Many teams git-ignore it, so a workflow
+  or `.mcp.json` that calls a script there works on one machine and breaks in CI.
+  Shared scripts go in `scripts/`.
 - **`.gitignore` covers `node_modules`, build output, `.sws/prior-art.local.yml`**
   (a local index that must never be committed) **and `.sws/axe-results.json`**
   (derived from a build; committing it lets a stale pass travel with the repo).
@@ -45,6 +53,18 @@ on:
 Full permissions block, Pages action versions, and the two gotchas
 (`upload-pages-artifact@v4` excludes dotfiles; subpath deploys need `base`) are in
 `sws-deploy`.
+
+Beside `build` and `deploy`, a **`checks` job** runs lint, typecheck, tests, and
+a check that fails on switched-off tests (`.only`, `.skip`, `.fixme`). The
+deploy job does not `need` it, so a failure there is a red check on the commit
+and never a held-back publish. The job is in `astro-static` step 8.
+
+**Pull requests get a Copilot review before a person's.** Request it with
+`gh pr edit <pr> --add-reviewer @copilot`, wait for a review of the head commit,
+then fix or answer each Copilot thread and resolve it. Re-request after fixes,
+at most twice. Threads a person started are theirs. If the request fails,
+Copilot review is not enabled for the repository; say so and carry on. Commands
+for every step are in `sws-github`.
 
 ## The report has to reach a reader
 
@@ -80,8 +100,10 @@ deploys with the site.
 
 ## Everything is advisory except one thing
 
-**The job succeeds regardless of findings.** A separate, small, fast secrets job
-is the only one allowed to fail.
+**The build-and-deploy job succeeds regardless of findings.** Two others can go
+red: the `checks` job, whose failure is the nag and holds nothing back, and a
+separate, small, fast secrets job, which is the one thing in the system that
+blocks.
 
 The secrets message must differ by context. On a pull request, blocking stops the
 leak from landing. On a push to `main` the commit is already in the remote's

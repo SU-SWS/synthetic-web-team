@@ -165,3 +165,11 @@ hardcoded hex, a removed focus outline, a hover or focus state that is only a
 colour change, an island that did not need to be one, an image without
 dimensions, and a heading level chosen for its size. That list catches most of
 what actually goes wrong.
+
+On a pull request, let Copilot review first: `gh pr edit <pr> --add-reviewer
+@copilot`, then fix or answer each of its threads and resolve them, so the
+person reviewing after you sees only what is left. Answer from the standards
+rather than adopting a suggestion that contradicts them: Copilot does not know
+that the Global Footer is immutable or that Decanter's CSS wins on tokens.
+Leave threads a person started for that person. The full steps, with commands,
+are in `sws-github`.

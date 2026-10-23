@@ -67,6 +67,15 @@ Listed so the recipe covers them.
   does not approve or remove them.
 - **A hand-built footer that is close but not exact.** The footer check will say
   where it differs.
+- **Blocking hooks**: husky, lefthook, a pre-commit config, or agent hooks in a
+  committed `.claude/settings.json`. `sws check` reports them, as advice. They
+  are the team's choice, so leave them, add none, and suggest moving the check
+  into a CI job the deploy does not wait on (`astro-static` step 8).
+- **Its own `AGENTS.md`, `CLAUDE.md` and `.mcp.json`.** `add .` keeps all three:
+  the contract goes between markers at the end of `AGENTS.md`, `CLAUDE.md` gets
+  `@AGENTS.md` if it lacks it, and the `sws` server joins the project's own MCP
+  servers. Scripts that a committed file calls belong in `scripts/`, not in
+  `.claude/`, which many teams git-ignore.
 
 ## What to do now
 

@@ -17,7 +17,8 @@
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { plan } from '../packages/wizard/src/emit.mjs';
+import { plan, STANDARDS_DIR, IMPORT, CONTRACT_BEGIN, CONTRACT_END } from '../packages/wizard/src/emit.mjs';
+import { EDITORS } from '../packages/wizard/src/detect.mjs';
 
 const SOURCE = 'skills';
 const TARGETS = ['.agents/skills', '.claude/skills'];
@@ -103,9 +104,64 @@ else console.log('OK     project scope emits no skills');
 for (const required of ['AGENTS.md', '.sws/manifest.yml', '.sws/acknowledged.yml']) {
   if (!projectPaths.has(required)) fail(`project scope is missing ${required}`);
 }
-const stdCount = [...projectPaths].filter((x) => x.startsWith('standards/')).length;
-if (!stdCount) fail('project scope emits no standards/ files');
+const stdCount = [...projectPaths].filter((x) => x.startsWith(`${STANDARDS_DIR}/`)).length;
+if (!stdCount) fail(`project scope emits no ${STANDARDS_DIR}/ files`);
 else console.log(`OK     project scope  AGENTS.md, .sws state, ${stdCount} standards files`);
+
+// ---- what a project gets, with every editor selected -----------------------
+//
+// Three invariants, each the fix for a problem a real project hit:
+//   - nothing at the root but AGENTS.md and the pointer files an editor needs,
+//     because a `standards/` folder next to the team's source is clutter
+//   - no committed file names a .claude/ path, because many teams git-ignore it
+//   - CLAUDE.md and GEMINI.md are exactly `@AGENTS.md`, as Next.js writes them,
+//     and AGENTS.md is the contract between markers, citing .sws/standards/
+const everyEditor = plan({ ...args, editors: EDITORS, scope: 'project' });
+const pointers = new Set(EDITORS.flatMap((e) => e.emits));
+
+const stray = everyEditor.map((f) => f.path)
+  .filter((x) => x !== 'AGENTS.md' && !x.startsWith('.sws/') && !pointers.has(x));
+if (stray.length) fail(`project scope writes outside .sws/: ${stray.join(', ')}`);
+else console.log(`OK     project scope  everything but AGENTS.md and ${pointers.size} editor pointers is under .sws/`);
+
+// A path INSIDE a project's .claude/. Naming the directory to say why nothing
+// goes there is the contract doing its job, and `~/.claude/skills` is the
+// person's home directory, which is where skills do go.
+const PROJECT_CLAUDE_PATH = /(^|[^~\w/])\.claude\/[\w-]/m;
+// A file outside .sws/ may already exist for the project's own reasons, so it
+// is added to, never written over. The one exception is a file under our own
+// name (`sws.mdc`, `sws.md`), which nobody else would have.
+const overwrites = everyEditor
+  .filter((f) => !f.path.startsWith('.sws/') && !f.merge && !/(^|\/)sws\.[a-z]+$/.test(f.path))
+  .map((f) => f.path);
+if (overwrites.length) fail(`would overwrite a file the project may own: ${overwrites.join(', ')}`);
+else console.log('OK     every shared file is merged into, never overwritten');
+
+const claudePaths = everyEditor.filter((f) => !f.path.startsWith(`${STANDARDS_DIR}/`) && PROJECT_CLAUDE_PATH.test(f.contents));
+if (claudePaths.length) fail(`committed file names a .claude/ path: ${claudePaths.map((f) => f.path).join(', ')}`);
+else console.log('OK     no emitted contract, pointer or state file names a .claude/ path');
+
+for (const name of ['CLAUDE.md', 'GEMINI.md']) {
+  const f = everyEditor.find((x) => x.path === name);
+  if (!f) fail(`${name} is not emitted for any editor`);
+  else if (f.contents !== IMPORT || f.merge !== 'import') fail(`${name} is not exactly ${JSON.stringify(IMPORT)}`);
+}
+console.log('OK     CLAUDE.md and GEMINI.md are exactly @AGENTS.md');
+
+const agents = everyEditor.find((x) => x.path === 'AGENTS.md');
+const body = agents?.contents ?? '';
+if (!body.startsWith(CONTRACT_BEGIN) || !body.endsWith(CONTRACT_END)) {
+  fail('the shipped contract is not wrapped in its markers');
+}
+// A bare `standards/x` in the shipped contract points at a folder a project no
+// longer has. `standards/<path>` is the one deliberate mention: the sentence
+// that says skills cite that form.
+const bare = [...body.matchAll(/`(standards\/[^`]*)`/g)].map((m) => m[1]).filter((x) => x !== 'standards/<path>');
+if (bare.length) fail(`shipped contract cites standards/ without .sws/: ${bare.join(', ')}`);
+const cited = [...body.matchAll(/`\.sws\/(standards\/[^`<]+?)\/?`/g)].map((m) => m[1]);
+const missing = cited.filter((x) => !existsSync(x));
+if (missing.length) fail(`shipped contract cites paths that do not exist: ${missing.join(', ')}`);
+if (!bare.length && !missing.length) console.log(`OK     shipped contract  between markers, ${cited.length} .sws/standards/ paths, all resolve`);
 
 const emittedSkillFiles = [...emitted.keys()].filter((p) => /^\.(agents|claude)\/skills\/.+\/SKILL\.md$/.test(p)).length;
 console.log(`\n${names.length} skills in ${SOURCE}/, ${emittedSkillFiles} files emitted across ${TARGETS.length} paths at USER scope`);
