@@ -772,6 +772,8 @@ if (result.conflicts.length) {
       say(`    ${' '.repeat(c.length)}  ${D('--force replaces from that heading to the next top-level heading.')}`);
     } else if (r === 'symlink') {
       say(`    ${c}  ${D('is a symbolic link, and nothing is written through one.')}`);
+    } else if (r === 'outside') {
+      say(`    ${c}  ${D('sits under a directory that links out of the project, so nothing was written.')}`);
     } else if (r === 'unparseable') {
       say(`    ${c}  ${D('is not plain JSON (comments, perhaps), so the sws server was not added.')}`);
       say(`    ${' '.repeat(c.length)}  ${D('Writing it back would strip them. Add the server yourself if you want it.')}`);

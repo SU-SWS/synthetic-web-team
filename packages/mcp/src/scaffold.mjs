@@ -98,9 +98,14 @@ export function scaffold(defaultRoot, { path, answers, editors, write = false, m
       ``);
   }
 
+  // `update-references` carries the file and line of each reference that is
+  // holding a move back. Without them, the caller is told to fix references it
+  // has no way to find.
+  const refs = (n) => (n.references ?? []).map((x) =>
+    `\n    - \`${x.file}${x.line ? `:${x.line}` : ''}\` ${x.text}`).join('');
   parts.push(`## Next`, ...r.next.map((n) =>
     `- **${n.kind}**${n.path ? ` \`${n.path}\`` : ''}${n.command ? ` \`${n.command}\`` : ''}` +
-    `${n.skill ? ` skill \`${n.skill}\`` : ''}\n    ${n.why}`));
+    `${n.skill ? ` skill \`${n.skill}\`` : ''}\n    ${n.why}${refs(n)}`));
 
   if (!r.written) {
     parts.push('', `To apply this, call again with \`write: true\`.`);

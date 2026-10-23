@@ -459,7 +459,13 @@ export function write(root, files, { force = false, version = null, scope = 'pro
     let contents = f.contents;
     let target = p;
 
-    if (f.merge && f.path !== 'AGENTS.md' && sameFile(p, agents)) {
+    if (!resolvesInside(root, p)) {
+      // A parent directory that is a link out of the project. The checks below
+      // look at the file itself; this one stops a write landing somewhere else
+      // entirely, through `.sws/` or `.github/` linked to a shared folder.
+      status = 'conflict';
+      reason = 'outside';
+    } else if (f.merge && f.path !== 'AGENTS.md' && sameFile(p, agents)) {
       // This file and AGENTS.md are one file, linked either way round, as with
       // CLAUDE.md or .github/copilot-instructions.md -> AGENTS.md. It already
       // holds the contract, and adding our part would put an import, or a
@@ -622,6 +628,11 @@ function migrate(root, prev, planned, { dryRun = false, force = false } = {}) {
   for (const { from, to, recorded } of pending) {
     const src = join(root, from);
     const dest = join(root, to);
+    // Both ends must resolve inside the project, parents included. A
+    // `standards/` replaced by a link to a shared folder would otherwise have
+    // its files renamed out of that folder. Such a file is left where it is,
+    // and reports as an orphan.
+    if (!resolvesInside(root, src) || !resolvesInside(root, dest)) continue;
     if (existsSync(dest)) {
       if (hash(readFileSync(src, 'utf8')) !== recorded) continue;
       if (!dryRun) rmSync(src);
@@ -652,13 +663,16 @@ function findReferences(root, pending, ours) {
   // The entries actually being moved, `fragments`, `policy`, `scope.md`...,
   // so an unrelated `standards/` path of the team's own does not count.
   const entries = [...new Set(pending.map((m) => m.from.split('/')[1]))].map(re).join('|');
+  // Matched against the WHOLE file, so a call formatted across lines still
+  // counts: `\s*` spans newlines. Each match is mapped back to the line it
+  // starts on.
   const patterns = [
     // standards/fragments/..., ../standards/..., `${root}/standards/...`
-    new RegExp(`(?<!\\.sws[\\\\/])(?<![\\w.-])standards[\\\\/](?:${entries})(?![\\w-])`),
+    new RegExp(`(?<!\\.sws[\\\\/])(?<![\\w.-])standards[\\\\/](?:${entries})(?![\\w-])`, 'g'),
     // join('standards', 'fragments', ...), the way this package's own site does it
-    new RegExp(`(?<!['"]\\.sws['"]\\s*,\\s*)['"]standards['"]\\s*,\\s*['"](?:${entries})['"\\\\/]`),
+    new RegExp(`(?<!['"]\\.sws['"]\\s*,\\s*)['"]standards['"]\\s*,\\s*['"](?:${entries})['"\\\\/]`, 'g'),
     // sws check --standards standards
-    /--standards[= ](?:\.\/)?standards(?![\w./-])/,
+    /--standards[= ](?:\.\/)?standards(?![\w./-])/g,
   ];
 
   // A link into the files being moved, such as Jekyll's
@@ -688,9 +702,15 @@ function findReferences(root, pending, ours) {
       if (PROSE_FILES.test(n) || BINARY_FILES.test(n) || ours.has(r) || st.size > 512 * 1024) continue;
       const buf = readFileSync(p);
       if (buf.subarray(0, 8000).includes(0)) continue;
-      buf.toString('utf8').split('\n').forEach((line, i) => {
-        if (patterns.some((x) => x.test(line))) hits.push({ file: r, line: i + 1, text: line.trim().slice(0, 160) });
-      });
+      const text = buf.toString('utf8');
+      const lines = text.split('\n');
+      const at = new Set();
+      for (const x of patterns) {
+        for (const m of text.matchAll(x)) at.add(text.slice(0, m.index).split('\n').length);
+      }
+      for (const n of [...at].sort((a, b) => a - b)) {
+        hits.push({ file: r, line: n, text: lines[n - 1].trim().slice(0, 160) });
+      }
     }
   })(root, '');
   return hits;
@@ -924,6 +944,21 @@ const withEol = (s, eol) => (eol === '\n' ? s : s.replace(/\n/g, eol));
 
 function sameFile(a, b) {
   try { return realpathSync(a) === realpathSync(b); } catch { return false; }
+}
+
+// Whether a path's directory, or the nearest part of it that exists, resolves
+// inside the project once every link along the way is followed. The file itself
+// is judged separately, by the symlink handling in write().
+function resolvesInside(root, p) {
+  try {
+    const base = realpathSync(root);
+    let dir = dirname(p);
+    while (!existsSync(dir) && dirname(dir) !== dir) dir = dirname(dir);
+    const real = realpathSync(dir);
+    return real === base || real.startsWith(base + sep);
+  } catch {
+    return false;
+  }
 }
 
 // Where a link leads, if that is a regular file inside the project; null for

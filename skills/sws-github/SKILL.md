@@ -172,9 +172,9 @@ open thread is noise for the person who reviews after you.
    ```
 
 3. **Work through every unresolved thread from either reviewer.** Copilot's are
-   known by their author, the agent review's by the `<!-- sws-code-review -->`
-   marker, since it posts under your own account. Paginated, so a long review
-   cannot hide one past the first hundred:
+   known by their author, the agent review's by STARTING with the
+   `<!-- sws-code-review -->` marker, since it posts under your own account. A
+   person who quotes the marker has not started an agent thread. Paginated:
 
    ```bash
    gh api graphql --paginate -F owner=<owner> -F repo=<repo> -F pr=<pr> -f query='
@@ -183,7 +183,7 @@ open thread is noise for the person who reviews after you.
          nodes { id isResolved comments(first: 1) { nodes { author { login } path line body } } } } } } }' \
      --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved | not)
        | select((.comments.nodes[0].author.login | test("copilot"; "i"))
-           or (.comments.nodes[0].body | contains("<!-- sws-code-review -->")))'
+           or (.comments.nodes[0].body | startswith("<!-- sws-code-review -->")))'
    ```
 
    **Fix it** and reply with what changed and the commit, or **reply with why it

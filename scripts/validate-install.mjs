@@ -26,6 +26,7 @@ import { execFileSync } from 'node:child_process';
 import { plan, write, contract, STANDARDS_DIR, IMPORT, CONTRACT_BEGIN, CONTRACT_END, INSTALLED_PATH } from '../packages/wizard/src/emit.mjs';
 import { EDITORS } from '../packages/wizard/src/detect.mjs';
 import { findStandards } from '../packages/cli/src/standards.mjs';
+import { scaffold } from '../packages/mcp/src/scaffold.mjs';
 
 const SOURCE = resolve('.');
 const WIZARD = resolve('packages/wizard/bin/wizard.mjs');
@@ -241,6 +242,49 @@ scenario('an earlier layout whose own code reads the standards at standards/');
   check(o.moved.length === 0 && seen === 'Makefile, _data/global-footer.yml, scripts/footer.py',
     `a Python step, a Makefile and a link into standards/ hold the move too: got ${seen}`);
   check(existsSync(join(other, '_data/global-footer.yml')), 'and the link is not left dangling');
+
+  // Formatting alone must not get past the scan.
+  const multi = fresh();
+  oldLayout(multi);
+  put(multi, 'src/lib/footer.ts', "const p = join(\n  'standards',\n  'fragments',\n  'global-footer.yml',\n);\n");
+  const ml = run(multi);
+  check(ml.moved.length === 0 && ml.deferred?.references.some((x) => x.file === 'src/lib/footer.ts' && x.line === 2),
+    'a join() split across lines holds the move, reported at the line it starts on');
+
+  // The MCP path renders the references, not only the instruction to fix them.
+  const mcp = fresh();
+  oldLayout(mcp);
+  put(mcp, 'src/lib/footer.ts', READER);
+  const text = scaffold(mcp, { mode: 'add', editors: ['claude-code'], answers }).content[0].text;
+  check(text.includes('update-references') && text.includes('src/lib/footer.ts:1'),
+    'sws_scaffold lists each reference with its file and line');
+}
+
+scenario('a directory that links out of the project');
+{
+  // standards/ itself replaced by a link to a shared folder.
+  const shared = fresh();
+  const root = fresh();
+  oldLayout(root);
+  for (const f of standards) {
+    const rel = f.path.slice('.sws/standards/'.length);
+    put(shared, rel, get(root, `standards/${rel}`));
+  }
+  rmSync(join(root, 'standards'), { recursive: true });
+  symlinkSync(shared, join(root, 'standards'));
+  const r = run(root);
+  check(r.moved.length === 0 && existsSync(join(shared, 'fragments/global-footer.yml')),
+    'nothing is renamed out of the shared folder');
+  check(r.orphans.length === standards.length, 'the old paths report as orphans instead, and stay');
+
+  // .github/ linked out: the Copilot pointer is not written into it.
+  const elsewhere = fresh();
+  const out = fresh();
+  symlinkSync(elsewhere, join(out, '.github'));
+  const o = runAll(out);
+  check(status(o, '.github/copilot-instructions.md') === 'conflict'
+    && o.results.find((x) => x.path === '.github/copilot-instructions.md').reason === 'outside'
+    && readdirSync(elsewhere).length === 0, 'a file under a directory that links out is not written');
 }
 
 scenario('moved by hand, with the contract pasted under the project\'s own rules');
