@@ -81,21 +81,29 @@ scenario('an entry for the blocking check with no path is ignored, loudly');
 
   // A path that names nothing is no path. '**' was the obvious thing to type
   // to make the warning above go away, and it reopened the original bug.
-  for (const path of ['**', '**/*', './', '*']) {
-    const all = sws(repo({ 'a/x.js': `const secret = '${KEY}';\n`, 'b/y.js': `const secret = '${OTHER}';\n` }, [entry({ path })]));
+  for (const path of ['**', '**/*', './', '*', '**/*.*', '*.*']) {
+    const all = sws(repo({ 'a/x.js': `const secret = '${KEY}';\n`, 'y.js': `const secret = '${OTHER}';\n` }, [entry({ path })]));
     check(all.exit === 1 && /ignored/.test(all.secrets.detail), `path: '${path}' is ignored like a missing path`);
+  }
+  // A scoped glob still works.
+  for (const path of ['**/*.js', 'a/**', 'a/']) {
+    const scoped = sws(repo({ 'a/x.js': `const secret = '${KEY}';\n` }, [entry({ path })]));
+    check(scoped.exit === 0 && !/ignored/.test(scoped.secrets.detail), `path: '${path}' is honoured`);
   }
 }
 
-scenario('line, sha256 and value narrow an entry');
+scenario('line and sha256 narrow an entry; value is refused');
 {
   const files = { 'config.js': `const a = { token: '${KEY}' };\nconst b = { token: '${OTHER}' };\n` };
   check(sws(repo(files, [entry({ path: 'config.js', line: 1 })])).exit === 1, 'line 1 accepted, line 2 still fails');
   check(sws(repo(files, [entry({ path: 'config.js', sha256: hash(KEY) })])).exit === 1, 'one sha256 accepted, the other still fails');
   check(sws(repo(files, [entry({ path: 'config.js', sha256: hash(KEY) }), entry({ path: 'config.js', sha256: hash(OTHER) })])).exit === 0,
     'both accepted by sha256: acknowledged');
-  check(sws(repo(files, [entry({ path: 'config.js', value: KEY }), entry({ path: 'config.js', value: OTHER })])).exit === 0,
-    'value works too, for text that is not credential-shaped');
+  // value: would leave a plaintext copy in acknowledged.yml that, for the
+  // generic pattern, nothing scans for. Refused, and the entry does not
+  // quietly widen to the whole path either.
+  const v = sws(repo(files, [entry({ path: 'config.js', value: KEY }), entry({ path: 'config.js', value: OTHER })]));
+  check(v.exit === 1 && /`value:` would copy the matched text/.test(v.secrets.detail), 'value: entries are ignored, loudly, and fail closed');
   check(sws(repo(files, [entry({ path: 'config.js' })])).exit === 0, 'the whole file accepted: acknowledged');
 
   // Two values on ONE line are two locations. Folding by line meant accepting
@@ -125,15 +133,36 @@ scenario('a whole private key or token is one value, and is told from another');
   const t = sws(repo({ 'a.js': `const t = '${jwt('sigAAAAAAAAAAAA')}';\nconst u = '${jwt('sigBBBBBBBBBBBB')}';\n` },
     [entry({ path: 'a.js', sha256: hash(jwt('sigAAAAAAAAAAAA')) })]));
   check(t.exit === 1 && t.secrets.locations.length === 1, 'two JWTs that differ only in their signature are two values');
+
+  // A key without its footer is still the key.
+  const body = PEM.split('\n').slice(1, -2).join('\n');
+  const footless = `-----BEGIN ${'RSA PRIVATE'} KEY-----\n${body}\n`;
+  check(sws(repo({ 'id_rsa': footless })).secrets.locations?.length === 1, 'a key with its footer line missing still fails');
+  const yaml = `deploy:\n  key: |\n    -----BEGIN ${'PRIVATE'} KEY-----\n    ${body.replace(/\n/g, '\n    ')}\nother: 1\n`;
+  check(sws(repo({ 'deploy.yml': yaml })).secrets.locations?.length === 1, 'and so does one in a YAML block with the footer dropped');
+  const big = `-----BEGIN ${'PRIVATE'} KEY-----\n${'MIIEvQIBADANBgkqhkiG9w0BAQEFAASC\n'.repeat(400)}-----END ${'PRIVATE'} KEY-----\n`;
+  check(sws(repo({ 'big.pem': big })).secrets.locations?.length === 1, 'a key longer than 10,000 characters still fails');
+
+  // One block's footer is never another's: an example header must not take
+  // the real key below it, footer and all.
+  const example = `const example = '-----BEGIN ${'PRIVATE'} KEY-----';\n\n${PEM}`;
+  const ex = sws(repo({ 'keys.js': example }, [entry({ path: 'keys.js', line: 1 })]));
+  check(ex.exit === 1 && ex.secrets.detail.includes('keys.js:3'), 'accepting an example header leaves the real key after it failing');
+
+  // A placeholder never hides a real match inside it.
+  const wrapped = `const head = '-----BEGIN ${'PRIVATE'} KEY-----';\n${say('secret', OTHER)}const foot = '-----END ${'PRIVATE'} KEY-----';\n`;
+  const w = sws(repo({ 'fixture.js': wrapped }));
+  check(w.exit === 1 && w.secrets.locations?.length === 1, 'a real credential between a fixture\'s BEGIN and END strings still fails');
 }
 
 scenario('narrowing by sha256 keeps credential-shaped text out of acknowledged.yml');
 {
-  // A value: entry with an AWS-shaped string was itself a finding in this file.
+  // A value: entry with an AWS-shaped string was itself a finding in this file;
+  // value: is refused now, and the copy it wrote is still found.
   const aws = ['AKIA', 'IOSFODNN7', 'EXAMPLE'].join('');
   const byValue = sws(repo({ 'docs/aws.md': `Example key: ${aws}\n` }, [entry({ path: 'docs/aws.md', value: aws })]));
   check(byValue.exit === 1 && byValue.secrets.detail.includes('.sws/acknowledged.yml'),
-    'value: with a credential-shaped string is found in acknowledged.yml in turn, and fails closed');
+    'a credential-shaped value: is refused, and the copy in acknowledged.yml is reported');
   const byHash = sws(repo({ 'docs/aws.md': `Example key: ${aws}\n` }, [entry({ path: 'docs/aws.md', sha256: hash(aws) })]));
   check(byHash.exit === 0 && byHash.secrets.state === 'acknowledged', 'sha256: accepts it, with nothing new to find');
 }

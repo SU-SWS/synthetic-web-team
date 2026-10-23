@@ -265,7 +265,7 @@ async function run() {
     const entries = ack.filter((x) => x.check === f.id);
     const a = entries.length ? applyAcknowledgements(f, entries, { blocking, now }) : null;
     if (a?.ignored.length) {
-      console.error(`  warning: ${a.ignored.length} acknowledgement(s) for ${f.id} ignored: a blocking check is accepted only for a named file or directory.`);
+      console.error(`  warning: ${a.ignored.length} acknowledgement(s) for ${f.id} ignored; the report says why.`);
     }
     // The value hashes were for matching entries, just above. Nothing below
     // this line, no report, comment or artifact, gets to see them.

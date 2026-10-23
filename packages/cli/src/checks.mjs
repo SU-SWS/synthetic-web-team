@@ -802,24 +802,56 @@ export function scanSecrets(body) {
     for (const m of body.matchAll(re)) {
       let start = m.index;
       let end = m.index + m[0].length;
+      let unterminated = false;
       if (m[1] !== undefined) {
         // The quoted value sits at the end of the match, before its quote.
         end -= 1;
         start = end - m[1].length;
       } else if (label === 'private key') {
-        const footer = body.slice(end, end + 10000).match(/-----END [A-Z ]*PRIVATE KEY-----/);
+        // Its own footer: searched to the end of the file, since a large key
+        // can run past any window, but never past the next header, or an
+        // example header would take a real key's footer and that key with it.
+        const rest = body.slice(end);
+        const next = rest.search(/-----BEGIN [A-Z ]*PRIVATE KEY-----/);
+        const own = next === -1 ? rest : rest.slice(0, next);
+        const footer = own.match(/-----END [A-Z ]*PRIVATE KEY-----/);
         if (footer) end += footer.index + footer[0].length;
+        else {
+          // No footer is still a key: anyone holding it can add the footer
+          // back. Never a placeholder, and its span is the key material that
+          // follows and nothing else, so it cannot swallow unrelated text.
+          unterminated = true;
+          end += keyBody(own);
+        }
       }
-      if (found.some((x) => start < x.end && x.start < end)) continue;
       const value = body.slice(start, end);
+      const placeholder = !unterminated && isPlaceholder(label, value);
+      // A real match is never hidden by a placeholder around it: a fixture's
+      // BEGIN and END strings either side of a real assignment made one
+      // placeholder span, and the assignment vanished inside it.
+      if (found.some((x) => start < x.end && x.start < end && (!x.placeholder || placeholder))) continue;
       found.push({
-        start, end, label, value,
+        start, end, label, value, placeholder,
         line: body.slice(0, start).split('\n').length,
-        placeholder: isPlaceholder(label, value),
       });
     }
   }
   return found.sort((a, b) => a.start - b.start);
+}
+
+// The key material after a header with no footer: base64, and `\n` escapes in
+// a string literal, on the header's own line, then whole lines of base64 below
+// it. Stops at the first anything else.
+function keyBody(text) {
+  let n = text.match(/^(?:\\[nr]|[A-Za-z0-9+/=\t ])*/)[0].length;
+  const nl = text.slice(n).match(/^\r?\n/);
+  if (!nl) return n;
+  n += nl[0].length;
+  for (const line of text.slice(n).split(/(?<=\n)/)) {
+    if (!/^[\t ]*[A-Za-z0-9+/=]{4,}[\t ]*\r?\n?$/.test(line)) break;
+    n += line.length;
+  }
+  return n;
 }
 
 export function secrets({ root }) {

@@ -137,9 +137,10 @@ credential is rotated, never acknowledged. For a fixture, prefer a value the
 patterns do not match (`'<token>'`) to an entry.
 
 To narrow an entry to one value, run `sws digest <path>:<line>` and copy the
-`sha256` it prints. Never write the value itself into the file: a
-credential-shaped one is found there in turn, and no report shows the hash,
-because a hash of a weak password lets anyone holding the report check guesses.
+`sha256` it prints. Never write the value itself into the file: an entry with
+`value:` is ignored and reported, because the text would sit in a tracked file
+that nothing scans it in. No report shows the hash either, because a hash of a
+weak password lets anyone holding the report check guesses.
 
 **Never edit `acceptance.yml` or a fragment to make a project pass.** Fragments
 change when upstream changes, with a date. If a criterion genuinely seems wrong,
