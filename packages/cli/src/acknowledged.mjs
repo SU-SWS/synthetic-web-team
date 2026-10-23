@@ -11,12 +11,21 @@
 // only location by location:
 //
 //   path    required for a blocking check. An exact file, a directory ending in
-//           `/`, or a glob (`*` within a segment, `**` across segments).
+//           `/`, or a glob (`*` within a segment, `**` across segments). A path
+//           that names nothing, such as `**` or `**/*`, counts as no path: it
+//           would bring back the check-wide acceptance this exists to stop.
 //   line    optional. Narrows the entry to that line, so an edit that moves the
 //           match brings it back for a fresh look.
-//   value   optional. Narrows the entry to that matched text, compared by
-//           digest: the report never carries the value itself. Only ever for a
-//           placeholder. A real credential is rotated, not accepted.
+//   sha256  optional. Narrows the entry to one matched value, by the full
+//           SHA-256 of that value. `sws digest <path>:<line>` prints it,
+//           locally. It is never printed in a report: a hash of a human-chosen
+//           password lets anyone holding the report check guesses offline.
+//   value   optional, the same narrowing by the text itself, for a value that
+//           is not credential-shaped. A credential-shaped one written here
+//           would be found in this file in turn; use `sha256` for those.
+//
+// Narrowing is only ever for a false positive. A real credential is rotated,
+// not accepted.
 //
 // Any location no entry covers keeps the finding failing. A finding with no
 // locations is accepted by check id as before, except that a blocking one
@@ -38,9 +47,13 @@ export function loadAcknowledged(root) {
   } catch { return []; }
 }
 
-// Short and one-way: enough to tell two matched values apart, never enough to
-// recover one from a report or a CI log.
-export const digest = (s) => createHash('sha256').update(String(s)).digest('hex').slice(0, 12);
+// The full hash of a matched value, for comparing against an entry in this
+// process. Never serialised: the CLI strips it from every location before a
+// report is rendered.
+export const sha256 = (s) => createHash('sha256').update(String(s)).digest('hex');
+
+// A path that matches everything once its wildcards are taken away.
+const namesNothing = (p) => !String(p ?? '').replace(/^\.\//, '').replace(/[*?/]/g, '');
 
 // `path:line looks like a <label>`, for up to `max` locations.
 export function describeLocations(locations, max = 5) {
@@ -66,7 +79,8 @@ export function pathMatches(pattern, path) {
 function covers(entry, loc) {
   if (!pathMatches(entry.path, loc.path)) return false;
   if (entry.line != null && Number(entry.line) !== loc.line) return false;
-  if (entry.value != null && digest(entry.value) !== loc.digest) return false;
+  if (entry.sha256 != null && String(entry.sha256).toLowerCase() !== loc.sha256) return false;
+  if (entry.value != null && sha256(entry.value) !== loc.sha256) return false;
   return true;
 }
 
@@ -88,10 +102,10 @@ function acceptedBy(entries, now) {
  * wrote them believing they worked.
  */
 export function applyAcknowledgements(finding, entries, { blocking = false, now = new Date() } = {}) {
-  const ignored = blocking ? entries.filter((a) => !a.path) : [];
+  const ignored = blocking ? entries.filter((a) => namesNothing(a.path)) : [];
   const usable = entries.filter((a) => !ignored.includes(a));
   const warn = ignored.length
-    ? `  (${ignored.length} acknowledgement${ignored.length > 1 ? 's' : ''} ignored: an entry for ${finding.id} must name a path, because accepting a blocking check everywhere would hide the next real one)`
+    ? `  (${ignored.length} acknowledgement${ignored.length > 1 ? 's' : ''} ignored: an entry for ${finding.id} must name a file or directory, not every path, because accepting a blocking check everywhere would hide the next real one)`
     : '';
 
   if (finding.state !== 'fail' || !usable.length) {

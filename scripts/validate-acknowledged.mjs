@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import YAML from 'yaml';
-import { applyAcknowledgements, pathMatches } from '../packages/cli/src/acknowledged.mjs';
+import { applyAcknowledgements, pathMatches, sha256 as hash } from '../packages/cli/src/acknowledged.mjs';
 
 const CLI = resolve('packages/cli/bin/sws.mjs');
 const STANDARDS = resolve('standards');
@@ -76,25 +76,97 @@ scenario('an entry for the blocking check with no path is ignored, loudly');
 {
   const r = sws(repo({ 'src/config.js': `const secret = '${OTHER}';\n` }, [entry({})]));
   check(r.exit === 1 && r.secrets.state === 'fail', 'the check still fails');
-  check(/ignored: an entry for minweb\.no-secrets must name a path/.test(r.secrets.detail), 'the report says why the entry did nothing');
+  check(/ignored: an entry for minweb\.no-secrets must name a file or directory/.test(r.secrets.detail), 'the report says why the entry did nothing');
   check(/warning: 1 acknowledgement\(s\) for minweb\.no-secrets ignored/.test(r.stderr), 'and so does stderr');
+
+  // A path that names nothing is no path. '**' was the obvious thing to type
+  // to make the warning above go away, and it reopened the original bug.
+  for (const path of ['**', '**/*', './', '*']) {
+    const all = sws(repo({ 'a/x.js': `const secret = '${KEY}';\n`, 'b/y.js': `const secret = '${OTHER}';\n` }, [entry({ path })]));
+    check(all.exit === 1 && /ignored/.test(all.secrets.detail), `path: '${path}' is ignored like a missing path`);
+  }
 }
 
-scenario('line and value narrow an entry');
+scenario('line, sha256 and value narrow an entry');
 {
   const files = { 'config.js': `const a = { token: '${KEY}' };\nconst b = { token: '${OTHER}' };\n` };
   check(sws(repo(files, [entry({ path: 'config.js', line: 1 })])).exit === 1, 'line 1 accepted, line 2 still fails');
-  check(sws(repo(files, [entry({ path: 'config.js', value: KEY })])).exit === 1, 'one value accepted, the other still fails');
+  check(sws(repo(files, [entry({ path: 'config.js', sha256: hash(KEY) })])).exit === 1, 'one sha256 accepted, the other still fails');
+  check(sws(repo(files, [entry({ path: 'config.js', sha256: hash(KEY) }), entry({ path: 'config.js', sha256: hash(OTHER) })])).exit === 0,
+    'both accepted by sha256: acknowledged');
   check(sws(repo(files, [entry({ path: 'config.js', value: KEY }), entry({ path: 'config.js', value: OTHER })])).exit === 0,
-    'both values accepted: acknowledged');
+    'value works too, for text that is not credential-shaped');
   check(sws(repo(files, [entry({ path: 'config.js' })])).exit === 0, 'the whole file accepted: acknowledged');
+
+  // Two values on ONE line are two locations. Folding by line meant accepting
+  // one accepted both.
+  const one = { 'config.js': `const a = { token: '${KEY}' }; const b = { token: '${OTHER}' };\n` };
+  check(sws(repo(one)).secrets.locations.length === 2, 'two credentials on one line are two locations');
+  check(sws(repo(one, [entry({ path: 'config.js', sha256: hash(KEY) })])).exit === 1, 'accepting one of them leaves the other failing');
 }
 
-scenario('every match is reported, and no value is ever repeated');
+scenario('a placeholder never hides a credential next to it');
+{
+  // The placeholder used to mark its line as seen, so the real one after it on
+  // the same line was never looked at. A minified bundle is one long line.
+  const line = `export const c = { ${say('token', ['your', 'access', 'token'].join('-')).trim()}, ${say('secret', OTHER).trim()} };\n`;
+  const r = sws(repo({ 'config.js': line }));
+  check(r.exit === 1 && r.secrets.locations?.length === 1, `a real credential after a placeholder on one line still fails (${r.secrets.state})`);
+}
+
+scenario('a whole private key or token is one value, and is told from another');
+{
+  const KEY_B = PEM.replace('MIIEvQIB', 'MIIEvQIC');
+  const both = sws(repo({ 'keys/a.pem': PEM, 'keys/b.pem': KEY_B }, [entry({ path: 'keys/', sha256: hash(PEM.trimEnd()) })]));
+  check(both.exit === 1 && both.secrets.detail.includes('keys/b.pem'),
+    'two keys that differ after the header have different hashes, so accepting one leaves the other');
+
+  const jwt = (sig) => ['eyJhbGciOiJIUzI1NiJ9', 'eyJzdWIiOiIxMjM0NTY3ODkwIn0', sig].join('.');
+  const t = sws(repo({ 'a.js': `const t = '${jwt('sigAAAAAAAAAAAA')}';\nconst u = '${jwt('sigBBBBBBBBBBBB')}';\n` },
+    [entry({ path: 'a.js', sha256: hash(jwt('sigAAAAAAAAAAAA')) })]));
+  check(t.exit === 1 && t.secrets.locations.length === 1, 'two JWTs that differ only in their signature are two values');
+}
+
+scenario('narrowing by sha256 keeps credential-shaped text out of acknowledged.yml');
+{
+  // A value: entry with an AWS-shaped string was itself a finding in this file.
+  const aws = ['AKIA', 'IOSFODNN7', 'EXAMPLE'].join('');
+  const byValue = sws(repo({ 'docs/aws.md': `Example key: ${aws}\n` }, [entry({ path: 'docs/aws.md', value: aws })]));
+  check(byValue.exit === 1 && byValue.secrets.detail.includes('.sws/acknowledged.yml'),
+    'value: with a credential-shaped string is found in acknowledged.yml in turn, and fails closed');
+  const byHash = sws(repo({ 'docs/aws.md': `Example key: ${aws}\n` }, [entry({ path: 'docs/aws.md', sha256: hash(aws) })]));
+  check(byHash.exit === 0 && byHash.secrets.state === 'acknowledged', 'sha256: accepts it, with nothing new to find');
+}
+
+scenario('every match is reported, and neither value nor hash is ever repeated');
 {
   const r = sws(repo({ 'a.js': `token: '${KEY}'\nsecret: '${OTHER}'\n`, 'b.pem': PEM }));
   check(r.secrets.locations.length === 3, `every match, not the first per file (${r.secrets.locations.length} of 3)`);
   check(!r.stdout.includes(KEY) && !r.stdout.includes(OTHER), 'neither value appears anywhere in the report');
+  check(!r.stdout.includes(hash(KEY)) && !r.stdout.includes(hash(KEY).slice(0, 12))
+    && r.secrets.locations.every((l) => !('sha256' in l) && !('digest' in l)),
+    'no hash of a value appears either: a hash of a weak password is a guess-checker');
+}
+
+scenario('files and keys the scan used to miss');
+{
+  const r = sws(repo({ 'docs/café.js': `const secret = '${KEY}';\n`, 'config.json': `{ "secret": "${OTHER}" }\n` }));
+  const paths = (r.secrets.locations ?? []).map((l) => l.path).sort().join(', ');
+  check(paths === 'config.json, docs/café.js', `a non-ASCII file name and a quoted JSON key are both scanned: got ${paths}`);
+}
+
+scenario('passphrases that only contain a telling word inside another word');
+{
+  const words = [['monkey', 'horse', 'battery', 'staple'], ['whiskey', 'tango', 'foxtrot'], ['secretary', 'desk', 'lamp', 'blue']];
+  const r = sws(repo(Object.fromEntries(words.map((w, i) => [`p${i}.js`, say('password', w.join('-'))]))));
+  check(r.secrets.locations?.length === 3, `monkey, whiskey and secretary are not "key" or "secret" (${r.secrets.locations?.length ?? 0} of 3)`);
+}
+
+scenario('sws digest prints the sha256 to narrow an entry, locally');
+{
+  const root = repo({ 'config.js': `const a = { token: '${KEY}' };\n` });
+  const out = spawnSync('node', [CLI, 'digest', 'config.js:1'], { cwd: root, encoding: 'utf8' }).stdout;
+  check(out.includes(`sha256: ${hash(KEY)}`) && !out.includes(KEY), 'it prints the hash of the value, and not the value');
 }
 
 scenario('obvious placeholders are skipped, and said to be');

@@ -12,7 +12,7 @@ import { join, resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import YAML from 'yaml';
-import { ALL, findHtml } from '../src/checks.mjs';
+import { ALL, findHtml, scanSecrets } from '../src/checks.mjs';
 import { runAxe, RESULTS_PATH as AXE_RESULTS_PATH } from '../src/axe.mjs';
 import { runPerf, RESULTS_PATH as PERF_RESULTS_PATH } from '../src/perf.mjs';
 import { runStates, RESULTS_PATH as STATE_RESULTS_PATH } from '../src/states.mjs';
@@ -24,7 +24,7 @@ import * as history from '../src/history.mjs';
 import * as gh from '../src/github.mjs';
 import { preflight, summarise } from '../src/preflight.mjs';
 import { findStandards as locateStandards } from '../src/standards.mjs';
-import { loadAcknowledged, applyAcknowledgements } from '../src/acknowledged.mjs';
+import { loadAcknowledged, applyAcknowledgements, sha256 } from '../src/acknowledged.mjs';
 // Sibling directory inside the same published package (@su-sws/synthetic-web-team), so this
 // relative path resolves in the repository and in a tarball alike. One reader
 // of the install record means the CLI and the wizard cannot disagree about what
@@ -86,6 +86,10 @@ const USAGE = `
                     project, plus: npx playwright install chromium
   perf              Measure the performance budget in a real browser. Writes
                     .sws/perf-results.json. Needs @playwright/test. Exits 0.
+  digest <path>[:<line>]
+                    Print the sha256 of each value the secrets check matches in
+                    a file, to narrow an acknowledgement to one false positive.
+                    Local only: no report ever carries these hashes.
   prior-art scan    Index Stanford projects on this machine. Never transmitted.
   version
 
@@ -261,13 +265,16 @@ async function run() {
     const entries = ack.filter((x) => x.check === f.id);
     const a = entries.length ? applyAcknowledgements(f, entries, { blocking, now }) : null;
     if (a?.ignored.length) {
-      console.error(`  warning: ${a.ignored.length} acknowledgement(s) for ${f.id} ignored: a blocking check is accepted only for a named path.`);
+      console.error(`  warning: ${a.ignored.length} acknowledgement(s) for ${f.id} ignored: a blocking check is accepted only for a named file or directory.`);
     }
+    // The value hashes were for matching entries, just above. Nothing below
+    // this line, no report, comment or artifact, gets to see them.
+    const locations = (a?.locations ?? f.locations)?.map(({ sha256: _hash, ...l }) => l);
     return {
       ...f,
       state: a?.state ?? f.state,
       detail: a?.detail ?? f.detail,
-      ...(a?.locations ? { locations: a.locations } : {}),
+      ...(locations ? { locations } : {}),
       weight: c.weight ?? 0,
       severity: c.severity ?? 'warn',
       blocking,
@@ -687,6 +694,39 @@ function runPreflight() {
   return ready || !flags.strict ? 0 : 1;
 }
 
+// --- digest -----------------------------------------------------------------
+// The sha256 that narrows an acknowledgement to one matched value. Computed
+// here, on this machine, from the file itself, because no report carries it:
+// a hash of a human-chosen password in a public PR comment is a guess-checker.
+// Reading the value from the file also keeps it out of shell history.
+
+function runDigest() {
+  const target = positionals[1];
+  const m = target?.match(/^(.+?)(?::(\d+))?$/);
+  if (!m) {
+    console.error('Usage: sws digest <path>[:<line>]');
+    return 2;
+  }
+  const [, rel, lineArg] = m;
+  const p = resolve(root, rel);
+  if (!existsSync(p)) {
+    console.error(`No such file: ${rel}`);
+    return 2;
+  }
+  const hits = scanSecrets(readFileSync(p, 'utf8'))
+    .filter((s) => !s.placeholder && (!lineArg || s.line === Number(lineArg)));
+  if (!hits.length) {
+    console.log(`  Nothing the secrets check would report in ${rel}${lineArg ? ` at line ${lineArg}` : ''}.`);
+    return 0;
+  }
+  for (const s of hits) console.log(`  ${rel}:${s.line}  ${s.label}  sha256: ${sha256(s.value)}`);
+  console.log('');
+  console.log('  Only if a match is NOT a credential, accept just that one, in .sws/acknowledged.yml:');
+  console.log(`    - check: minweb.no-secrets\n      path: ${rel.replace(/^\.\//, '')}\n      sha256: <from above>`);
+  console.log('  A real credential is rotated, never accepted.');
+  return 0;
+}
+
 // --- dispatch ---------------------------------------------------------------
 
 switch (cmd) {
@@ -702,6 +742,9 @@ switch (cmd) {
     break;
   case 'perf':
     process.exit(await perf());
+    break;
+  case 'digest':
+    process.exit(runDigest());
     break;
   case 'prior-art':
     console.log('prior-art scan is not implemented yet. It will index Stanford');

@@ -371,10 +371,11 @@ const ACKNOWLEDGED_TEMPLATE = `# Accepted risks.
 # An entry covers what it names, not the whole check. Where a check reports
 # where it found something (minweb.no-secrets does), \`path\` scopes the entry
 # to that file, a directory ending in \`/\`, or a glob such as \`test/fixtures/**\`,
-# and \`line\` or \`value\` narrow it further. Anything not covered still fails.
-# An entry for minweb.no-secrets with no \`path\` is ignored: accept a false
-# positive in one file, never the check. A real credential is rotated, not
-# accepted here.
+# and \`line\` or \`sha256\` narrow it further (\`sws digest <path>:<line>\`
+# prints the sha256, locally). Anything not covered still fails. An entry for
+# minweb.no-secrets whose \`path\` is missing or matches everything (\`**\`) is
+# ignored: accept a false positive in one file, never the check. A real
+# credential is rotated, not accepted here.
 #
 # This is the same shape a MinSec temporary exception takes, so the record is
 # useful beyond this tool. Expired review dates resurface once.

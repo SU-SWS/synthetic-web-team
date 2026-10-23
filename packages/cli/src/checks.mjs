@@ -19,7 +19,7 @@ import { RESULTS_PATH as AXE_RESULTS_PATH, SCHEMA as AXE_SCHEMA } from './axe.mj
 import { RESULTS_PATH as PERF_RESULTS_PATH, SCHEMA as PERF_SCHEMA } from './perf.mjs';
 import { RESULTS_PATH as STATE_RESULTS_PATH, SCHEMA as STATE_SCHEMA } from './states.mjs';
 import { newestMtime } from './browser.mjs';
-import { describeLocations, digest } from './acknowledged.mjs';
+import { describeLocations, sha256 } from './acknowledged.mjs';
 
 const read = (p) => readFileSync(p, 'utf8');
 const readYaml = (p) => YAML.parse(read(p));
@@ -750,13 +750,17 @@ export function perf({ root, dist, html }) {
 // --------------------------------------------------------------------------
 
 const SECRET_PATTERNS = [
-  [/AKIA[0-9A-Z]{16}/, 'AWS access key id'],
-  [/gh[pousr]_[A-Za-z0-9]{36,}/, 'GitHub token'],
-  [/sk_live_[A-Za-z0-9]{20,}/, 'Stripe live secret key'],
-  [/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/, 'private key'],
-  [/eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\./, 'JWT'],
-  // The quoted value is captured, so a placeholder can be told from a key.
-  [/(?:api[_-]?key|secret|password|token)\s*[:=]\s*['"]([A-Za-z0-9!@#$%^&*_\-]{16,})['"]/i, 'hardcoded credential'],
+  [/AKIA[0-9A-Z]{16}/g, 'AWS access key id'],
+  [/gh[pousr]_[A-Za-z0-9]{36,}/g, 'GitHub token'],
+  [/sk_live_[A-Za-z0-9]{20,}/g, 'Stripe live secret key'],
+  [/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g, 'private key'],
+  // Header, payload AND signature: two tokens that differ only in their
+  // signature are two credentials, and must not share a hash.
+  [/eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]*/g, 'JWT'],
+  // The quoted value is captured, so a placeholder can be told from a key. The
+  // optional quote after the name catches a JSON key, `"secret": "..."`, which
+  // the pattern used to miss entirely.
+  [/(?:api[_-]?key|secret|password|token)['"]?\s*[:=]\s*['"]([A-Za-z0-9!@#$%^&*_\-]{16,})['"]/gi, 'hardcoded credential'],
 ];
 
 // Values that are plainly not credentials, so a usage example or a test fixture
@@ -765,33 +769,75 @@ const SECRET_PATTERNS = [
 // header. Deliberately narrow. Anything with digits, mixed case or no telling
 // word still counts, because a false pass here is the one irreversible mistake.
 // (A value in angle brackets, `'<management-token>'`, never matched at all.)
-const PLACEHOLDER_WORD = /(token|key|secret|password|passwd|example|placeholder|dummy|sample|fake|your|changeme|redacted)/i;
+//
+// The telling word must be a whole word of the phrase. Matching inside words
+// let `monkey-horse-battery-staple` and `secretary-desk-lamp-blue`, real
+// passphrases, through as placeholders.
+const PLACEHOLDER_WORDS = new Set(['token', 'key', 'secret', 'password', 'passwd', 'example', 'placeholder',
+  'dummy', 'sample', 'fake', 'your', 'changeme', 'redacted']);
 
-function isPlaceholder(label, value, body, at) {
+function isPlaceholder(label, value) {
   if (label === 'private key') {
-    // A real key has a base64 body. A header around a word is a fixture.
-    const end = body.indexOf('-----END', at + 20);
-    const inside = body.slice(at + 20, end === -1 ? at + 4000 : end);
+    // A real key has a base64 body between the header and the footer. A header
+    // around a word is a fixture.
+    const inside = value.replace(/-----[A-Z ]+-----/g, '');
     return (inside.match(/[A-Za-z0-9+/=]/g) ?? []).length < 64;
   }
   if (label !== 'hardcoded credential') return false;
   if (/^(.)\1+$/.test(value)) return true;                       // xxxxxxxxxxxxxxxx
-  return /^[a-z]+(?:[-_][a-z]+)+$/.test(value) && PLACEHOLDER_WORD.test(value);  // storyblok-user-access-token
+  return /^[a-z]+(?:[-_][a-z]+)+$/.test(value)                    // storyblok-user-access-token
+    && value.split(/[-_]/).some((w) => PLACEHOLDER_WORDS.has(w));
+}
+
+// Every match in one file's text, with the WHOLE credential each one stands for.
+//
+// The span matters twice. Overlapping matches are folded by span, not by line:
+// folding by line let a placeholder earlier on a line hide a real credential
+// after it, and let accepting one value on a line accept every value on it.
+// And the span is what gets hashed: a private key is its whole block, not the
+// header every key of that type shares.
+export function scanSecrets(body) {
+  const found = [];
+  for (const [re, label] of SECRET_PATTERNS) {
+    for (const m of body.matchAll(re)) {
+      let start = m.index;
+      let end = m.index + m[0].length;
+      if (m[1] !== undefined) {
+        // The quoted value sits at the end of the match, before its quote.
+        end -= 1;
+        start = end - m[1].length;
+      } else if (label === 'private key') {
+        const footer = body.slice(end, end + 10000).match(/-----END [A-Z ]*PRIVATE KEY-----/);
+        if (footer) end += footer.index + footer[0].length;
+      }
+      if (found.some((x) => start < x.end && x.start < end)) continue;
+      const value = body.slice(start, end);
+      found.push({
+        start, end, label, value,
+        line: body.slice(0, start).split('\n').length,
+        placeholder: isPlaceholder(label, value),
+      });
+    }
+  }
+  return found.sort((a, b) => a.start - b.start);
 }
 
 export function secrets({ root }) {
   let files;
   try {
-    files = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' })
-      .split('\n').filter(Boolean);
+    // -z, because without it git quotes any path with a non-ASCII byte, and a
+    // quoted path never exists on disk, so `docs/café.js` was never read.
+    files = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' })
+      .split('\0').filter(Boolean);
   } catch {
     return [dunno('minweb.no-secrets', 'not a git repository, or git unavailable; cannot enumerate tracked files')];
   }
 
   // EVERY match, not the first per file. Stopping at the first meant fixing one
   // only revealed the next, one doctor run at a time. Each becomes a location,
-  // which is what an acknowledgement is scoped to; the matched value is kept
-  // only as a digest, so no report or CI log ever repeats it.
+  // which is what an acknowledgement is scoped to. The value's hash is for
+  // matching an entry in this process only, and is stripped before any report
+  // is written: a hash of a human-chosen password is a guess-checker.
   const SKIP = /\.(png|jpe?g|gif|webp|avif|ico|woff2?|ttf|otf|eot|pdf|zip|mp4|webm)$/i;
   const locations = [];
   const placeholders = [];
@@ -799,18 +845,9 @@ export function secrets({ root }) {
     if (SKIP.test(f) || f.includes('node_modules')) continue;
     const p = join(root, f);
     if (!existsSync(p) || statSync(p).size > 512 * 1024) continue;
-    const body = read(p);
-    const seen = new Set();
-    for (const [re, label] of SECRET_PATTERNS) {
-      for (const m of body.matchAll(new RegExp(re.source, `${re.flags}g`))) {
-        const line = body.slice(0, m.index).split('\n').length;
-        // One report per line: a key inside `api_key: '...'` is one finding.
-        if (seen.has(line)) continue;
-        seen.add(line);
-        const value = m[1] ?? m[0];
-        if (isPlaceholder(label, value, body, m.index)) placeholders.push(`${f}:${line}`);
-        else locations.push({ path: f, line, label, digest: digest(value) });
-      }
+    for (const s of scanSecrets(read(p))) {
+      if (s.placeholder) placeholders.push(`${f}:${s.line}`);
+      else locations.push({ path: f, line: s.line, label: s.label, sha256: sha256(s.value) });
     }
   }
 
@@ -831,6 +868,8 @@ export function secrets({ root }) {
       'ROTATE THE CREDENTIAL NOW. It is already in git history and blocking a deploy does not un-leak it.',
       'Then remove it from history (git filter-repo or BFG), then force-push.',
       'Then move the value into Vault or your host\'s environment settings.',
+      'Only if a match is NOT a credential: accept that one location in .sws/acknowledged.yml by its path,',
+      'narrowed with `sws digest <path>:<line>`, never the whole check.',
     ].join(' '),
   }];
 }
