@@ -374,17 +374,21 @@ Then gate only the deploy: `if: github.ref == 'refs/heads/main' && github.event_
       - run: npm ci
       - run: npm run lint --if-present
       - run: npm run typecheck --if-present
+      # Its own build and browser: nothing the build job made is on this
+      # runner, and a test over the built site (step 7) needs both.
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
       - run: npm run test --if-present
       - name: No switched-off tests
         run: |
-          if git grep -nE '(^|[^[:alnum:]_$.])(test|it|describe|context)(\.[a-z]+)*\.(only|skip|fixme)\(' -- \
+          if git grep -nE '(^|[^[:alnum:]_$.])(test|it|describe|context)(\.[a-z]+)*\.(only|skip|fixme)([^[:alnum:]_$]|$)' -- \
               '*.js' '*.mjs' '*.cjs' '*.ts' '*.mts' '*.cts' '*.jsx' '*.tsx'; then
             echo "::error::A test is switched off with .only, .skip or .fixme. Turn it back on, or delete it."
             exit 1
           fi
 ```
 
-`--if-present` runs the scripts the project defines and skips the rest, so add scripts rather than editing steps: `"typecheck": "astro check"` with `@astrojs/check` and `typescript` as dev dependencies, and `lint` and `test` once there is something for them to check. A deliberate conditional skip trips the last step too. That is the nag working: a person looks, and decides.
+`--if-present` runs the scripts the project defines and skips the rest, so add scripts rather than editing steps: `"typecheck": "astro check"` with `@astrojs/check` and `typescript` as dev dependencies, and `lint` and `test` once there is something for them to check. The job builds the site and installs Chromium itself, which repeats work the build job does; that is the price of the deploy never waiting on it. The last step also catches `test.only.each(...)` and a space before the call. A deliberate conditional skip trips it too. That is the nag working: a person looks, and decides.
 
 **Do not set up branch protection, required status checks, or a protected environment beyond `github-pages`.** Each one quietly turns push-to-main into a pull-request requirement, and this recipe's audience includes people editing a page through the GitHub web UI who will not open a pull request to fix a typo.
 

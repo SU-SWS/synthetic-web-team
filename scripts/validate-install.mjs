@@ -144,6 +144,18 @@ scenario('existing AGENTS.md and CLAUDE.md, as Next.js writes them');
     'a second run leaves AGENTS.md alone');
 }
 
+scenario('AGENTS.md prose that quotes the markers');
+{
+  const root = fresh();
+  const prose = '# Our rules\n\nThe SWS contract lives between `<!-- BEGIN:sws-agent-contract -->` and `<!-- END:sws-agent-contract -->`.\n';
+  put(root, 'AGENTS.md', prose);
+  const r = run(root);
+  const text = get(root, 'AGENTS.md');
+  check(status(r, 'AGENTS.md') === 'merged' && text.startsWith(prose) && text.endsWith(`${BLOCK}\n`),
+    'a marker quoted inline is not the block: the prose is untouched and the contract appended');
+  check(status(run(root), 'AGENTS.md') === 'unchanged', 'and a second run finds the real block');
+}
+
 scenario('their own CLAUDE.md, with no import');
 {
   const root = fresh();
@@ -325,6 +337,9 @@ scenario('.mcp.json that is not plain JSON, or that customises our entry');
   const r = run(root);
   check(status(r, '.mcp.json') === 'conflict' && r.results.find((x) => x.path === '.mcp.json').reason === 'unparseable'
     && get(root, '.mcp.json') === jsonc, 'comments: reported, and the file is not touched');
+  put(root, '.mcp.json', '{\n  "mcpServers": {}\n}\n');
+  check(status(run(root), '.mcp.json') === 'merged' && json(root, '.mcp.json').mcpServers.sws !== undefined,
+    'once the comments are gone, the next run adds the server (a failed merge recorded nothing)');
 
   const pinned = fresh();
   const text = `${JSON.stringify({ mcpServers: { sws: { command: 'npx', args: ['-y', '@su-sws/synthetic-web-team-mcp@0.1.0'] } } }, null, 2)}\n`;

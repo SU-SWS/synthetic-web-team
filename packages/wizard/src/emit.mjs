@@ -495,7 +495,13 @@ export function write(root, files, { force = false, version = null, scope = 'pro
       // reason: a one-shot warning is easy to miss, and an agent discards the
       // output entirely. It is also what makes `remove()` safe, since the record
       // stays a description of OUR content rather than drifting onto theirs.
-      nextHashes[f.path] = recorded ?? newHash;
+      //
+      // A conflict with no record behind it records nothing. A shared file can
+      // conflict on its very first run (an MCP config with comments), and
+      // recording what we WOULD have written read, on the next run, as proof
+      // that we had written it and someone removed it, so the server was never
+      // added once the comments were gone.
+      if (recorded !== undefined) nextHashes[f.path] = recorded;
     } else {
       nextHashes[f.path] = existsSync(p) ? hash(readFileSync(p, 'utf8')) : newHash;
     }
@@ -738,10 +744,18 @@ function mergeImport(local) {
   return next === local ? { status: 'unchanged' } : { status, text: next };
 }
 
+// A marker counts only on a line of its own. Prose that MENTIONS one, like a
+// README sentence explaining the markers, is never mistaken for the block:
+// treating it as one replaced part of that sentence with the contract.
 function findBlock(text, begin = CONTRACT_BEGIN, end = CONTRACT_END) {
-  const start = text.indexOf(begin);
+  const lineAt = (marker, from) => {
+    const re = new RegExp(`^${marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[ \\t]*$`, 'mg');
+    re.lastIndex = from;
+    return re.exec(text)?.index ?? -1;
+  };
+  const start = lineAt(begin, 0);
   if (start === -1) return null;
-  const stop = text.indexOf(end, start);
+  const stop = lineAt(end, start + begin.length);
   return stop === -1 ? null : { start, end: stop + end.length };
 }
 

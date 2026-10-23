@@ -163,17 +163,18 @@ the person who reviews after you.
    HEAD=$(gh pr view <pr> --json headRefOid -q .headRefOid)
    REVIEWS=repos/<owner>/<repo>/pulls/<pr>/reviews
    COPILOT=".[] | select((.user.login | test(\"copilot\"; \"i\")) and .commit_id == \"$HEAD\")"
-   for i in $(seq 20); do gh api "$REVIEWS" --jq "$COPILOT | .id" | grep -q . && break; sleep 30; done
-   gh api "$REVIEWS" --jq "$COPILOT | .body"
+   for i in $(seq 20); do gh api --paginate "$REVIEWS" --jq "$COPILOT | .id" | grep -q . && break; sleep 30; done
+   gh api --paginate "$REVIEWS" --jq "$COPILOT | .body"
    ```
 
-3. **Work through every unresolved Copilot thread:**
+3. **Work through every unresolved Copilot thread.** Paginated, so a long
+   review cannot hide one past the first hundred:
 
    ```bash
-   gh api graphql -F owner=<owner> -F repo=<repo> -F pr=<pr> -f query='
-     query($owner: String!, $repo: String!, $pr: Int!) { repository(owner: $owner, name: $repo) {
-       pullRequest(number: $pr) { reviewThreads(first: 100) { nodes { id isResolved
-         comments(first: 1) { nodes { author { login } path line body } } } } } } }' \
+   gh api graphql --paginate -F owner=<owner> -F repo=<repo> -F pr=<pr> -f query='
+     query($owner: String!, $repo: String!, $pr: Int!, $endCursor: String) { repository(owner: $owner, name: $repo) {
+       pullRequest(number: $pr) { reviewThreads(first: 100, after: $endCursor) { pageInfo { hasNextPage endCursor }
+         nodes { id isResolved comments(first: 1) { nodes { author { login } path line body } } } } } } }' \
      --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved | not)
        | select(.comments.nodes[0].author.login | test("copilot"; "i"))'
    ```
