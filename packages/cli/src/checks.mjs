@@ -99,6 +99,26 @@ export function projectFiles(root) {
   return files.sort((a, b) => depth(a) - depth(b) || a.localeCompare(b));
 }
 
+// The framework the project is built with: 'next', 'astro', or null for a
+// static site with neither. A check written for one framework never runs on
+// another, because its advice is wrong there: Astro sets response headers in
+// host config, Next in headers(); Astro's canonical URLs come from `site`,
+// Next's from metadataBase. Next wins if a project somehow has both.
+export function framework(root) {
+  const d = deps(root);
+  if (nextConfig(root) || d.next) return 'next';
+  if (['astro.config.mjs', 'astro.config.js', 'astro.config.ts'].some((f) => existsSync(join(root, f))) || d.astro) {
+    return 'astro';
+  }
+  return null;
+}
+
+// Source without its comments, so a check reading config never counts a
+// commented-out line: `// key: 'Content-Security-Policy'` is not a CSP. Line
+// comments are only taken where `//` cannot be part of a URL in a string.
+const withoutJsComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
+const withoutTomlComments = (s) => s.replace(/^\s*#.*$/gm, '');
+
 // --------------------------------------------------------------------------
 // footer: reads the contract, never hardcodes the link set
 // --------------------------------------------------------------------------
@@ -456,16 +476,23 @@ export function seo({ root, html, dist }) {
     ? bad('seo.meta-description', `${noDesc.length} page(s) without one: ${noDesc.slice(0, 3).join(', ')}`)
     : ok('seo.meta-description', 'all pages have a meta description'));
 
+  // The fix depends on the framework: Astro derives canonical URLs and the
+  // sitemap from `site`; Next from the metadata API and app/sitemap.ts.
+  const isNext = framework(root) === 'next';
   out.push(noCanon.length
     ? bad('seo.canonical', `${noCanon.length} page(s) without a canonical link`,
-        'Requires `site` set in the framework config. Missing `site` also silently breaks the sitemap.')
+        isNext
+          ? "Set `alternates.canonical` in each page's metadata, with `metadataBase` in the root layout so it resolves absolutely."
+          : 'Requires `site` set in the framework config. Missing `site` also silently breaks the sitemap.')
     : ok('seo.canonical', 'canonical links present'));
 
   const sitemap = ['sitemap-index.xml', 'sitemap.xml'].find((f) => existsSync(join(dist, f)));
   out.push(sitemap
     ? ok('seo.sitemap', `${sitemap} emitted`)
     : bad('seo.sitemap', 'no sitemap in the build output',
-        'Add @astrojs/sitemap and set `site` in the config.'));
+        isNext
+          ? 'Add app/sitemap.ts, which Next serves at /sitemap.xml.'
+          : 'Add @astrojs/sitemap and set `site` in the config.'));
 
   const robotsPath = join(dist, 'robots.txt');
   if (!existsSync(robotsPath)) {
@@ -1339,14 +1366,34 @@ const DEFAULT_HEADER_SET = [
   ['X-Frame-Options', 'frame options'],
 ];
 
+// Where a CSP comes from, if anywhere: the Next config's headers(), the Netlify
+// plugin that adds a per-request nonce, or host config. Bodies are read
+// without comments, so a commented-out policy is not one.
+function cspSource(root, nextBody, host) {
+  if (nextBody && /Content-Security-Policy/i.test(nextBody)) return 'headers() in the Next config';
+  if (deps(root)['@netlify/plugin-csp-nonce']
+    || (host?.kind === 'netlify' && /@netlify\/plugin-csp-nonce/.test(host.body))) return '@netlify/plugin-csp-nonce';
+  if (host && /Content-Security-Policy/i.test(host.body)) return host.file;
+  return null;
+}
+
 export function security({ root }) {
-  const cfg = nextConfig(root);
-  const host = hostConfig(root);
+  const found = nextConfig(root);
+  const cfg = found && { ...found, body: withoutJsComments(found.body) };
+  const rawHost = hostConfig(root);
+  const host = rawHost && {
+    ...rawHost, body: rawHost.kind === 'netlify' ? withoutTomlComments(rawHost.body) : rawHost.body,
+  };
   const out = [];
 
-  // Astro-specific: headers in host config. Meaningful regardless of whether
-  // a Next config is also present, so it runs independently of the block below.
-  out.push(host
+  // Headers in host config: how Astro and a static build send them, because
+  // Astro middleware misses prerendered routes. Never on a Next project, which
+  // sets them in headers() for every route, static files included, and
+  // security.headers-set checks that instead.
+  out.push(framework(root) === 'next'
+    ? na('astro.headers-in-host-config',
+        'a Next project: response headers come from headers() in the Next config (see security.headers-set)')
+    : host
     ? (() => {
         const missing = DEFAULT_HEADER_SET.filter(([h]) => !new RegExp(h, 'i').test(host.body)).map(([, l]) => l);
         return missing.length
@@ -1377,15 +1424,15 @@ export function security({ root }) {
   // header that breaks pages at CONTENT-EDIT time rather than at deploy time.
   // MinWeb requires no response headers at all. The default header set below
   // is what we actually ask for, because none of it can break a page.
+  const csp = cspSource(root, hasHeaders ? b : null, host);
+  out.push(csp
+    ? ok('security.csp-present', `CSP set by ${csp}; record it in .sws/manifest.yml`)
+    : ok('security.csp-present', 'no CSP, which is compliant: CSP is optional'));
   if (!hasHeaders) {
-    out.push(ok('security.csp-present', 'no CSP, which is compliant: CSP is optional'));
     out.push(bad('security.headers-set', 'no headers() function in the Next config',
       'Add headers() returning the default set: HSTS, nosniff, Referrer-Policy, ' +
       'Permissions-Policy, and X-Frame-Options: SAMEORIGIN. See standards/hosting/capabilities.yml.'));
   } else {
-    out.push(/Content-Security-Policy/i.test(b)
-      ? ok('security.csp-present', 'CSP configured in headers(); record it in .sws/manifest.yml')
-      : ok('security.csp-present', 'no CSP, which is compliant: CSP is optional'));
 
     const want = [
       ['Strict-Transport-Security', 'HSTS'],
@@ -1422,7 +1469,7 @@ export function security({ root }) {
 
 export function next({ root, html }) {
   const cfg = nextConfig(root);
-  const isNext = !!cfg || !!deps(root).next;
+  const isNext = framework(root) === 'next';
   if (!isNext) {
     return ['next.postcss-configured', 'next.no-vite-tailwind', 'next.no-tailwind-config', 'next.metadata-base']
       .map((id) => na(id, 'not a Next project'));
