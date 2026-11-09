@@ -15,7 +15,10 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { createInterface } from 'node:readline/promises';
 import { detect, deriveTier } from '../src/detect.mjs';
-import { plan, write, remove, ensureDevDependency, plannedMigration, STANDARDS_DIR } from '../src/emit.mjs';
+import {
+  plan, write, remove, ensureDevDependency, plannedMigration, readInstalled,
+  STANDARDS_DIR, LAYOUTS, CONTAINED_CONTRACT,
+} from '../src/emit.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -30,6 +33,7 @@ const { values: flags, positionals } = parseArgs({
     json: { type: 'boolean', default: false },
     interactive: { type: 'boolean', default: false },
     force: { type: 'boolean', default: false },
+    layout: { type: 'string' },
     remove: { type: 'boolean', default: false },
     help: { type: 'boolean', short: 'h', default: false },
   },
@@ -143,6 +147,11 @@ const HELP = `
   --interactive    Force prompts even without a TTY.
   --force          Overwrite files you have edited locally. Off by default.
   --dry-run        Report what would be written, write nothing.
+  --layout <name>  Where 'init' and 'add' write. root (the default): the
+                   contract into AGENTS.md, plus a pointer for each editor and
+                   the devDependency. contained: nothing outside .sws/; the
+                   contract is .sws/AGENTS.md, and you point your own files at
+                   it. Remembered in .sws/installed.json, so a re-run keeps it.
   --remove         Uninstall. Valid with 'install' only. Deletes just the files the
                    install record lists, so unrelated skills in your skills
                    directories are never touched, and a file you edited is kept
@@ -159,7 +168,7 @@ const HELP = `
   every run until it matches again. .sws/installed.json records what was written
   so an edit can be told from an old version. Pass --force to discard your edits.
   A project with standards/ at its root from an earlier version has them moved
-  into .sws/standards/, edits and all.
+  into .sws/standards/, edits and all. A contained project stays contained.
 
   An editor install and a project install carry their own versions, so they can
   drift. 'sws doctor' reports the difference as a note rather than a finding:
@@ -300,6 +309,20 @@ if (!source) {
   die(2, 'Could not find the standards content.',
     'Expected it beside this tool, or in the current directory. Pass --source <dir>.');
 }
+
+// The layout: the flag, else what the install record says this project chose,
+// else root. Remembering it is what lets a contained project update with a
+// plain `add .`; forgetting it would write AGENTS.md on the next update.
+const layout = flags.layout ?? (mode === 'user' ? null : readInstalled(root)?.layout) ?? 'root';
+if (flags.layout !== undefined && mode === 'user') {
+  die(2, '--layout applies to init and add', "'install' writes skills into your editor and nothing per-site.");
+}
+if (!LAYOUTS.includes(layout)) {
+  die(2, `unknown --layout: ${layout}`,
+    'Expected root (the contract in AGENTS.md, and a pointer for each editor) or contained (nothing outside .sws/).');
+}
+const contained = layout === 'contained';
+const contractPath = contained ? CONTAINED_CONTRACT : 'AGENTS.md';
 
 const B = (s) => (process.stdout.isTTY ? `\x1b[1m${s}\x1b[0m` : s);
 const D = (s) => (process.stdout.isTTY ? `\x1b[2m${s}\x1b[0m` : s);
@@ -571,9 +594,15 @@ function emitJson({ written, write: wr }) {
 
   const next = [];
   next.push({
-    kind: 'read-contract', path: 'AGENTS.md',
+    kind: 'read-contract', path: contractPath,
     why: 'The behavioral contract. Read it before doing anything else in this project.',
   });
+  if (contained) {
+    next.push({
+      kind: 'point-to-contract', path: CONTAINED_CONTRACT,
+      why: 'Nothing outside .sws/ was written, so no tool reads the contract yet. Point your own AGENTS.md, or your editor\'s instructions, at .sws/AGENTS.md.',
+    });
+  }
   // A move held back because the project's code reads the old path. Early in
   // the list: until those references change, the layout cannot finish.
   const held = wr ? wr.deferred : migration.deferred;
@@ -599,7 +628,7 @@ function emitJson({ written, write: wr }) {
       why: 'These are placeholders, not answers. MinWeb requires a named business owner and technical administrator with valid Stanford email. Ask the user; do not invent them.',
     });
   }
-  if (chosen.some((e) => e.emits.some((x) => x.endsWith('mcp.json')))) {
+  if (!contained && chosen.some((e) => e.emits.some((x) => x.endsWith('mcp.json')))) {
     next.push({
       kind: 'optional-mcp', command: 'npx -y @su-sws/synthetic-web-team-mcp --help',
       why: `An MCP server for these standards was added to your client config. It is a second entry point, never a requirement: sws_get_standard, sws_footer_html, sws_check, sws_decanter_token, sws_scaffold. Everything it exposes is also a file under ${STANDARDS_DIR}/. It was added next to any servers you already had. Remove the entry if you do not want it, and later updates will leave it out.`,
@@ -616,7 +645,9 @@ function emitJson({ written, write: wr }) {
   } else {
     next.push({
       kind: 'add-dependency', command: `npm install -D ${DEP_NAME}`,
-      why: `Do this once the project has a package.json. Without the local dependency \`npx sws\` fetches the unrelated \`sws\` package from the public registry rather than this CLI.`,
+      why: contained
+        ? `The contained layout leaves package.json alone. Add it yourself if you want \`npx sws\`: without the local dependency it fetches the unrelated \`sws\` package from the public registry rather than this CLI.`
+        : `Do this once the project has a package.json. Without the local dependency \`npx sws\` fetches the unrelated \`sws\` package from the public registry rather than this CLI.`,
     });
   }
   next.push({
@@ -636,6 +667,7 @@ function emitJson({ written, write: wr }) {
     warnings: versionWarning ? [versionWarning] : [],
     previousVersion: wr?.previousVersion ?? null,
     mode: mode === 'add' ? 'add' : 'init',
+    layout,
     written,
     root,
     source,
@@ -681,7 +713,7 @@ if (tier.tier !== 'low') {
 
 // --- review, then write -----------------------------------------------------
 
-const files = plan({ root, source, editors: chosen, answers, tier });
+const files = plan({ root, source, editors: chosen, answers, tier, layout });
 
 // Always 0 at project scope, and kept in the JSON counts so the schema holds.
 // Not printed: a project holds no skills, and the line that used to be here
@@ -706,6 +738,7 @@ if (migration.deferred) {
 
 if (flags['dry-run']) {
   depResult = ensureDevDependency(root, { name: DEP_NAME, range: depRange, dryRun: true });
+  if (contained && depResult.status === 'would-add') depResult = { status: 'not-added', range: depRange, reason: 'contained' };
   say(`\n  ${D('Dry run. Nothing written.')}\n`);
   if (flags.json) emitJson({ written: false, write: null });
   process.exit(0);
@@ -723,8 +756,10 @@ if (interactive) {
   }
 }
 
-const result = write(root, files, { force: flags.force, version: contentVersion });
-depResult = ensureDevDependency(root, { name: DEP_NAME, range: depRange });
+const result = write(root, files, { force: flags.force, version: contentVersion, layout });
+// Contained never writes package.json. An existing declaration is still reported.
+depResult = ensureDevDependency(root, { name: DEP_NAME, range: depRange, dryRun: contained });
+if (contained && depResult.status === 'would-add') depResult = { status: 'not-added', range: depRange, reason: 'contained' };
 
 // Say what actually changed, not how many files were considered. On a re-run
 // this reads "nothing to do", which is the truth and what a caller should
@@ -803,6 +838,12 @@ if (result.orphans.length) {
   say('');
 }
 
+if (contained) {
+  say(`  ${B('Contained:')} ${D('nothing outside .sws/ was written. Point your own AGENTS.md at')}`);
+  say(`  ${D(`${CONTAINED_CONTRACT} so agents read the contract.`)}`);
+  say('');
+}
+
 // The dependency decides whether `npx sws` runs this CLI or an unrelated
 // package of the same name off the public registry, so it is reported, never
 // silent -- either way round.
@@ -819,6 +860,10 @@ if (depResult.status === 'added') {
 } else if (depResult.status === 'unparseable') {
   say(`  ${B('Could not read package.json:')} ${D(depResult.detail)}`);
   say(`  ${D('Left alone. Add ' + DEP_NAME + ' to devDependencies yourself.')}`);
+  say('');
+} else if (depResult.status === 'not-added') {
+  say(`  ${B('package.json left alone,')} ${D('as the contained layout does. Add ' + DEP_NAME)}`);
+  say(`  ${D('to devDependencies yourself if you want `npx sws` to run this CLI.')}`);
   say('');
 } else if (depResult.status === 'skipped-unknown-version') {
   say(`  ${B('No version to pin,')} ${D('so package.json was left alone. Add')}`);

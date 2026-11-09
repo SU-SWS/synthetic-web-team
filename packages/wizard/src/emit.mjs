@@ -28,6 +28,16 @@ import { join, dirname, resolve, sep } from 'node:path';
 // Where a project's vendored standards live.
 export const STANDARDS_DIR = '.sws/standards';
 
+// Where the project's SWS files go. `root`, the default, merges the contract
+// into the project's AGENTS.md and adds a pointer for each editor. `contained`
+// writes nothing outside .sws/: the contract is .sws/AGENTS.md, a file of its
+// own, and no editor pointer, MCP config or package.json is touched. It is for
+// a team that keeps SWS separate from its own files and points its AGENTS.md
+// at .sws/AGENTS.md itself. The install record remembers the layout, so a
+// plain re-run of `add .` keeps it.
+export const LAYOUTS = ['root', 'contained'];
+export const CONTAINED_CONTRACT = '.sws/AGENTS.md';
+
 // Layouts an earlier version wrote, and where those files live now. A re-run
 // moves every file the install record lists; see migrate().
 const MOVED = [['standards/', `${STANDARDS_DIR}/`]];
@@ -67,7 +77,7 @@ export const SKILL_TARGETS = ['.agents/skills', '.claude/skills'];
 const skillNames = (source) => readdirSync(join(source, 'skills'))
   .filter((d) => existsSync(join(source, 'skills', d, 'SKILL.md')));
 
-export function plan({ root, source, editors, answers, tier, scope = 'project' }) {
+export function plan({ root, source, editors, answers, tier, scope = 'project', layout = 'root' }) {
   const files = [];
   const add = (path, contents, note, opts = {}) => files.push({ path, contents, note, ...opts });
 
@@ -95,11 +105,18 @@ export function plan({ root, source, editors, answers, tier, scope = 'project' }
   // they are byte-identical in every repository and referencing them in place is
   // not available: most editors that read .agents/skills offer no configurable
   // path to redirect. See docs/skill-paths.md and docs/two-part-install.md.
-  add('AGENTS.md', contract(source),
-    'behavioral contract, between markers; the rest of the file is yours', {
-      merge: 'block', markers: [CONTRACT_BEGIN, CONTRACT_END], legacyHeading: LEGACY_CONTRACT_HEADING,
-      adds: 'the contract, between sws-agent-contract markers',
-    });
+  const contained = layout === 'contained';
+  if (contained) {
+    const text = contract(source);
+    add(CONTAINED_CONTRACT, text.endsWith('\n') ? text : `${text}\n`,
+      'behavioral contract; nothing outside .sws/ is written, so point your AGENTS.md here');
+  } else {
+    add('AGENTS.md', contract(source),
+      'behavioral contract, between markers; the rest of the file is yours', {
+        merge: 'block', markers: [CONTRACT_BEGIN, CONTRACT_END], legacyHeading: LEGACY_CONTRACT_HEADING,
+        adds: 'the contract, between sws-agent-contract markers',
+      });
+  }
 
   const skills = skillNames(source);
 
@@ -136,7 +153,9 @@ export function plan({ root, source, editors, answers, tier, scope = 'project' }
   // Most of these are files a project may already have for its own reasons,
   // so they are ADDED TO, never written: see SHARED. Only the rules files under
   // our own name (.cursor/rules/sws.mdc, .devin/rules/sws.md) are whole files.
-  for (const e of editors) {
+  //
+  // None in the contained layout: every one of them lives outside .sws/.
+  for (const e of contained ? [] : editors) {
     for (const f of e.emits) {
       if (files.some((x) => x.path === f)) continue;
       if (SHARED[f]) {
@@ -443,7 +462,7 @@ const ACKNOWLEDGED_TEMPLATE = `# Accepted risks.
  * and writing the import through it would replace the contract with a line that
  * imports itself.
  */
-export function write(root, files, { force = false, version = null, scope = 'project' } = {}) {
+export function write(root, files, { force = false, version = null, scope = 'project', layout = 'root' } = {}) {
   const prev = readInstalled(root);
   let planned = new Set(files.map((f) => f.path));
 
@@ -574,7 +593,7 @@ export function write(root, files, { force = false, version = null, scope = 'pro
   // when it has been seen once.
   for (const x of orphans) nextHashes[x] = prev.files[x];
 
-  writeInstalled(root, { version, files: nextHashes, scope });
+  writeInstalled(root, { version, files: nextHashes, scope, layout });
 
   const count = (s) => results.filter((r) => r.status === s).length;
   return {
@@ -1036,7 +1055,7 @@ export function readInstalled(root) {
   }
 }
 
-function writeInstalled(root, { version, files, scope = 'project' }) {
+function writeInstalled(root, { version, files, scope = 'project', layout = 'root' }) {
   // The advice differs by scope, and getting it wrong matters: "commit this" is
   // right in a repository and nonsense in a home directory.
   const advice = scope === 'user'
@@ -1051,6 +1070,8 @@ function writeInstalled(root, { version, files, scope = 'project' }) {
       + `re-install can tell an update from a local edit. ${advice}`,
     tool: '@su-sws/synthetic-web-team',
     scope,
+    // Only when it is not the default, so a root install's record is unchanged.
+    ...(layout === 'contained' ? { layout } : {}),
     version,
     at: new Date().toISOString(),
     files,

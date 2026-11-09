@@ -76,6 +76,9 @@ Listed so the recipe covers them.
   `@AGENTS.md` if it lacks it, and the `sws` server joins the project's own MCP
   servers. Scripts that a committed file calls belong in `scripts/`, not in
   `.claude/`, which many teams git-ignore.
+- **A team that keeps SWS apart from its own files.** `add . --layout contained`
+  writes only into `.sws/`, with the contract at `.sws/AGENTS.md`, and a re-run
+  keeps that layout. The team points its own `AGENTS.md` at it.
 
 ## What to do now
 
