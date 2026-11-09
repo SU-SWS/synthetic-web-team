@@ -132,6 +132,12 @@ jobs:
       - name: Source checks find every recipe's layout
         run: node scripts/validate-layouts.mjs
 
+      # A divergence recorded as the contract asks still left its finding under
+      # "Should fix" on every run. A divergence's checks: now covers them, for
+      # preferences only: a requirement and the blocking check cannot be covered.
+      - name: Divergences cover the checks they name
+        run: node scripts/validate-divergences.mjs
+
       # Packing is the only way to learn that a `files` list is wrong or that
       # @su-sws/standards' prepack stopped staging content -- and both fail
       # silently right up until someone publishes. So pack for real, then assert

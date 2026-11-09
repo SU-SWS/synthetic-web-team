@@ -24,7 +24,7 @@
 #      same way: a harness where axe silently failed to load still printed
 #      "0 violations", which is a report that lies.
 
-# Result states: pass | fail | unknown | acknowledged | not_applicable
+# Result states: pass | fail | unknown | acknowledged | diverged | not_applicable
 
 recipe: astro-static
 version: 1

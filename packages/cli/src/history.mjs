@@ -132,6 +132,7 @@ export function entryFor({ score, findings, sha, ref, runId }) {
       fail: findings.filter((f) => f.state === 'fail').length,
       unknown: findings.filter((f) => f.state === 'unknown').length,
       acknowledged: findings.filter((f) => f.state === 'acknowledged').length,
+      diverged: findings.filter((f) => f.state === 'diverged').length,
     },
   };
 }

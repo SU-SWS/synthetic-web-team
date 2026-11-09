@@ -25,6 +25,7 @@ import * as gh from '../src/github.mjs';
 import { preflight, summarise } from '../src/preflight.mjs';
 import { findStandards as locateStandards } from '../src/standards.mjs';
 import { loadAcknowledged, applyAcknowledgements, sha256 } from '../src/acknowledged.mjs';
+import { loadDivergences, applyDivergences } from '../src/divergences.mjs';
 // Sibling directory inside the same published package (@su-sws/synthetic-web-team), so this
 // relative path resolves in the repository and in a tarball alike. One reader
 // of the install record means the CLI and the wizard cannot disagree about what
@@ -255,10 +256,13 @@ async function run() {
   // criterion still reports, at weight 0, so a check is never silently dropped.
   const byId = new Map((acceptance.criteria || []).map((c) => [c.id, c]));
   const ack = loadAcknowledged(root);
+  const divergences = loadDivergences(root);
   const now = new Date();
 
   // An acknowledgement covers what it names, not the whole check: see
   // src/acknowledged.mjs. Entries a blocking check cannot honour are reported.
+  // Then a divergence that names a check still failing explains it, for checks
+  // that are preferences rather than requirements: see src/divergences.mjs.
   const findings = raw.map((f) => {
     const c = byId.get(f.id) || {};
     const blocking = Boolean(f.blocking || c.severity === 'block');
@@ -267,13 +271,18 @@ async function run() {
     if (a?.ignored.length) {
       console.error(`  warning: ${a.ignored.length} acknowledgement(s) for ${f.id} ignored; the report says why.`);
     }
+    const afterAck = { ...f, state: a?.state ?? f.state, detail: a?.detail ?? f.detail };
+    const d = applyDivergences(afterAck, divergences, { blocking, policy: c.policy ?? null });
+    if (d?.ignored.length) {
+      console.error(`  warning: ${d.ignored.length} divergence(s) naming ${f.id} ignored; the report says why.`);
+    }
     // The value hashes were for matching entries, just above. Nothing below
     // this line, no report, comment or artifact, gets to see them.
     const locations = (a?.locations ?? f.locations)?.map(({ sha256: _hash, ...l }) => l);
     return {
       ...f,
-      state: a?.state ?? f.state,
-      detail: a?.detail ?? f.detail,
+      state: d?.state ?? afterAck.state,
+      detail: d?.detail ?? afterAck.detail,
       ...(locations ? { locations } : {}),
       weight: c.weight ?? 0,
       severity: c.severity ?? 'warn',

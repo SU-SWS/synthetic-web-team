@@ -51,8 +51,24 @@ divergences:
     by: sheamck@stanford.edu
 ```
 
-The record is what lets the next person understand the project, and it is what
-stops `sws doctor` nagging about a choice already made deliberately.
+The record is what lets the next person understand the project. When the choice
+makes a check fail, name the check in `checks:`, and the report moves the finding
+from the nag to a "Divergences" section, with the reason beside it:
+
+```yaml
+  - from: next-ssr
+    changed: Font Awesome Pro icons, not Heroicons
+    reason: Licensed and managed by the web team, with the token in CI (ADR 0013)
+    cost_accepted: A licence to renew, and a token every install needs
+    checks: [security.no-fontawesome-pro]
+    date: 2026-11-09
+    by: sheamck@stanford.edu
+```
+
+`checks:` covers preferences only: criteria with `policy: patterns` or no
+policy. A divergence naming a requirement (accessibility, brand, MinWeb, MinSec,
+MinPriv) or the blocking check is ignored, and the report says so. Those are
+below, under what never bends.
 
 **5. Say when a swap is genuinely unsupported.** Not everything is a preference.
 Tailwind 3 with Decanter 8 does not work, because Decanter 8 requires Tailwind 4.

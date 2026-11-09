@@ -357,7 +357,9 @@ content:
 prior_art: []
 
 # Deliberate departures from the recipe. Each needs a reason. Silent divergence
-# is the only kind that is a problem. See the sws-diverge skill.
+# is the only kind that is a problem. See the sws-diverge skill. Name the checks a
+# divergence explains in \`checks:\`, and the report lists them as divergences
+# rather than findings to fix. Preferences only: a requirement cannot be diverged.
 divergences: []
 `;
 }
