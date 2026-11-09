@@ -138,6 +138,12 @@ jobs:
       - name: Divergences cover the checks they name
         run: node scripts/validate-divergences.mjs
 
+      # A check for one framework never runs on another. The Astro host-config
+      # header check once told a Next site, whose headers() sends every header,
+      # that netlify.toml was missing all five.
+      - name: Framework checks run only on their framework
+        run: node scripts/validate-frameworks.mjs
+
       # Packing is the only way to learn that a `files` list is wrong or that
       # @su-sws/standards' prepack stopped staging content -- and both fail
       # silently right up until someone publishes. So pack for real, then assert
