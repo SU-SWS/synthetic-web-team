@@ -100,6 +100,14 @@ your `devDependencies`, so that `npx sws` afterwards runs this CLI. Unscoped
 `sws` on the public registry is an unrelated package, and without the local
 dependency that is what you would get.
 
+**Or keep it all in `.sws/`.** Some teams keep SWS apart from their own files.
+For them, `add . --layout contained` writes nothing outside `.sws/`: the
+contract is `.sws/AGENTS.md`, a file of its own, and no editor pointer, MCP
+config or `package.json` is touched. Nothing reads the contract until you point
+your own `AGENTS.md` at it, and `next[]` says so. Add the devDependency yourself
+if you want `npx sws`. The install record remembers the layout, so a plain
+`add .` updates it in place, and `--layout root` switches back.
+
 ### Or drive the installer yourself
 
 **The primary caller is an agent, so that is the first-class path.** One command,
