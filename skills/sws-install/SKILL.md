@@ -50,6 +50,16 @@ So: knowledge installs once per tool, the record installs once per site.
 Nothing else goes at the root, and nothing goes in `.claude/`: many teams
 git-ignore it, so a committed file pointing there breaks for everyone else.
 
+**The contained layout writes only the `.sws/` rows.** `add . --layout contained`
+is for a team that keeps SWS apart from its own files. The contract is
+`.sws/AGENTS.md` instead of a block in `AGENTS.md`, and there are no editor
+pointers, no MCP configs and no `package.json` change: an existing devDependency
+is reported as `present`, a missing one as `not-added`. `.sws/installed.json`
+records `"layout": "contained"`, so a plain `add .` keeps it; `--layout root`
+switches back. Use it only when the person asks. Afterwards, `next[]` has a
+`point-to-contract` step: the project points its own `AGENTS.md` at
+`.sws/AGENTS.md`. Suggest the line; don't write it, because that file is theirs.
+
 **No skills.** If you find `.agents/skills/` or `.claude/skills/` inside a
 project, it predates the two-part install. That is not a fault and nothing
 breaks, but the copies there are frozen and the user-level ones are what update.

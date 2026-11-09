@@ -144,6 +144,12 @@ jobs:
       - name: Framework checks run only on their framework
         run: node scripts/validate-frameworks.mjs
 
+      # `add .` always wrote outside .sws/, so a team that keeps SWS apart from
+      # its own files could only update by hand. The contained layout writes
+      # nothing else, checked byte for byte, and a plain re-run keeps it.
+      - name: The contained layout stays in .sws/
+        run: node scripts/validate-contained.mjs
+
       # Packing is the only way to learn that a `files` list is wrong or that
       # @su-sws/standards' prepack stopped staging content -- and both fail
       # silently right up until someone publishes. So pack for real, then assert
