@@ -34,6 +34,15 @@ import { readInstalled } from '../../wizard/src/emit.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
+// The version of the published package, @su-sws/synthetic-web-team, from its
+// root package.json, which ships. packages/cli/package.json is a workspace
+// manifest the package does not include, so reading it crashed `sws version`
+// in every install while passing in this repository.
+const OWN_VERSION = (() => {
+  try { return JSON.parse(readFileSync(resolve(HERE, '..', '..', '..', 'package.json'), 'utf8')).version; }
+  catch { return null; }
+})();
+
 // `standards/` ships in the same package as this file (@su-sws/synthetic-web-team), so the
 // relative walk below finds it in both the published layout and this
 // repository. There used to be an `import('@su-sws/standards')` fallback here;
@@ -437,10 +446,7 @@ async function run() {
   // it carries. No network call, no registry lookup.
   if (cmd === 'doctor') {
     const installed = readInstalled(root);
-    const mine = (() => {
-      try { return JSON.parse(readFileSync(resolve(HERE, '..', '..', '..', 'package.json'), 'utf8')).version; }
-      catch { return null; }
-    })();
+    const mine = OWN_VERSION;
     if (installed?.version && mine && installed.version !== mine) {
       note(`  Standards in this project are v${installed.version}; this tool carries v${mine}.`);
       note(`  To update:  npx @su-sws/synthetic-web-team add .`);
@@ -762,7 +768,11 @@ switch (cmd) {
     process.exit(0);
     break;
   case 'version':
-    console.log(JSON.parse(readFileSync(join(HERE, '..', 'package.json'), 'utf8')).version);
+    if (!OWN_VERSION) {
+      console.error('sws: could not read the version of @su-sws/synthetic-web-team');
+      process.exit(1);
+    }
+    console.log(OWN_VERSION);
     process.exit(0);
     break;
   default:

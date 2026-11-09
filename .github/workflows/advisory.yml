@@ -144,6 +144,12 @@ jobs:
       - name: Framework checks run only on their framework
         run: node scripts/validate-frameworks.mjs
 
+      # The file list below cannot catch a command that reads a file the
+      # package leaves out: `sws version` read packages/cli/package.json and
+      # crashed in every install. So run the commands from the tarball itself.
+      - name: Commands run from the packed package
+        run: node scripts/validate-packed.mjs
+
       # `add .` always wrote outside .sws/, so a team that keeps SWS apart from
       # its own files could only update by hand. The contained layout writes
       # nothing else, checked byte for byte, and a plain re-run keeps it.
