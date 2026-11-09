@@ -61,6 +61,44 @@ function installed(root, name) {
   return existsSync(p) ? JSON.parse(read(p)) : null;
 }
 
+// The project's own source files, relative to root and sorted shallowest first,
+// wherever the project keeps them. Recipes disagree on the layout: Astro puts
+// everything under src/, Next keeps styles/ and app/ at the root or under src/.
+// A check that guesses one folder reports a fail on every project laid out the
+// other way, so source checks search the whole project instead.
+//
+// Through git when it can, tracked files plus untracked ones git would not
+// ignore, so .gitignore decides what is build output and no list of folder
+// names goes stale. node_modules is never source, ignored or not. Outside a
+// repository, walk the tree and skip node_modules, dot-folders and the usual
+// build output.
+const NOT_SOURCE = new Set(['node_modules', 'dist', '_site', 'build', 'out']);
+
+export function projectFiles(root) {
+  let files;
+  try {
+    files = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+      { cwd: root, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] })
+      .split('\0').filter(Boolean)
+      .filter((f) => !f.split('/').includes('node_modules'))
+      // A file deleted but not yet staged is still listed.
+      .filter((f) => existsSync(join(root, f)));
+  } catch {
+    files = [];
+    (function walk(d) {
+      if (!existsSync(d)) return;
+      for (const n of readdirSync(d)) {
+        const p = join(d, n);
+        if (statSync(p).isDirectory()) {
+          if (!n.startsWith('.') && !NOT_SOURCE.has(n)) walk(p);
+        } else files.push(relative(root, p));
+      }
+    })(root);
+  }
+  const depth = (f) => f.split('/').length;
+  return files.sort((a, b) => depth(a) - depth(b) || a.localeCompare(b));
+}
+
 // --------------------------------------------------------------------------
 // footer: reads the contract, never hardcodes the link set
 // --------------------------------------------------------------------------
@@ -358,17 +396,10 @@ export function decanter({ root }) {
           'Dead package: supports neither current Astro nor Tailwind 4. Use @tailwindcss/vite.')
     : ok('decanter.no-dead-integration', '@astrojs/tailwind absent'));
 
-  // Entry CSS: redundant tailwind import, and the @source myth.
-  const cssFiles = [];
-  (function walk(d) {
-    if (!existsSync(d)) return;
-    for (const n of readdirSync(d)) {
-      const p = join(d, n);
-      if (statSync(p).isDirectory()) { if (n !== 'node_modules') walk(p); }
-      else if (n.endsWith('.css')) cssFiles.push(p);
-    }
-  })(join(root, 'src'));
-
+  // Entry CSS: redundant tailwind import, and the @source myth. Searched across
+  // the project, because Astro keeps it in src/styles/ and Next in styles/ or
+  // app/, at the root or under src/.
+  const cssFiles = projectFiles(root).filter((f) => f.endsWith('.css')).map((f) => join(root, f));
   const entry = cssFiles.find((f) => /@import\s+['"]decanter['"]/.test(read(f)));
   if (!entry) {
     out.push(d ? bad('decanter.entry-css', 'no CSS file imports decanter',
@@ -1418,18 +1449,13 @@ export function next({ root, html }) {
     : ok('next.no-tailwind-config', 'no tailwind JS config'));
 
   // metadataBase is the Next equivalent of Astro's `site`, and the same miss.
-  const layouts = [];
-  (function walk(d) {
-    if (!existsSync(d)) return;
-    for (const n of readdirSync(d)) {
-      const p = join(d, n);
-      if (statSync(p).isDirectory()) { if (n !== 'node_modules') walk(p); }
-      else if (/^layout\.(t|j)sx?$/.test(n)) layouts.push(p);
-    }
-  })(join(root, 'app'));
+  // Next takes the App Router from app/ or, when that is absent, src/app/.
+  const layouts = projectFiles(root)
+    .filter((f) => /^(src\/)?app\/(.+\/)?layout\.(t|j)sx?$/.test(f))
+    .map((f) => join(root, f));
 
   if (!layouts.length) {
-    out.push(dunno('next.metadata-base', 'no app/layout file found; App Router expected'));
+    out.push(dunno('next.metadata-base', 'no layout file in app/ or src/app/; App Router expected'));
   } else {
     const hit = layouts.find((f) => /metadataBase/.test(read(f)));
     out.push(hit
