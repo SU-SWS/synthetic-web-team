@@ -11,6 +11,9 @@
 //                 would mean the score never recovers, and people would stop
 //                 documenting risk acceptance, which is the behaviour we most
 //                 want.
+//   diverged      earns its weight, and the score is annotated, for the same
+//                 reason: a deliberate choice written down is the behaviour the
+//                 contract asks for. Only preferences can be diverged from.
 //   not_applicable  excluded from the total entirely.
 
 // Grouping is by what the reader can DO, not by policy chapter. Note every
@@ -23,20 +26,32 @@ const GROUPS = [
   ['Consider',        (f) => f.state === 'fail'],
   ['Could not check', (f) => f.state === 'unknown'],
   ['Accepted risks',  (f) => f.state === 'acknowledged'],
+  ['Divergences',     (f) => f.state === 'diverged'],
 ];
 
 export function score(findings) {
-  let earned = 0, possible = 0, ack = 0;
+  let earned = 0, possible = 0, ack = 0, div = 0;
   for (const f of findings) {
     if (f.state === 'not_applicable' || !f.weight) continue;
     possible += f.weight;
     if (f.state === 'pass') earned += f.weight;
     else if (f.state === 'acknowledged') { earned += f.weight; ack++; }
+    else if (f.state === 'diverged') { earned += f.weight; div++; }
   }
   return {
     value: possible ? Math.round((earned / possible) * 100) : 100,
-    earned, possible, acknowledged: ack,
+    earned, possible, acknowledged: ack, diverged: div,
   };
+}
+
+const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
+
+/** What the score includes besides passes, e.g. "1 accepted risk, 2 divergences", or ''. */
+export function includes(sc) {
+  return [
+    sc.acknowledged ? plural(sc.acknowledged, 'accepted risk') : '',
+    sc.diverged ? plural(sc.diverged, 'divergence') : '',
+  ].filter(Boolean).join(', ');
 }
 
 export function group(findings) {
@@ -56,7 +71,7 @@ const C = {
 };
 const paint = (s, c) => (process.stdout.isTTY ? `${C[c]}${s}${C.reset}` : s);
 
-const ICON = { pass: '+', fail: '!', unknown: '?', acknowledged: '~', not_applicable: '.' };
+const ICON = { pass: '+', fail: '!', unknown: '?', acknowledged: '~', diverged: '=', not_applicable: '.' };
 
 export function renderTerminal({ findings, sc, recipe, blocking }) {
   const L = [];
@@ -67,7 +82,7 @@ export function renderTerminal({ findings, sc, recipe, blocking }) {
   const bar = '#'.repeat(Math.round(sc.value / 5)).padEnd(20, '.');
   const colour = sc.value >= 90 ? 'green' : sc.value >= 70 ? 'yellow' : 'red';
   L.push(`  ${paint(bar, colour)}  ${paint(String(sc.value), 'bold')}/100` +
-    (sc.acknowledged ? paint(`  (includes ${sc.acknowledged} accepted risk${sc.acknowledged > 1 ? 's' : ''})`, 'dim') : ''));
+    (includes(sc) ? paint(`  (includes ${includes(sc)})`, 'dim') : ''));
   L.push('');
 
   for (const [name, items] of group(findings)) {
@@ -111,7 +126,7 @@ export function renderMarkdown({ findings, sc, recipe, blocking }) {
   L.push(`## Stanford compliance report`);
   L.push('');
   L.push(`**Score ${sc.value}/100**` +
-    (sc.acknowledged ? ` (includes ${sc.acknowledged} accepted risk${sc.acknowledged > 1 ? 's' : ''})` : '') +
+    (includes(sc) ? ` (includes ${includes(sc)})` : '') +
     `  ·  recipe \`${recipe}\``);
   L.push('');
   if (blocking.length) {
@@ -137,7 +152,7 @@ export function renderMarkdown({ findings, sc, recipe, blocking }) {
 export function renderJson({ findings, sc, recipe, blocking }) {
   return JSON.stringify({
     recipe, score: sc, blocking: blocking.map((b) => b.id),
-    counts: ['pass', 'fail', 'unknown', 'acknowledged', 'not_applicable']
+    counts: ['pass', 'fail', 'unknown', 'acknowledged', 'diverged', 'not_applicable']
       .reduce((a, s) => ({ ...a, [s]: findings.filter((f) => f.state === s).length }), {}),
     findings,
   }, null, 2);
@@ -175,7 +190,7 @@ export function renderPrComment({ findings, sc, recipe, blocking }, { trend, run
   const unknowns = findings.filter((f) => f.state === 'unknown');
   L.push(`\`${recipe}\` · ${findings.filter((f) => f.state === 'pass').length} passing · ` +
     `${fails.length} to fix · ${unknowns.length} unchecked` +
-    (sc.acknowledged ? ` · ${sc.acknowledged} accepted risk${sc.acknowledged > 1 ? 's' : ''}` : ''));
+    (includes(sc) ? ` · ${includes(sc).replace(', ', ' · ')}` : ''));
   L.push('');
 
   if (blocking.length) {
@@ -295,6 +310,7 @@ export function renderHtml({ findings, sc, recipe, blocking }, { trend, spark, s
   tr.fail td:first-child{border-left:3px solid var(--cardinal)}
   tr.unknown td:first-child{border-left:3px solid #b9b6b0}
   tr.acknowledged td:first-child{border-left:3px solid #7a9a01}
+  tr.diverged td:first-child{border-left:3px solid #006cb8}
   footer{margin-top:2.5rem;padding-top:1rem;border-top:1px solid var(--line);
          color:#5f5e5b;font-size:.85rem}
 </style></head><body>

@@ -42,7 +42,13 @@ correct for that project. Read it rather than inventing criteria.
 
 ## Result states, and one that matters more than it looks
 
-`pass` · `fail` · `unknown` · `acknowledged` · `not_applicable`
+`pass` · `fail` · `unknown` · `acknowledged` · `diverged` · `not_applicable`
+
+`acknowledged` is an accepted risk from `.sws/acknowledged.yml`, with a review
+date. `diverged` is a deliberate choice: a divergence in `.sws/manifest.yml` whose
+`checks:` names the check. Only checks that are SWS preferences (policy
+`patterns`, or none) can be diverged; a requirement stays a failure or an
+accepted risk.
 
 **`unknown` is never a pass and never scores.** Any check that can fail to
 execute must report it: axe needs a real browser, the footer check needs built

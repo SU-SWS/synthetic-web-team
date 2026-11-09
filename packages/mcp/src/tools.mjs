@@ -192,12 +192,14 @@ export function check(defaultRoot, { path, standards } = {}) {
     ``,
     `Recipe \`${r.recipe}\` in ${cwd}`,
     `${r.counts.pass} passing, ${r.counts.fail} to fix, ${r.counts.unknown} unchecked` +
-      (r.counts.acknowledged ? `, ${r.counts.acknowledged} accepted` : ''),
+      (r.counts.acknowledged ? `, ${r.counts.acknowledged} accepted` : '') +
+      (r.counts.diverged ? `, ${r.counts.diverged} diverged` : ''),
     ``,
   ];
   if (by('fail').length) parts.push(`## To fix\n${by('fail').map(line).join('\n')}\n`);
   if (by('unknown').length) parts.push(`## Could not check\n${by('unknown').map(line).join('\n')}\n`);
   if (by('acknowledged').length) parts.push(`## Accepted risks\n${by('acknowledged').map(line).join('\n')}\n`);
+  if (by('diverged').length) parts.push(`## Divergences\n${by('diverged').map(line).join('\n')}\n`);
 
   parts.push(
     `## How to read this`,
