@@ -249,7 +249,7 @@ package directory.
 
 **Advisory, not blocking.** Findings are reports, PR comments, and a visible score that trends. Exactly one thing fails a build: committed credentials, because that harm is irreversible. A tool that fails your build over a contrast ratio gets uninstalled by Friday, and then nothing is compliant.
 
-The report is designed to **find the reader** rather than expecting the reader to find CI. A push to `main` rewrites one long-lived "Site health" issue in place — findable by someone who has never opened the Actions tab, and it notifies watchers. A pull request gets one comment, also updated in place, because a new comment per push is noise people mute. The score trend lives in that issue's body as an HTML comment, which is why it needs no database, no artifact that expires, and no commit churn.
+The report is designed to **find the reader** rather than expecting the reader to find CI. A run on the default branch rewrites one long-lived "Site health" issue in place — findable by someone who has never opened the Actions tab, and it notifies watchers. A pull request gets one comment, also updated in place, because a new comment per push is noise people mute. A push to any other branch reports in its job summary only, so a release branch never overwrites the default branch's report or its trend. The score trend lives in that issue's body as an HTML comment, which is why it needs no database, no artifact that expires, and no commit churn.
 
 **Push to `main` deploys.** Pull requests are first-class but never required, and nothing in the setup makes one mandatory. Many campus editors work through the GitHub web UI and will not open a pull request to fix a typo. With a CMS, git disappears entirely.
 
