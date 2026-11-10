@@ -3,8 +3,15 @@
 // Two destinations, chosen by how the change arrived, because pull requests are
 // first-class here but never required:
 //
-//   push to main   one long-lived "Site health" issue, UPDATED IN PLACE
-//   pull request   one collapsible comment, UPDATED IN PLACE
+//   default branch  one long-lived "Site health" issue, UPDATED IN PLACE
+//   pull request    one collapsible comment, UPDATED IN PLACE
+//   anything else   nothing: the job summary is the only report
+//
+// The issue is the default branch's report, and its body carries the shared
+// score trend. A push to a release or integration branch that updated it would
+// overwrite that report with another branch's, and splice the other branch's
+// score into the trend. So the issue is written only when the run is on the
+// default branch, and only when that can be told for certain.
 //
 // "In place" is the whole design. A new comment per push turns a PR into a wall
 // of bot noise that people mute, and a new issue per push is worse. Both are
@@ -33,26 +40,70 @@ export function context(env = process.env) {
   const [owner, repo] = env.GITHUB_REPOSITORY.split('/');
   const token = env.GITHUB_TOKEN || env.GH_TOKEN || env.INPUT_GITHUB_TOKEN || null;
 
-  // A PR number is only reliably available from the event payload.
-  let pr = null;
-  if (env.GITHUB_EVENT_NAME?.startsWith('pull_request') && env.GITHUB_EVENT_PATH) {
-    try {
-      const ev = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
-      pr = ev?.pull_request?.number ?? ev?.number ?? null;
-    } catch { /* fall through: no PR number, so no comment */ }
+  // The PR number and the default branch are only reliably available from the
+  // event payload. An unreadable payload leaves both null: no PR comment, and
+  // no Site health issue.
+  let ev = null;
+  if (env.GITHUB_EVENT_PATH) {
+    try { ev = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8')); } catch { /* ev stays null */ }
   }
+  const pr = env.GITHUB_EVENT_NAME?.startsWith('pull_request')
+    ? (ev?.pull_request?.number ?? ev?.number ?? null)
+    : null;
+  const defaultBranch = typeof ev?.repository?.default_branch === 'string'
+    ? ev.repository.default_branch
+    : null;
 
   return {
-    owner, repo, token, pr,
+    owner, repo, token, pr, defaultBranch,
     event: env.GITHUB_EVENT_NAME ?? null,
     sha: env.GITHUB_SHA ?? null,
     ref: env.GITHUB_REF_NAME ?? env.GITHUB_REF ?? null,
+    branch: branchOf(env),
     runId: env.GITHUB_RUN_ID ?? null,
     serverUrl: env.GITHUB_SERVER_URL || 'https://github.com',
     get runUrl() {
       return this.runId ? `${this.serverUrl}/${this.owner}/${this.repo}/actions/runs/${this.runId}` : null;
     },
   };
+}
+
+/**
+ * The branch this run is on, or null for a tag or an unknown ref. GITHUB_REF
+ * is the full ref and says whether it is a branch; GITHUB_REF_NAME is the short
+ * name, trusted only when GITHUB_REF_TYPE says it is a branch.
+ */
+function branchOf(env) {
+  if (env.GITHUB_REF) {
+    return env.GITHUB_REF.startsWith('refs/heads/') ? env.GITHUB_REF.slice('refs/heads/'.length) : null;
+  }
+  return env.GITHUB_REF_TYPE === 'branch' && env.GITHUB_REF_NAME ? env.GITHUB_REF_NAME : null;
+}
+
+/**
+ * Where this run's report goes: `{ to: 'pr' }`, `{ to: 'issue' }`, or
+ * `{ to: null, reason }` when it goes only to the job summary. A pull request
+ * gets its comment. Anything else writes the Site health issue only on the
+ * default branch, and when the default branch or the run's branch cannot be
+ * read, it does not write it, because a wrong guess overwrites the default
+ * branch's report.
+ */
+export function destination(ctx) {
+  if (!ctx) return { to: null, reason: 'not in GitHub Actions' };
+  if (ctx.pr) return { to: 'pr' };
+  if (ctx.event?.startsWith('pull_request')) {
+    return { to: null, reason: 'the pull request number is not in the event payload' };
+  }
+  if (!ctx.defaultBranch) {
+    return { to: null, reason: 'the default branch is not in the event payload, so the Site health issue was left alone' };
+  }
+  if (!ctx.branch) {
+    return { to: null, reason: `this run is not on a branch, and the Site health issue is for ${ctx.defaultBranch}` };
+  }
+  if (ctx.branch !== ctx.defaultBranch) {
+    return { to: null, reason: `${ctx.branch} is not the default branch (${ctx.defaultBranch}), and the Site health issue is for ${ctx.defaultBranch}` };
+  }
+  return { to: 'issue' };
 }
 
 async function api(ctx, path, { method = 'GET', body } = {}) {

@@ -74,7 +74,8 @@ report, because it implies oversight that is not happening.
 
 | Trigger | Destination |
 |---|---|
-| Push to `main` | Job summary via `$GITHUB_STEP_SUMMARY`, plus one long-lived **"Site health" issue updated in place**, plus the HTML report as an artifact |
+| Push to the default branch | Job summary via `$GITHUB_STEP_SUMMARY`, plus one long-lived **"Site health" issue updated in place**, plus the HTML report as an artifact |
+| Push to any other branch | Job summary only, with a line saying why the issue was left alone, plus the artifact |
 | Pull request | Annotations on changed lines, one collapsible comment with score and trend, plus the artifact |
 
 The job summary needs no permissions and renders formatted markdown on the run

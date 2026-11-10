@@ -115,8 +115,10 @@ const USAGE = `
   --badge <file>    Write a shields.io endpoint JSON for a README badge.
 
   In CI, check upserts ONE PR comment on a pull request, or ONE persistent
-  "Site health" issue on a push to the default branch. Both are updated in
-  place, never duplicated. Needs issues:write and pull-requests:write.
+  "Site health" issue on a run on the default branch. Both are updated in
+  place, never duplicated. Needs issues:write and pull-requests:write. A run
+  on any other branch, or where the event payload does not name the default
+  branch, reports in the job summary only.
   Publishing never fails the build: a network or permission error is reported
   and the exit code is unaffected.
 
@@ -396,7 +398,8 @@ async function run() {
   // has to compare against the previous run rather than this one.
   let existingIssue = null;
   let sharedHistory = [];
-  const wantsPublish = ghCtx && ghCtx.token && !flags['no-publish'] && cmd === 'check';
+  const dest = gh.destination(ghCtx);
+  const wantsPublish = ghCtx && ghCtx.token && !flags['no-publish'] && cmd === 'check' && dest.to;
   if (wantsPublish) {
     const found = await gh.findHealthIssue(ghCtx);
     if (found.error) console.error(`  note: could not read the Site health issue (${found.error})`);
@@ -417,8 +420,7 @@ async function run() {
   }
 
   if (wantsPublish) {
-    const isPr = Boolean(ghCtx.pr);
-    if (isPr) {
+    if (wantsPublish === 'pr') {
       const r = await gh.upsertPrComment(ghCtx, renderPrComment(payload, { trend, runUrl: ghCtx.runUrl }));
       if (r.error) console.error(`  note: PR comment failed (${r.error})`);
       else if (r.action) note(`  PR comment ${r.action}: ${r.url}`);
@@ -432,6 +434,12 @@ async function run() {
     }
   } else if (ghCtx && !ghCtx.token && cmd === 'check' && !flags['no-publish']) {
     console.error('  note: in CI without GITHUB_TOKEN, so no PR comment or issue was written.');
+  } else if (ghCtx && cmd === 'check' && !flags['no-publish'] && !dest.to) {
+    // Said in the job summary too, because that is now the only report this
+    // run has, and a reader looking for the issue should learn why it is quiet.
+    const why = `No PR comment or Site health issue was written: ${dest.reason}.`;
+    note(`  note: ${why}`);
+    if (wantsSummary) writeFileSync(process.env.GITHUB_STEP_SUMMARY, `\n_${why}_\n`, { flag: 'a' });
   }
 
   // --- is this project on stale standards? ---------------------------------
