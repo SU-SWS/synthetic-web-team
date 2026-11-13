@@ -1,15 +1,15 @@
 # Harvested patterns
 
-Tier 1 of the lookup order in `sws-prior-art`. **Currently empty.**
+Tier 1 of the lookup order in `sws-prior-art`. The entries are at the end, under
+[Entries](#entries).
 
-That is the expected state, not a gap. Entries here are *harvested, never
-authored*: when a role skill solves something and the user confirms it worked,
+It stays short on purpose. Entries here are *harvested, never authored*: when a role skill solves something and the user confirms it worked,
 `sws harvest` offers to append an entry pointing at what was just written. A
 pattern ledger that someone sat down and wrote in advance is a design document,
 and it rots like one. This file grows as a byproduct of use, which is the only
 model that survives a busy team.
 
-So if you are here looking for prior art, skip to tier 2 and keep going:
+So if nothing under Entries fits, go to tier 2 and keep going:
 
 ```
 2. .sws/prior-art.local.yml     the user's own disk, free, private
@@ -51,3 +51,57 @@ decision was made or where the team is heading. Both need a person. See
 An entry going stale is normal and is not a defect to fix on sight. Mark it
 `cautionary` and say what moved, so the next reader learns the delta instead of
 rediscovering it.
+
+## Entries
+
+### Letting a coding agent change a CMS space without losing editors' work
+
+- **era**: decanter-8
+- **from**: [adapt-saa-homesite](https://github.com/SU-SWS/adapt-saa-homesite), ref `dev` once
+  SU-SWS/adapt-saa-homesite#54 merges: `.pipeline/skills/implement/storyblok-changes.md`
+- **confirmed**: 2026-11-10, by Shea McKinney (SAA). Confirmed so far: the backup pulls and their
+  diff, run against the live Storyblok space. The writes themselves haven't run on a ticket yet.
+- **use_for**: an agent that adds bloks, fields, datasource entries or test content in the space
+  editors use, with a way back
+- **do_not_use_for**: a CMS recipe (`scope.md` keeps CMSs out of this package), or editorial
+  content, which stays with editors
+
+- Each write is one of three kinds:
+  - **Add:** a new blok, an entry, or a test story.
+  - **Change:** a field on an existing blok.
+  - **Destructive:** deleting, renaming or retyping a field, publishing, or editing an editor's story.
+
+  Approving the plan approves adds and changes. Each destructive write asks a person again, and only the main session makes it, never a subagent.
+- Before touching anything that exists, the CMS's own CLI takes the backup
+  (`storyblok components|datasources|stories pull --path <folder>`). Storyblok keeps no history of
+  components or datasources, so the backup is the only way back for them. A restore pushes the
+  folder back once a person says yes.
+- The Management API's component and story updates replace the whole schema or content. Get it
+  first, merge, and send all of it. Diffing a fresh pull against the backup shows exactly what a
+  write changed, since two pulls in a row are identical.
+- Test content stays a draft in one folder per ticket. Environments other than production read
+  drafts, so tests and deploy previews see it and visitors never do.
+- Cost: a schema change is live for every editor before the pull request merges, so the pull
+  request lists every write. Restoring a story backed up with unpublished changes publishes them,
+  unless its file is set to `"published": false` first.
+
+### One CMS credential for an agent's MCP server and CLI, checked before work starts
+
+- **era**: decanter-8
+- **from**: [adapt-saa-homesite](https://github.com/SU-SWS/adapt-saa-homesite), ref `dev` once
+  SU-SWS/adapt-saa-homesite#54 merges: `.pipeline/scripts/storyblok.mjs`,
+  `.pipeline/scripts/storyblok-mcp-headers.mjs`
+- **confirmed**: 2026-11-10, by Shea McKinney (SAA), against the live space with an expired token
+  and then a valid one
+- **use_for**: an agent that needs the Storyblok CLI and MCP in the same session
+- **do_not_use_for**: CI credentials, which come from the host's secrets, not a developer's `.env`
+
+- `storyblok login` is interactive, so an agent can't complete it. The CLI also signs in from
+  `STORYBLOK_LOGIN`, `STORYBLOK_TOKEN` and `STORYBLOK_REGION`, so a small wrapper sets them from the
+  same personal access token the MCP server uses.
+- Claude Code removes credential-like variables from an MCP `headersHelper`'s environment, so the
+  helper reads the token from `.env` on disk.
+- `storyblok user` is the check: it exits 1 when the token is refused. The pipeline runs it
+  before planning and asks the person, rather than failing partway through.
+- Cost: a `STORYBLOK_TOKEN` in the shell outranks `.env`, and a changed shell variable reaches a
+  session only after a restart.
